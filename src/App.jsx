@@ -36,11 +36,13 @@ function buildPath(db, targetId) {
 }
 
 // ─── FolderTree (defined outside App to avoid remount on each render) ─────────
+// Renders from card data, not from db keys — so folders appear immediately on creation.
 function FolderTree({ db, currentId, onNavigate, id, depth }) {
   depth = depth ?? 0
   const canvas = db[id]
   if (!canvas) return null
   const isActive = id === currentId
+  // Read folder cards directly from canvas data
   const subFolders = canvas.cards.filter(c => c.isFolder)
   return (
     <>
@@ -60,18 +62,19 @@ function FolderTree({ db, currentId, onNavigate, id, depth }) {
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{canvas.name}</span>
       </div>
       {subFolders.map(f => (
-        <FolderTree key={f.id} db={db} currentId={currentId} onNavigate={onNavigate} id={f.id} depth={depth + 1} />
+        // Always render the row; recurse into children only if canvas entry exists
+        <FolderTree key={f.id} db={{ ...db, [f.id]: db[f.id] || { id: f.id, name: f.title, cards: [], connections: [] } }} currentId={currentId} onNavigate={onNavigate} id={f.id} depth={depth + 1} />
       ))}
     </>
   )
 }
 
 // ─── PostIt ──────────────────────────────────────────────────────────────────
-function PostIt({ card, selected, onMouseDown, onDblClick, onRename, onNoteOpen, onToggleFolder, onConnectDot }) {
+function PostIt({ card, selected, onMouseDown, onDblClick, onRename, onNoteOpen, onToggleFolder, onConnectDot, initialEditing, onEditStarted }) {
   const titleRef = useRef(null)
 
   function startEdit(e) {
-    e.stopPropagation()
+    if (e) e.stopPropagation()
     const el = titleRef.current
     el.contentEditable = 'true'
     el.focus()
@@ -81,6 +84,13 @@ function PostIt({ card, selected, onMouseDown, onDblClick, onRename, onNoteOpen,
     sel.removeAllRanges()
     sel.addRange(range)
   }
+
+  useEffect(() => {
+    if (initialEditing) {
+      startEdit(null)
+      onEditStarted()
+    }
+  }, [])
 
   function commitEdit() {
     const el = titleRef.current
@@ -111,6 +121,14 @@ function PostIt({ card, selected, onMouseDown, onDblClick, onRename, onNoteOpen,
         {card.title}
       </div>
 
+      {card.body ? (
+        <div style={{
+          fontSize: 10, color: 'rgba(65,36,2,0.6)', lineHeight: 1.4, marginTop: 4,
+          overflow: 'hidden', display: '-webkit-box',
+          WebkitLineClamp: 3, WebkitBoxOrient: 'vertical',
+        }}>{card.body}</div>
+      ) : null}
+
       <div className="postit-actions">
         <button
           className="paction"
@@ -139,7 +157,9 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [activeNoteId, setActiveNoteId] = useState(null)
   const [noteForm, setNoteForm] = useState({ title: '', body: '' })
+  const [notePanelMode, setNotePanelMode] = useState('side') // 'side' | 'full'
   const [selected, setSelected] = useState(null)
+  const [editingCardId, setEditingCardId] = useState(null)
   const [listSort, setListSort] = useState('az')     // 'az' | 'za' | 'date'
   const [offset, setOffset] = useState({ x: 0, y: 0 })
   const [scale, setScale] = useState(1)
@@ -344,6 +364,7 @@ export default function App() {
     const wy = (e.clientY - r.top  - offset.y) / scale
     const id = createCard(wx, wy)
     setSelected(id)
+    setEditingCardId(id)
   }
 
   function onCardMouseDown(e, card) {
@@ -578,11 +599,22 @@ export default function App() {
                     card={card}
                     selected={selected === card.id}
                     onMouseDown={e => onCardMouseDown(e, card)}
-                    onDblClick={e => { e.stopPropagation(); if (card.isFolder) enterCanvas(card.id, card.title) }}
+                    onDblClick={e => { e.stopPropagation(); if (card.isFolder) enterCanvas(card.id, card.title); else openNote(card) }}
                     onRename={title => updateCardFn(card.id, { title })}
                     onNoteOpen={() => openNote(card)}
-                    onToggleFolder={() => updateCardFn(card.id, { isFolder: !card.isFolder })}
+                    onToggleFolder={() => {
+                      const becomingFolder = !card.isFolder
+                      updateCardFn(card.id, { isFolder: becomingFolder })
+                      if (becomingFolder) {
+                        setDb(prev => prev[card.id] ? prev : {
+                          ...prev,
+                          [card.id]: { id: card.id, name: card.title, cards: [], connections: [] },
+                        })
+                      }
+                    }}
                     onConnectDot={e => onConnectDotMouseDown(e, card)}
+                    initialEditing={editingCardId === card.id}
+                    onEditStarted={() => setEditingCardId(null)}
                   />
                 ))}
               </div>
@@ -624,39 +656,77 @@ export default function App() {
 
           {/* ── Note panel ───────────────────────────────────────────────── */}
           {activeNoteId && (
-            <div style={{
-              width: 260, flexShrink: 0, background: '#fff',
-              borderLeft: '1px solid #e5e7eb', padding: 14,
-              display: 'flex', flexDirection: 'column', gap: 8,
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: '#bbb', letterSpacing: 1, textTransform: 'uppercase' }}>Note</span>
-                <button style={iconBtn} onClick={() => setActiveNoteId(null)}>×</button>
-              </div>
-              <input
-                value={noteForm.title}
-                onChange={e => setNoteForm(f => ({ ...f, title: e.target.value }))}
-                placeholder="Titolo"
-                style={{ border: '1px solid #e5e7eb', borderRadius: 4, padding: '6px 8px', fontSize: 13, fontFamily: 'inherit', outline: 'none' }}
-              />
-              <textarea
-                value={noteForm.body}
-                onChange={e => setNoteForm(f => ({ ...f, body: e.target.value }))}
-                placeholder="Note (markdown supportato)"
-                style={{
-                  border: '1px solid #e5e7eb', borderRadius: 4, padding: '6px 8px',
-                  fontSize: 13, fontFamily: 'inherit', lineHeight: 1.6,
-                  resize: 'vertical', minHeight: 220, outline: 'none', flex: 1,
-                }}
-              />
-              <button
-                onClick={saveNote}
-                style={{ background: '#378ADD', color: '#fff', border: 'none', borderRadius: 4, padding: '8px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}
-              >Salva</button>
-            </div>
+            <NotePanel
+              mode={notePanelMode}
+              noteForm={noteForm}
+              onChangeForm={setNoteForm}
+              onSave={saveNote}
+              onClose={() => setActiveNoteId(null)}
+              onToggleMode={() => setNotePanelMode(m => m === 'side' ? 'full' : 'side')}
+            />
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+// ─── NotePanel ────────────────────────────────────────────────────────────────
+function NotePanel({ mode, noteForm, onChangeForm, onSave, onClose, onToggleMode }) {
+  const isFull = mode === 'full'
+  const [titleFocused, setTitleFocused] = useState(false)
+
+  const panelStyle = isFull
+    ? { flex: 1, display: 'flex', flexDirection: 'column', background: '#fff', overflow: 'hidden' }
+    : { width: 380, flexShrink: 0, display: 'flex', flexDirection: 'column', background: '#fff', borderLeft: '1px solid #e5e7eb', overflow: 'hidden' }
+
+  return (
+    <div style={panelStyle}>
+      {/* Header */}
+      <div style={{ height: 44, display: 'flex', alignItems: 'center', padding: '0 16px', gap: 8, borderBottom: '1px solid #f0f0f0', flexShrink: 0 }}>
+        <span style={{ fontSize: 10, fontWeight: 700, color: '#bbb', letterSpacing: 1, textTransform: 'uppercase' }}>Note</span>
+        <div style={{ flex: 1 }} />
+        <button style={iconBtn} title={isFull ? 'Vista affiancata' : 'Vista intera'} onClick={onToggleMode}>
+          {isFull ? '⤡' : '⤢'}
+        </button>
+        <button style={iconBtn} title="Chiudi" onClick={onClose}>×</button>
+      </div>
+
+      {/* Scrollable content */}
+      <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+        <div style={isFull ? { maxWidth: 800, width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', flex: 1 } : { display: 'flex', flexDirection: 'column', flex: 1 }}>
+          <input
+            value={noteForm.title}
+            onChange={e => onChangeForm(f => ({ ...f, title: e.target.value }))}
+            placeholder="Titolo"
+            onFocus={() => setTitleFocused(true)}
+            onBlur={() => setTitleFocused(false)}
+            style={{
+              width: '100%', border: 'none', outline: 'none',
+              borderBottom: `2px solid ${titleFocused ? '#378ADD' : '#f0f0f0'}`,
+              padding: '12px 20px', fontSize: 16, fontWeight: 600, color: '#111',
+              fontFamily: 'inherit', background: 'transparent',
+            }}
+          />
+          <textarea
+            value={noteForm.body}
+            onChange={e => onChangeForm(f => ({ ...f, body: e.target.value }))}
+            placeholder="Note (markdown supportato)"
+            style={{
+              flex: 1, width: '100%', border: 'none', outline: 'none', resize: 'none',
+              padding: '16px 20px', fontSize: 14, lineHeight: 1.8, color: '#333',
+              fontFamily: 'inherit', background: 'transparent',
+              minHeight: isFull ? '60vh' : 0,
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Save button flush at bottom */}
+      <button
+        onClick={onSave}
+        style={{ height: 44, width: '100%', background: '#111', color: '#fff', border: 'none', borderRadius: 0, cursor: 'pointer', fontSize: 13, fontWeight: 600, flexShrink: 0 }}
+      >Salva</button>
     </div>
   )
 }
