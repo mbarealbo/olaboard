@@ -60,10 +60,33 @@ function makeEdge(conn, onLabelChange) {
   }
 }
 
+function ToolbarBtn({ active, onClick, title, color, children }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-sm transition-colors"
+      style={{
+        background: active ? color : 'transparent',
+        border: active ? `2px solid ${color}` : '2px solid transparent',
+        fontWeight: active ? 600 : 400,
+        color: '#374151',
+        cursor: 'pointer',
+      }}
+      onMouseEnter={e => { if (!active) e.currentTarget.style.background = '#f3f4f6' }}
+      onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}
+    >
+      <span style={{ width: 10, height: 10, borderRadius: 2, background: color, display: 'inline-block', flexShrink: 0 }} />
+      {children}
+    </button>
+  )
+}
+
 function Inner({ canvasId, userId, canvases, onEnterFolder, onNoteOpen, onCanvasCreated, onSyncCard }) {
   const [nodes, setNodes, onNodesChange] = useNodesState([])
   const [edges, setEdges, onEdgesChange] = useEdgesState([])
   const [loading, setLoading] = useState(true)
+  const [pendingNodeType, setPendingNodeType] = useState(null)
   const { screenToFlowPosition } = useReactFlow()
 
   const handlersRef = useRef(null)
@@ -79,36 +102,40 @@ function Inner({ canvasId, userId, canvases, onEnterFolder, onNoteOpen, onCanvas
   }, [onNoteOpen])
 
   const onConvertToFolder = useCallback(async (card) => {
-    const canvas = await createCanvas({ name: card.title || 'Cartella', parent_id: canvasId, user_id: userId })
+    const h = handlersRef.current
+    const currentTitle = nodes.find(n => n.id === String(card.id))?.data?.title || card.title
+    const canvas = await createCanvas({ name: currentTitle || 'Cartella', parent_id: canvasId, user_id: userId })
     await updateCard(card.id, { is_folder: true, node_type: 'folder' })
     onCanvasCreated(canvas)
-    onSyncCard('update', { ...card, is_folder: true, node_type: 'folder' })
-    const h = handlersRef.current
+    const updated = { ...card, title: currentTitle, is_folder: true, node_type: 'folder' }
+    onSyncCard('update', updated)
     setNodes(prev => prev.map(n =>
       n.id === String(card.id)
-        ? makeNode({ ...card, is_folder: true, node_type: 'folder' }, { ...h, onEnterFolder: () => onEnterFolder(canvas.id) })
+        ? makeNode({ ...updated, x: n.position.x, y: n.position.y }, { ...h, onEnterFolder: () => onEnterFolder(canvas.id) })
         : n
     ))
-  }, [canvasId, userId, onCanvasCreated, onSyncCard, onEnterFolder])
+  }, [canvasId, userId, onCanvasCreated, onSyncCard, onEnterFolder, nodes])
 
   const onConvertToPostIt = useCallback(async (card) => {
-    await updateCard(card.id, { is_folder: false, node_type: 'postit' })
-    onSyncCard('update', { ...card, is_folder: false, node_type: 'postit' })
     const h = handlersRef.current
+    await updateCard(card.id, { is_folder: false, node_type: 'postit' })
+    const updated = { ...card, is_folder: false, node_type: 'postit' }
+    onSyncCard('update', updated)
     setNodes(prev => prev.map(n =>
       n.id === String(card.id)
-        ? makeNode({ ...card, is_folder: false, node_type: 'postit' }, h)
+        ? makeNode({ ...updated, title: n.data.title, x: n.position.x, y: n.position.y }, h)
         : n
     ))
   }, [onSyncCard])
 
   const onConvertToText = useCallback(async (card) => {
-    await updateCard(card.id, { is_folder: false, node_type: 'text' })
-    onSyncCard('update', { ...card, is_folder: false, node_type: 'text' })
     const h = handlersRef.current
+    await updateCard(card.id, { is_folder: false, node_type: 'text' })
+    const updated = { ...card, is_folder: false, node_type: 'text' }
+    onSyncCard('update', updated)
     setNodes(prev => prev.map(n =>
       n.id === String(card.id)
-        ? makeNode({ ...card, is_folder: false, node_type: 'text' }, h)
+        ? makeNode({ ...updated, title: n.data.title, x: n.position.x, y: n.position.y }, h)
         : n
     ))
   }, [onSyncCard])
@@ -154,24 +181,42 @@ function Inner({ canvasId, userId, canvases, onEnterFolder, onNoteOpen, onCanvas
     setEdges(prev => addEdge(makeEdge(conn, onLabelChange), prev))
   }, [canvasId, onLabelChange])
 
+  const addNodeAtPosition = useCallback(async (e, nodeType) => {
+    const pos = screenToFlowPosition({ x: e.clientX, y: e.clientY })
+    const defaults = {
+      postit: { title: 'Nuova idea', is_folder: false },
+      text: { title: 'Testo', is_folder: false },
+      folder: { title: 'Cartella', is_folder: true },
+    }
+    const d = defaults[nodeType] || defaults.postit
+    const card = await createCard({
+      canvas_id: canvasId,
+      title: d.title,
+      body: '',
+      x: pos.x - 90,
+      y: pos.y - 50,
+      is_folder: d.is_folder,
+      node_type: nodeType,
+    })
+    onSyncCard('add', card)
+    setNodes(prev => [...prev, makeNode(card, handlersRef.current)])
+    return card
+  }, [canvasId, screenToFlowPosition, onSyncCard])
+
+  const onPaneClick = useCallback(async (e) => {
+    if (!pendingNodeType) return
+    await addNodeAtPosition(e, pendingNodeType)
+    setPendingNodeType(null)
+  }, [pendingNodeType, addNodeAtPosition])
+
   const onDoubleClick = useCallback(async (e) => {
     if (e.target.closest('.react-flow__node')) return
     if (e.target.closest('.react-flow__controls')) return
     if (e.target.closest('.react-flow__minimap')) return
+    if (e.target.closest('.board-toolbar')) return
 
-    const pos = screenToFlowPosition({ x: e.clientX, y: e.clientY })
-    const card = await createCard({
-      canvas_id: canvasId,
-      title: 'Nuova idea',
-      body: '',
-      x: pos.x - 90,
-      y: pos.y - 50,
-      is_folder: false,
-      node_type: 'postit',
-    })
-    onSyncCard('add', card)
-    setNodes(prev => [...prev, makeNode(card, handlersRef.current)])
-  }, [canvasId, screenToFlowPosition, onSyncCard])
+    await addNodeAtPosition(e, 'postit')
+  }, [addNodeAtPosition])
 
   const onNodeDragStop = useCallback(async (_e, node) => {
     await updateCard(node.id, { x: node.position.x, y: node.position.y })
@@ -189,6 +234,10 @@ function Inner({ canvasId, userId, canvases, onEnterFolder, onNoteOpen, onCanvas
   }, [])
 
   const onKeyDown = useCallback((e) => {
+    if (e.key === 'Escape') {
+      setPendingNodeType(null)
+      return
+    }
     if (e.key !== 'Delete' && e.key !== 'Backspace') return
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
     e.preventDefault()
@@ -213,7 +262,7 @@ function Inner({ canvasId, userId, canvases, onEnterFolder, onNoteOpen, onCanvas
 
   return (
     <div
-      className="flex-1"
+      className="flex-1 relative"
       style={{ height: '100%' }}
       onDoubleClick={onDoubleClick}
       onKeyDown={onKeyDown}
@@ -228,6 +277,7 @@ function Inner({ canvasId, userId, canvases, onEnterFolder, onNoteOpen, onCanvas
         onNodeDragStop={onNodeDragStop}
         onNodesDelete={onNodesDelete}
         onEdgesDelete={onEdgesDelete}
+        onPaneClick={onPaneClick}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         fitView
@@ -235,6 +285,7 @@ function Inner({ canvasId, userId, canvases, onEnterFolder, onNoteOpen, onCanvas
         zoomOnDoubleClick={false}
         minZoom={0.1}
         maxZoom={3}
+        panOnDrag={!pendingNodeType}
       >
         <Background color="#d1d5db" gap={24} size={1} />
         <Controls />
@@ -243,6 +294,40 @@ function Inner({ canvasId, userId, canvases, onEnterFolder, onNoteOpen, onCanvas
           style={{ bottom: 16, right: 16 }}
         />
       </ReactFlow>
+
+      <div
+        className="board-toolbar absolute flex items-center gap-1 bg-white rounded-lg shadow-md border border-gray-200 px-2 py-1.5"
+        style={{ top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 20 }}
+      >
+        <ToolbarBtn
+          active={pendingNodeType === 'postit'}
+          onClick={() => setPendingNodeType(p => p === 'postit' ? null : 'postit')}
+          title="Post-it (doppio click ovunque)"
+          color="#FAC775"
+        >
+          <span style={{ fontSize: 13 }}>Post-it</span>
+        </ToolbarBtn>
+        <ToolbarBtn
+          active={pendingNodeType === 'text'}
+          onClick={() => setPendingNodeType(p => p === 'text' ? null : 'text')}
+          title="Testo libero"
+          color="#e5e7eb"
+        >
+          <span style={{ fontSize: 13, fontWeight: 600 }}>T</span>
+        </ToolbarBtn>
+        <ToolbarBtn
+          active={pendingNodeType === 'folder'}
+          onClick={() => setPendingNodeType(p => p === 'folder' ? null : 'folder')}
+          title="Cartella"
+          color="#EF9F27"
+        >
+          <span style={{ fontSize: 13 }}>Cartella</span>
+        </ToolbarBtn>
+
+        {pendingNodeType && (
+          <span className="text-xs text-gray-400 ml-2">Clicca sulla lavagna per posizionare</span>
+        )}
+      </div>
     </div>
   )
 }
