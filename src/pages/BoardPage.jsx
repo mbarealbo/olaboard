@@ -5,7 +5,7 @@ import BoardCanvas from '../components/BoardCanvas'
 import NotePanel from '../components/NotePanel'
 import ListView from '../components/ListView'
 import {
-  fetchCanvases, createCanvas,
+  fetchCanvases, createCanvas, updateCanvas,
   fetchCards, createCard, updateCard,
   fetchConnections,
 } from '../lib/db'
@@ -30,11 +30,12 @@ function exportMd(canvasName, cards, connections) {
 export default function BoardPage({ user, isDemo }) {
   const [canvases, setCanvases] = useState([])
   const [currentCanvasId, setCurrentCanvasId] = useState(null)
-  // cards è la source of truth per la lista e il pannello note
   const [cards, setCards] = useState([])
   const [activeNote, setActiveNote] = useState(null)
   const [view, setView] = useState('canvas')
   const [loading, setLoading] = useState(true)
+  const [editingCanvasName, setEditingCanvasName] = useState(false)
+  const [canvasNameDraft, setCanvasNameDraft] = useState('')
 
   // Carica tutti i canvas e crea quello di default se mancante
   useEffect(() => {
@@ -81,6 +82,26 @@ export default function BoardPage({ user, isDemo }) {
   function handleGoUp() {
     const current = canvases.find(c => c.id === currentCanvasId)
     if (current?.parent_id) navigate(current.parent_id)
+  }
+
+  function startEditingCanvasName() {
+    const current = canvases.find(c => c.id === currentCanvasId)
+    if (!current) return
+    setCanvasNameDraft(current.name)
+    setEditingCanvasName(true)
+  }
+
+  async function commitCanvasName() {
+    setEditingCanvasName(false)
+    const trimmed = canvasNameDraft.trim()
+    if (!trimmed || trimmed === canvases.find(c => c.id === currentCanvasId)?.name) return
+    const updated = await updateCanvas(currentCanvasId, { name: trimmed })
+    setCanvases(prev => prev.map(c => c.id === currentCanvasId ? { ...c, name: updated.name } : c))
+  }
+
+  function handleCanvasNameKeyDown(e) {
+    if (e.key === 'Enter') e.target.blur()
+    if (e.key === 'Escape') { setEditingCanvasName(false) }
   }
 
   // Chiamato da BoardCanvas ogni volta che aggiunge/modifica/rimuove una card
@@ -160,9 +181,24 @@ export default function BoardPage({ user, isDemo }) {
 
           <Breadcrumb canvases={canvases} currentCanvasId={currentCanvasId} onNavigate={navigate} />
 
-          {/* Mostra nome canvas se non c'è breadcrumb */}
           {!hasParent && (
-            <span className="text-sm font-semibold text-gray-800">{currentCanvas?.name}</span>
+            editingCanvasName ? (
+              <input
+                autoFocus
+                value={canvasNameDraft}
+                onChange={e => setCanvasNameDraft(e.target.value)}
+                onBlur={commitCanvasName}
+                onKeyDown={handleCanvasNameKeyDown}
+                className="text-sm font-semibold text-gray-800 bg-transparent border-b border-blue-400 outline-none px-0"
+                style={{ minWidth: 80, maxWidth: 260 }}
+              />
+            ) : (
+              <span
+                className="text-sm font-semibold text-gray-800 cursor-text hover:text-blue-600 transition-colors"
+                onDoubleClick={startEditingCanvasName}
+                title="Doppio clic per rinominare"
+              >{currentCanvas?.name}</span>
+            )
           )}
 
           <div className="flex-1" />
