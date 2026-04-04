@@ -46,6 +46,7 @@ export default function App() {
   const [noteForm, setNoteForm] = useState({ title: '', body: '' })
   const [notePanelMode, setNotePanelMode] = useState('side')
   const [listSort, setListSort] = useState('az')
+  const [selectedConn, setSelectedConn] = useState(null)
 
   const currentIdRef = useRef('root')
 
@@ -134,6 +135,24 @@ export default function App() {
     setStack(buildPath(db, targetId))
     setSelected(null); setActiveNoteId(null)
   }, [db])
+
+  // ── connection delete ─────────────────────────────────────────────────────
+  useEffect(() => {
+    function onKey(e) {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedConn) {
+        setDb(prev => {
+          const cId = currentIdRef.current
+          const canvas = prev[cId]
+          if (!canvas) return prev
+          return { ...prev, [cId]: { ...canvas, connections: canvas.connections.filter(c => c.id !== selectedConn) } }
+        })
+        setSelectedConn(null)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [selectedConn])
 
   // ── connection label ──────────────────────────────────────────────────────
   function updateConnLabel(connId) {
@@ -266,7 +285,7 @@ export default function App() {
             <div
               ref={boardRef}
               style={{ flex: 1, position: 'relative', overflow: 'hidden', background: '#f0f0f0', cursor: boardCursor, userSelect: 'none' }}
-              onMouseDown={onBoardMouseDown}
+              onMouseDown={e => { setSelectedConn(null); onBoardMouseDown(e) }}
               onDoubleClick={onBoardDblClick}
             >
               {/* SVG overlay – arrows in screen-space */}
@@ -275,8 +294,12 @@ export default function App() {
                   <marker id="ah" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
                     <polygon points="0 0, 10 3.5, 0 7" fill="#378ADD" />
                   </marker>
+                  <marker id="ah-sel" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                    <polygon points="0 0, 10 3.5, 0 7" fill="#e53935" />
+                  </marker>
                 </defs>
                 {connections.map(conn => {
+                  const isSel = selectedConn === conn.id
                   const allLabels = [...labels, ...cards.filter(c => c.isLabel).map(c => ({ id: c.id, x: c.x, y: c.y }))]
                   function resolveEntity(id) {
                     const card = cards.find(c => c.id === id && !c.isLabel)
@@ -311,12 +334,16 @@ export default function App() {
                   const cp1x = x1 + fdx * OFF, cp1y = y1 + fdy * OFF
                   const cp2x = x2 + tdx * OFF, cp2y = y2 + tdy * OFF
                   const mx = (x1 + x2) / 2, my = (y1 + y2) / 2
+                  const d = `M${x1},${y1} C${cp1x},${cp1y} ${cp2x},${cp2y} ${x2},${y2}`
+                  const stroke = isSel ? '#e53935' : '#378ADD'
+                  const markerEnd = isSel ? 'url(#ah-sel)' : 'url(#ah)'
                   return (
-                    <g key={conn.id} style={{ pointerEvents: 'all' }}>
-                      <path d={`M${x1},${y1} C${cp1x},${cp1y} ${cp2x},${cp2y} ${x2},${y2}`} fill="none" stroke="#378ADD" strokeWidth={2} markerEnd="url(#ah)" />
-                      <circle cx={mx} cy={my} r={7} fill={conn.label ? '#378ADD' : 'rgba(55,138,221,0.18)'} stroke="none" style={{ cursor: 'pointer' }} onClick={() => updateConnLabel(conn.id)} />
+                    <g key={conn.id} style={{ pointerEvents: 'all' }} onClick={e => { e.stopPropagation(); setSelectedConn(isSel ? null : conn.id) }}>
+                      <path d={d} fill="none" stroke="transparent" strokeWidth={12} style={{ cursor: 'pointer' }} />
+                      <path d={d} fill="none" stroke={stroke} strokeWidth={isSel ? 3 : 2} markerEnd={markerEnd} style={{ pointerEvents: 'none' }} />
+                      <circle cx={mx} cy={my} r={7} fill={conn.label ? stroke : (isSel ? 'rgba(229,57,53,0.18)' : 'rgba(55,138,221,0.18)')} stroke="none" style={{ cursor: 'pointer' }} onClick={e => { e.stopPropagation(); updateConnLabel(conn.id) }} />
                       {conn.label && (
-                        <text x={mx} y={my - 10} textAnchor="middle" fontSize={11} fill="#378ADD" style={{ pointerEvents: 'none' }}>{conn.label}</text>
+                        <text x={mx} y={my - 10} textAnchor="middle" fontSize={11} fill={stroke} style={{ pointerEvents: 'none' }}>{conn.label}</text>
                       )}
                     </g>
                   )
