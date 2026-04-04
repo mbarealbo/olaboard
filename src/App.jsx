@@ -277,13 +277,31 @@ export default function App() {
                   </marker>
                 </defs>
                 {connections.map(conn => {
-                  const fc = cards.find(c => c.id === conn.from)
-                  const tc = cards.find(c => c.id === conn.to)
-                  if (!fc || !tc) return null
+                  const allLabels = [...labels, ...cards.filter(c => c.isLabel).map(c => ({ id: c.id, x: c.x, y: c.y }))]
+                  function resolveEntity(id) {
+                    const card = cards.find(c => c.id === id && !c.isLabel)
+                    if (card) return { entity: card, isLabel: false }
+                    const lbl = allLabels.find(l => l.id === id)
+                    if (lbl) return { entity: lbl, isLabel: true }
+                    return null
+                  }
+                  function labelAnchorPoint(lbl, anchor) {
+                    const LW = 100, LH = 30
+                    switch (anchor) {
+                      case 'top':    return [lbl.x + LW / 2, lbl.y]
+                      case 'bottom': return [lbl.x + LW / 2, lbl.y + LH]
+                      case 'left':   return [lbl.x,          lbl.y + LH / 2]
+                      case 'right':
+                      default:       return [lbl.x + LW,     lbl.y + LH / 2]
+                    }
+                  }
+                  const fromRes = resolveEntity(conn.from)
+                  const toRes   = resolveEntity(conn.to)
+                  if (!fromRes || !toRes) return null
                   const fa = conn.fromAnchor || 'right'
                   const ta = conn.toAnchor   || 'left'
-                  const [fpx, fpy] = anchorPoint(fc, fa)
-                  const [tpx, tpy] = anchorPoint(tc, ta)
+                  const [fpx, fpy] = fromRes.isLabel ? labelAnchorPoint(fromRes.entity, fa) : anchorPoint(fromRes.entity, fa)
+                  const [tpx, tpy] = toRes.isLabel   ? labelAnchorPoint(toRes.entity, ta)   : anchorPoint(toRes.entity, ta)
                   const [x1, y1] = w2s(fpx, fpy)
                   const [x2, y2] = w2s(tpx, tpy)
                   const OFF = 60 * scaleRef.current
@@ -366,19 +384,21 @@ export default function App() {
                       if (!canvas) return prev
                       return { ...prev, [cId]: { ...canvas, labels: (canvas.labels||[]).filter(l => l.id !== label.id) } }
                     })}
+                    onConnectDot={(e, anchor) => onConnectDotMouseDown(e, label, anchor)}
                   />
                 ))}
 
                 {/* Cards – on top */}
                 {cards.map(card => {
                   if (card.isLabel) {
+                    const labelObj = { id: card.id, x: card.x, y: card.y, text: card.title || '', fontSize: 16 }
                     return (
                       <CanvasLabel
                         key={card.id}
-                        label={{ id: card.id, x: card.x, y: card.y, text: card.title || '', fontSize: 16 }}
+                        label={labelObj}
                         selected={selectedLabel === card.id}
                         editing={editingLabelId === card.id}
-                        onMouseDown={e => onLabelMouseDown(e, { id: card.id, x: card.x, y: card.y })}
+                        onMouseDown={e => onLabelMouseDown(e, labelObj)}
                         onStartEdit={() => setEditingLabelId(card.id)}
                         onEndEdit={() => setEditingLabelId(null)}
                         onTextChange={text => updateCardFn(card.id, { title: text })}
@@ -388,6 +408,7 @@ export default function App() {
                           if (!canvas) return prev
                           return { ...prev, [cId]: { ...canvas, cards: canvas.cards.filter(c => c.id !== card.id) } }
                         })}
+                        onConnectDot={(e, anchor) => onConnectDotMouseDown(e, labelObj, anchor)}
                       />
                     )
                   }

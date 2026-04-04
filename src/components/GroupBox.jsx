@@ -54,7 +54,7 @@ export function Group({ group, onTitleBarMouseDown, onResizeHandleMouseDown, onD
   )
 }
 
-export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit, onEndEdit, onTextChange, onDelete }) {
+export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit, onEndEdit, onTextChange, onDelete, onConnectDot }) {
   const elRef = useRef(null)
   const [hovered, setHovered] = useState(false)
 
@@ -77,13 +77,14 @@ export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit
 
   return (
     <div
+      data-card-id={label.id}
       style={{
         position: 'absolute', left: label.x, top: label.y,
-        padding: '2px 4px', cursor: 'move', zIndex: 1,
+        padding: '2px 4px', cursor: editing ? 'text' : 'move', zIndex: 1,
         border: selected || hovered ? '1px dashed #ccc' : '1px dashed transparent',
         borderRadius: 2, userSelect: 'none',
       }}
-      onMouseDown={e => { e.stopPropagation(); onMouseDown(e) }}
+      onMouseDown={e => { if (editing) return; e.stopPropagation(); onMouseDown(e) }}
       onDoubleClick={e => { e.stopPropagation(); onStartEdit() }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -111,6 +112,14 @@ export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit
           if (e.key === 'Escape') elRef.current.blur()
         }}
       />
+      {onConnectDot && (
+        <>
+          <div className="connect-dot connect-dot-top"    onMouseDown={e => onConnectDot(e, 'top')} />
+          <div className="connect-dot connect-dot-right"  onMouseDown={e => onConnectDot(e, 'right')} />
+          <div className="connect-dot connect-dot-bottom" onMouseDown={e => onConnectDot(e, 'bottom')} />
+          <div className="connect-dot connect-dot-left"   onMouseDown={e => onConnectDot(e, 'left')} />
+        </>
+      )}
     </div>
   )
 }
