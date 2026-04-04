@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Handle, Position } from '@xyflow/react'
 
-export default function PostItNode({ data, selected }) {
+export default function TextNode({ data, selected }) {
   const [editing, setEditing] = useState(false)
   const [title, setTitle] = useState(data.title)
   const [showActions, setShowActions] = useState(false)
@@ -26,7 +26,7 @@ export default function PostItNode({ data, selected }) {
   const handleBlur = useCallback(() => {
     setEditing(false)
     if (title.trim() !== data.title) {
-      data.onRename?.(title.trim() || 'Senza titolo')
+      data.onRename?.(title.trim() || 'Testo')
     }
   }, [title, data])
 
@@ -44,30 +44,15 @@ export default function PostItNode({ data, selected }) {
       onMouseLeave={() => setShowActions(false)}
     >
       <div
-        className="rounded-sm shadow-md select-none"
         style={{
-          width: 180,
-          minHeight: 100,
-          background: '#FAC775',
-          border: selected ? '2px solid #378ADD' : '2px solid transparent',
-          padding: '28px 12px 12px',
-          position: 'relative',
+          minWidth: 120,
+          maxWidth: 260,
+          border: selected ? '1px dashed #378ADD' : '1px dashed transparent',
+          borderRadius: 4,
+          padding: '6px 10px',
+          background: 'transparent',
         }}
       >
-        {/* Tape effect */}
-        <div
-          style={{
-            position: 'absolute',
-            top: -6,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: 48,
-            height: 14,
-            background: 'rgba(255,255,255,0.6)',
-            borderRadius: 2,
-          }}
-        />
-
         {editing ? (
           <input
             ref={inputRef}
@@ -75,26 +60,19 @@ export default function PostItNode({ data, selected }) {
             onChange={e => setTitle(e.target.value)}
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}
-            className="w-full bg-transparent border-none outline-none text-sm font-semibold text-gray-800 resize-none"
-            style={{ fontFamily: 'inherit' }}
+            className="bg-transparent border-none outline-none text-sm text-gray-800 w-full"
+            style={{ fontFamily: 'inherit', minWidth: 80 }}
           />
         ) : (
           <p
-            className="text-sm font-semibold text-gray-800 break-words leading-snug cursor-text"
+            className="text-sm text-gray-800 break-words leading-snug cursor-text select-none"
             onDoubleClick={handleDoubleClick}
           >
-            {title || 'Senza titolo'}
-          </p>
-        )}
-
-        {data.body && (
-          <p className="text-xs text-gray-600 mt-2 line-clamp-3 leading-snug">
-            {data.body}
+            {title || 'Testo libero'}
           </p>
         )}
       </div>
 
-      {/* Action buttons */}
       {showActions && !editing && (
         <div
           className="absolute flex gap-1"
@@ -102,17 +80,17 @@ export default function PostItNode({ data, selected }) {
         >
           <button
             className="bg-white rounded-md shadow px-2 py-1 text-xs hover:bg-gray-50 border border-gray-200"
+            title="Converti in post-it"
+            onMouseDown={e => { e.stopPropagation(); data.onConvertToPostIt?.() }}
+          >
+            🗒 post-it
+          </button>
+          <button
+            className="bg-white rounded-md shadow px-2 py-1 text-xs hover:bg-gray-50 border border-gray-200"
             title="Apri note"
             onMouseDown={e => { e.stopPropagation(); data.onOpenNote?.() }}
           >
             ↓ note
-          </button>
-          <button
-            className="bg-white rounded-md shadow px-2 py-1 text-xs hover:bg-gray-50 border border-gray-200"
-            title="Converti in testo libero"
-            onMouseDown={e => { e.stopPropagation(); data.onConvertToText?.() }}
-          >
-            T testo
           </button>
           <button
             className="bg-white rounded-md shadow px-2 py-1 text-xs hover:bg-gray-50 border border-gray-200"

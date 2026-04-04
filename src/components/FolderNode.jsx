@@ -113,6 +113,20 @@ export default function FolderNode({ data, selected }) {
         >
           <button
             className="bg-white rounded-md shadow px-2 py-1 text-xs hover:bg-gray-50 border border-gray-200"
+            title="Converti in post-it"
+            onMouseDown={e => { e.stopPropagation(); data.onConvertToPostIt?.() }}
+          >
+            🗒 post-it
+          </button>
+          <button
+            className="bg-white rounded-md shadow px-2 py-1 text-xs hover:bg-gray-50 border border-gray-200"
+            title="Apri note"
+            onMouseDown={e => { e.stopPropagation(); data.onOpenNote?.() }}
+          >
+            ↓ note
+          </button>
+          <button
+            className="bg-white rounded-md shadow px-2 py-1 text-xs hover:bg-gray-50 border border-gray-200"
             title="Entra nella cartella"
             onMouseDown={e => { e.stopPropagation(); data.onEnter?.() }}
           >

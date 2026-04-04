@@ -52,10 +52,10 @@ export async function fetchCards(canvasId) {
   return data
 }
 
-export async function createCard({ canvas_id, title, body, x, y, is_folder }) {
-  if (!isSupabaseConfigured) return mem.createCard({ canvas_id, title, body, x, y, is_folder })
+export async function createCard({ canvas_id, title, body, x, y, is_folder, node_type }) {
+  if (!isSupabaseConfigured) return mem.createCard({ canvas_id, title, body, x, y, is_folder, node_type })
   const db = await supa()
-  const { data, error } = await db.from('cards').insert({ canvas_id, title, body: body || '', x, y, is_folder: is_folder || false }).select().single()
+  const { data, error } = await db.from('cards').insert({ canvas_id, title, body: body || '', x, y, is_folder: is_folder || false, node_type: node_type || 'postit' }).select().single()
   if (error) throw error
   return data
 }

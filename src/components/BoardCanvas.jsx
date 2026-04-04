@@ -14,6 +14,7 @@ import {
 
 import PostItNode from './PostItNode'
 import FolderNode from './FolderNode'
+import TextNode from './TextNode'
 import LabeledEdge from './LabeledEdge'
 import {
   fetchCards, createCard, updateCard, deleteCard,
@@ -21,13 +22,19 @@ import {
   createCanvas,
 } from '../lib/db'
 
-const nodeTypes = { postit: PostItNode, folder: FolderNode }
+const nodeTypes = { postit: PostItNode, folder: FolderNode, text: TextNode }
 const edgeTypes = { labeled: LabeledEdge }
 
-function makeNode(card, { onRename, onOpenNote, onConvertToFolder, onEnterFolder }) {
+function getNodeType(card) {
+  if (card.node_type) return card.node_type
+  return card.is_folder ? 'folder' : 'postit'
+}
+
+function makeNode(card, { onRename, onOpenNote, onConvertToFolder, onConvertToPostIt, onConvertToText, onEnterFolder }) {
+  const type = getNodeType(card)
   return {
     id: String(card.id),
-    type: card.is_folder ? 'folder' : 'postit',
+    type,
     position: { x: card.x, y: card.y },
     data: {
       title: card.title,
@@ -35,6 +42,8 @@ function makeNode(card, { onRename, onOpenNote, onConvertToFolder, onEnterFolder
       onRename: (title) => onRename(card.id, title),
       onOpenNote: () => onOpenNote(card),
       onConvertToFolder: () => onConvertToFolder(card),
+      onConvertToPostIt: () => onConvertToPostIt(card),
+      onConvertToText: () => onConvertToText(card),
       onEnter: () => onEnterFolder(card),
     },
   }
@@ -57,8 +66,6 @@ function Inner({ canvasId, userId, canvases, onEnterFolder, onNoteOpen, onCanvas
   const [loading, setLoading] = useState(true)
   const { screenToFlowPosition } = useReactFlow()
 
-  // ---- handlers stabili tramite useCallback ----
-
   const onRename = useCallback(async (cardId, title) => {
     const updated = await updateCard(cardId, { title })
     onSyncCard('update', updated)
@@ -71,7 +78,7 @@ function Inner({ canvasId, userId, canvases, onEnterFolder, onNoteOpen, onCanvas
 
   const onConvertToFolder = useCallback(async (card) => {
     const canvas = await createCanvas({ name: card.title || 'Cartella', parent_id: canvasId, user_id: userId })
-    const updated = await updateCard(card.id, { is_folder: true })
+    const updated = await updateCard(card.id, { is_folder: true, node_type: 'folder' })
     onCanvasCreated(canvas)
     onSyncCard('update', updated)
     setNodes(prev => prev.map(n =>
@@ -80,6 +87,26 @@ function Inner({ canvasId, userId, canvases, onEnterFolder, onNoteOpen, onCanvas
         : n
     ))
   }, [canvasId, userId, onCanvasCreated, onSyncCard, onEnterFolder])
+
+  const onConvertToPostIt = useCallback(async (card) => {
+    const updated = await updateCard(card.id, { is_folder: false, node_type: 'postit' })
+    onSyncCard('update', updated)
+    setNodes(prev => prev.map(n =>
+      n.id === String(card.id)
+        ? { ...n, type: 'postit' }
+        : n
+    ))
+  }, [onSyncCard])
+
+  const onConvertToText = useCallback(async (card) => {
+    const updated = await updateCard(card.id, { is_folder: false, node_type: 'text' })
+    onSyncCard('update', updated)
+    setNodes(prev => prev.map(n =>
+      n.id === String(card.id)
+        ? { ...n, type: 'text' }
+        : n
+    ))
+  }, [onSyncCard])
 
   const onEnterFolderCard = useCallback((card) => {
     const match = canvases.find(c => c.parent_id === canvasId && c.name === card.title)
@@ -98,12 +125,10 @@ function Inner({ canvasId, userId, canvases, onEnterFolder, onNoteOpen, onCanvas
     setEdges(prev => prev.map(e => e.id === edgeId ? { ...e, data: { ...e.data, label } } : e))
   }, [])
 
-  // Costruisce gli handler per i nodi — stabile finché gli handler non cambiano
   const buildHandlers = useCallback(() => ({
-    onRename, onOpenNote, onConvertToFolder, onEnterFolder: onEnterFolderCard,
-  }), [onRename, onOpenNote, onConvertToFolder, onEnterFolderCard])
+    onRename, onOpenNote, onConvertToFolder, onConvertToPostIt, onConvertToText, onEnterFolder: onEnterFolderCard,
+  }), [onRename, onOpenNote, onConvertToFolder, onConvertToPostIt, onConvertToText, onEnterFolderCard])
 
-  // ---- Caricamento iniziale ----
   useEffect(() => {
     if (!canvasId) return
     setLoading(true)
@@ -115,7 +140,6 @@ function Inner({ canvasId, userId, canvases, onEnterFolder, onNoteOpen, onCanvas
     })
   }, [canvasId])
 
-  // ---- Connessione tra nodi ----
   const onConnect = useCallback(async (params) => {
     const conn = await createConnection({
       canvas_id: canvasId,
@@ -126,9 +150,7 @@ function Inner({ canvasId, userId, canvases, onEnterFolder, onNoteOpen, onCanvas
     setEdges(prev => addEdge(makeEdge(conn, onLabelChange), prev))
   }, [canvasId, onLabelChange])
 
-  // ---- Doppio click sulla lavagna → nuovo post-it ----
   const onDoubleClick = useCallback(async (e) => {
-    // Ignora click su nodi, controlli, minimap
     if (e.target.closest('.react-flow__node')) return
     if (e.target.closest('.react-flow__controls')) return
     if (e.target.closest('.react-flow__minimap')) return
@@ -141,18 +163,17 @@ function Inner({ canvasId, userId, canvases, onEnterFolder, onNoteOpen, onCanvas
       x: pos.x - 90,
       y: pos.y - 50,
       is_folder: false,
+      node_type: 'postit',
     })
     onSyncCard('add', card)
     const h = buildHandlers()
     setNodes(prev => [...prev, makeNode(card, h)])
   }, [canvasId, screenToFlowPosition, onSyncCard, buildHandlers])
 
-  // ---- Drag stop → salva posizione ----
   const onNodeDragStop = useCallback(async (_e, node) => {
     await updateCard(node.id, { x: node.position.x, y: node.position.y })
   }, [])
 
-  // ---- Elimina nodi/archi selezionati ----
   const onNodesDelete = useCallback(async (deleted) => {
     for (const n of deleted) {
       await deleteCard(n.id)
@@ -215,7 +236,7 @@ function Inner({ canvasId, userId, canvases, onEnterFolder, onNoteOpen, onCanvas
         <Background color="#d1d5db" gap={24} size={1} />
         <Controls />
         <MiniMap
-          nodeColor={n => n.type === 'folder' ? '#EF9F27' : '#FAC775'}
+          nodeColor={n => n.type === 'folder' ? '#EF9F27' : n.type === 'text' ? '#e5e7eb' : '#FAC775'}
           style={{ bottom: 16, right: 16 }}
         />
       </ReactFlow>
