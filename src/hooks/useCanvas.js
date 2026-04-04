@@ -292,18 +292,13 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
 
     if (textMode) {
       const r = boardRef.current.getBoundingClientRect()
-      const wx = (e.clientX - r.left - offset.x) / scale
-      const wy = (e.clientY - r.top  - offset.y) / scale
-      const newLabel = { id: uid(), x: wx, y: wy, text: '', fontSize: 14 }
-      setDb(prev => {
-        const cId = currentIdRef.current
-        const canvas = prev[cId]
-        if (!canvas) return prev
-        return { ...prev, [cId]: { ...canvas, labels: [...(canvas.labels||[]), newLabel] } }
-      })
+      const o = offsetRef.current, s = scaleRef.current
+      const wx = (e.clientX - r.left - o.x) / s
+      const wy = (e.clientY - r.top  - o.y) / s
+      const labelId = createLabel(wx, wy)
       setTextMode(false)
-      setSelectedLabel(newLabel.id)
-      setEditingLabelId(newLabel.id)
+      setSelectedLabel(labelId)
+      setEditingLabelId(labelId)
       return
     }
 
@@ -401,6 +396,27 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
     return card.id
   }
 
+  // ── label creation & update ───────────────────────────────────────────────
+  function createLabel(wx, wy) {
+    const label = { id: uid(), x: wx, y: wy, text: '', fontSize: 16 }
+    setDb(prev => {
+      const cId = currentIdRef.current
+      const canvas = prev[cId]
+      if (!canvas) return prev
+      return { ...prev, [cId]: { ...canvas, labels: [...(canvas.labels||[]), label] } }
+    })
+    return label.id
+  }
+
+  function updateLabel(id, changes) {
+    setDb(prev => {
+      const cId = currentIdRef.current
+      const canvas = prev[cId]
+      if (!canvas) return prev
+      return { ...prev, [cId]: { ...canvas, labels: (canvas.labels||[]).map(l => l.id === id ? { ...l, ...changes } : l) } }
+    })
+  }
+
   const boardCursor = drawingGroup || textMode ? 'crosshair' : 'grab'
 
   return {
@@ -422,5 +438,6 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
     onCardMouseDown, onConnectDotMouseDown,
     onGroupTitleBarMouseDown, onGroupResizeHandleMouseDown,
     onLabelMouseDown, zoomBy,
+    createLabel, updateLabel,
   }
 }

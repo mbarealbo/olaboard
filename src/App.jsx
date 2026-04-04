@@ -11,7 +11,7 @@ function FolderTree({ db, currentId, onNavigate, id, depth }) {
   const canvas = db[id]
   if (!canvas) return null
   const isActive = id === currentId
-  const subFolders = canvas.cards.filter(c => c.isFolder)
+  const subFolders = canvas.cards.filter(c => c.isFolder && !c.isLabel)
   return (
     <>
       <div
@@ -100,6 +100,7 @@ export default function App() {
     onCardMouseDown, onConnectDotMouseDown,
     onGroupTitleBarMouseDown, onGroupResizeHandleMouseDown,
     onLabelMouseDown, zoomBy,
+    createLabel, updateLabel,
   } = useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnectionFn, setActiveNoteId, view })
 
   // ── navigation ───────────────────────────────────────────────────────────
@@ -182,7 +183,7 @@ export default function App() {
   }
 
   // ── list view ─────────────────────────────────────────────────────────────
-  const sortedCards = [...cards.filter(c => !c.isFolder)].sort((a, b) => {
+  const sortedCards = [...cards.filter(c => !c.isFolder && !c.isLabel)].sort((a, b) => {
     if (listSort === 'az') return (a.title || '').localeCompare(b.title || '')
     if (listSort === 'za') return (b.title || '').localeCompare(a.title || '')
     return 0
@@ -369,30 +370,53 @@ export default function App() {
                 ))}
 
                 {/* Cards – on top */}
-                {cards.map(card => (
-                  <PostIt
-                    key={card.id}
-                    card={card}
-                    selected={selected === card.id}
-                    onMouseDown={e => onCardMouseDown(e, card)}
-                    onDblClick={e => { e.stopPropagation(); if (card.isFolder) enterCanvas(card.id, card.title); else openNote(card) }}
-                    onRename={title => updateCardFn(card.id, { title })}
-                    onNoteOpen={() => openNote(card)}
-                    onToggleFolder={() => {
-                      const becomingFolder = !card.isFolder
-                      updateCardFn(card.id, { isFolder: becomingFolder })
-                      if (becomingFolder) {
-                        setDb(prev => prev[card.id] ? prev : {
-                          ...prev,
-                          [card.id]: { id: card.id, name: card.title, cards: [], connections: [], groups: [], labels: [] },
-                        })
-                      }
-                    }}
-                    onConnectDot={(e, anchor) => onConnectDotMouseDown(e, card, anchor)}
-                    initialEditing={editingCardId === card.id}
-                    onEditStarted={() => setEditingCardId(null)}
-                  />
-                ))}
+                {cards.map(card => {
+                  if (card.isLabel) {
+                    return (
+                      <CanvasLabel
+                        key={card.id}
+                        label={{ id: card.id, x: card.x, y: card.y, text: card.title || '', fontSize: 16 }}
+                        selected={selectedLabel === card.id}
+                        editing={editingLabelId === card.id}
+                        onMouseDown={e => onLabelMouseDown(e, { id: card.id, x: card.x, y: card.y })}
+                        onStartEdit={() => setEditingLabelId(card.id)}
+                        onEndEdit={() => setEditingLabelId(null)}
+                        onTextChange={text => updateCardFn(card.id, { title: text })}
+                        onDelete={() => setDb(prev => {
+                          const cId = currentId
+                          const canvas = prev[cId]
+                          if (!canvas) return prev
+                          return { ...prev, [cId]: { ...canvas, cards: canvas.cards.filter(c => c.id !== card.id) } }
+                        })}
+                      />
+                    )
+                  }
+                  return (
+                    <PostIt
+                      key={card.id}
+                      card={card}
+                      selected={selected === card.id}
+                      onMouseDown={e => onCardMouseDown(e, card)}
+                      onDblClick={e => { e.stopPropagation(); if (card.isFolder) enterCanvas(card.id, card.title); else openNote(card) }}
+                      onRename={title => updateCardFn(card.id, { title })}
+                      onNoteOpen={() => openNote(card)}
+                      onToggleFolder={() => {
+                        const becomingFolder = !card.isFolder
+                        updateCardFn(card.id, { isFolder: becomingFolder })
+                        if (becomingFolder) {
+                          setDb(prev => prev[card.id] ? prev : {
+                            ...prev,
+                            [card.id]: { id: card.id, name: card.title, cards: [], connections: [], groups: [], labels: [] },
+                          })
+                        }
+                      }}
+                      onConvertToLabel={() => updateCardFn(card.id, { isLabel: true })}
+                      onConnectDot={(e, anchor) => onConnectDotMouseDown(e, card, anchor)}
+                      initialEditing={editingCardId === card.id}
+                      onEditStarted={() => setEditingCardId(null)}
+                    />
+                  )
+                })}
               </div>
             </div>
 

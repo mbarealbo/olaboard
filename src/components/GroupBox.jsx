@@ -96,8 +96,13 @@ export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit
         onMouseDown={e => { if (editing) e.stopPropagation() }}
         onBlur={e => {
           const text = e.target.textContent.trim()
-          onEndEdit()
-          if (!text) onDelete(); else onTextChange(text)
+          if (!text) {
+            onEndEdit()
+            onDelete()
+          } else {
+            onTextChange(text)
+            onEndEdit()
+          }
         }}
         onKeyDown={e => {
           if (!editing) return
