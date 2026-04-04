@@ -30,7 +30,7 @@ function getNodeType(card) {
   return card.is_folder ? 'folder' : 'postit'
 }
 
-function makeNode(card, handlers) {
+function makeNode(card, handlersRef) {
   const type = getNodeType(card)
   return {
     id: String(card.id),
@@ -39,12 +39,12 @@ function makeNode(card, handlers) {
     data: {
       title: card.title,
       body: card.body,
-      onRename: (title) => handlers.onRename(card.id, title),
-      onOpenNote: () => handlers.onOpenNote(card),
-      onConvertToFolder: () => handlers.onConvertToFolder(card),
-      onConvertToPostIt: () => handlers.onConvertToPostIt(card),
-      onConvertToText: () => handlers.onConvertToText(card),
-      onEnter: () => handlers.onEnterFolder(card),
+      onRename: (title) => handlersRef.current.onRename(card.id, title),
+      onOpenNote: () => handlersRef.current.onOpenNote(card),
+      onConvertToFolder: () => handlersRef.current.onConvertToFolder(card),
+      onConvertToPostIt: () => handlersRef.current.onConvertToPostIt(card),
+      onConvertToText: () => handlersRef.current.onConvertToText(card),
+      onEnter: () => handlersRef.current.onEnterFolder(card),
     },
   }
 }
@@ -102,40 +102,38 @@ function Inner({ canvasId, userId, canvases, onEnterFolder, onNoteOpen, onCanvas
   }, [onNoteOpen])
 
   const onConvertToFolder = useCallback(async (card) => {
-    const h = handlersRef.current
     const currentTitle = nodes.find(n => n.id === String(card.id))?.data?.title || card.title
     const canvas = await createCanvas({ name: currentTitle || 'Cartella', parent_id: canvasId, user_id: userId })
     await updateCard(card.id, { is_folder: true, node_type: 'folder' })
     onCanvasCreated(canvas)
     const updated = { ...card, title: currentTitle, is_folder: true, node_type: 'folder' }
     onSyncCard('update', updated)
-    setNodes(prev => prev.map(n =>
-      n.id === String(card.id)
-        ? makeNode({ ...updated, x: n.position.x, y: n.position.y }, { ...h, onEnterFolder: () => onEnterFolder(canvas.id) })
-        : n
-    ))
+    setNodes(prev => prev.map(n => {
+      if (n.id !== String(card.id)) return n
+      const node = makeNode({ ...updated, x: n.position.x, y: n.position.y }, handlersRef)
+      node.data.onEnter = () => onEnterFolder(canvas.id)
+      return node
+    }))
   }, [canvasId, userId, onCanvasCreated, onSyncCard, onEnterFolder, nodes])
 
   const onConvertToPostIt = useCallback(async (card) => {
-    const h = handlersRef.current
     await updateCard(card.id, { is_folder: false, node_type: 'postit' })
     const updated = { ...card, is_folder: false, node_type: 'postit' }
     onSyncCard('update', updated)
     setNodes(prev => prev.map(n =>
       n.id === String(card.id)
-        ? makeNode({ ...updated, title: n.data.title, x: n.position.x, y: n.position.y }, h)
+        ? makeNode({ ...updated, title: n.data.title, x: n.position.x, y: n.position.y }, handlersRef)
         : n
     ))
   }, [onSyncCard])
 
   const onConvertToText = useCallback(async (card) => {
-    const h = handlersRef.current
     await updateCard(card.id, { is_folder: false, node_type: 'text' })
     const updated = { ...card, is_folder: false, node_type: 'text' }
     onSyncCard('update', updated)
     setNodes(prev => prev.map(n =>
       n.id === String(card.id)
-        ? makeNode({ ...updated, title: n.data.title, x: n.position.x, y: n.position.y }, h)
+        ? makeNode({ ...updated, title: n.data.title, x: n.position.x, y: n.position.y }, handlersRef)
         : n
     ))
   }, [onSyncCard])
@@ -165,7 +163,7 @@ function Inner({ canvasId, userId, canvases, onEnterFolder, onNoteOpen, onCanvas
     if (!canvasId) return
     setLoading(true)
     Promise.all([fetchCards(canvasId), fetchConnections(canvasId)]).then(([cards, conns]) => {
-      setNodes(cards.map(c => makeNode(c, handlersRef.current)))
+      setNodes(cards.map(c => makeNode(c, handlersRef)))
       setEdges(conns.map(c => makeEdge(c, onLabelChange)))
       setLoading(false)
     })
@@ -199,7 +197,7 @@ function Inner({ canvasId, userId, canvases, onEnterFolder, onNoteOpen, onCanvas
       node_type: nodeType,
     })
     onSyncCard('add', card)
-    setNodes(prev => [...prev, makeNode(card, handlersRef.current)])
+    setNodes(prev => [...prev, makeNode(card, handlersRef)])
     return card
   }, [canvasId, screenToFlowPosition, onSyncCard])
 
