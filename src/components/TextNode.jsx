@@ -1,131 +1,84 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { Handle, Position } from '@xyflow/react'
 
 export default function TextNode({ data, selected }) {
   const [editing, setEditing] = useState(false)
-  const [title, setTitle] = useState(data.title)
-  const [showActions, setShowActions] = useState(false)
-  const inputRef = useRef(null)
+  const [title, setTitle] = useState(data.title || 'Testo libero')
+  const [hover, setHover] = useState(false)
 
-  useEffect(() => {
-    setTitle(data.title)
-  }, [data.title])
-
-  useEffect(() => {
-    if (editing && inputRef.current) {
-      inputRef.current.focus()
-      inputRef.current.select()
-    }
-  }, [editing])
-
-  const handleDoubleClick = useCallback((e) => {
-    e.stopPropagation()
-    setEditing(true)
-  }, [])
-
-  const handleBlur = useCallback(() => {
-    setEditing(false)
-    if (title.trim() !== data.title) {
-      data.onRename?.(title.trim() || 'Testo')
-    }
-  }, [title, data])
-
-  const handleKeyDown = useCallback((e) => {
-    if (e.key === 'Enter' || e.key === 'Escape') {
-      inputRef.current?.blur()
-    }
-    e.stopPropagation()
-  }, [])
+  useEffect(() => { setTitle(data.title || 'Testo libero') }, [data.title])
 
   return (
     <div
-      className="relative"
-      onMouseEnter={() => setShowActions(true)}
-      onMouseLeave={() => setShowActions(false)}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        position: 'relative',
+        background: '#ffffff',
+        border: `2px solid ${selected ? '#378ADD' : hover ? '#aaa' : '#d0d0d0'}`,
+        borderRadius: 8,
+        minWidth: 140,
+        minHeight: 60,
+        padding: '10px 12px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
+        cursor: 'default',
+      }}
     >
-      <div
-        className="rounded-sm select-none"
-        style={{
-          minWidth: 140,
-          maxWidth: 260,
-          background: '#ffffff',
-          border: selected ? '2px solid #378ADD' : '1px solid #d1d5db',
-          boxShadow: selected ? '0 0 0 3px rgba(55,138,221,0.15)' : '0 1px 4px rgba(0,0,0,0.10)',
-          padding: '10px 14px',
-          position: 'relative',
-        }}
-      >
-        <div
-          style={{
-            position: 'absolute',
-            top: 6,
-            left: 10,
-            fontSize: 10,
-            color: '#9ca3af',
-            letterSpacing: '0.05em',
-            textTransform: 'uppercase',
-            fontWeight: 600,
-            userSelect: 'none',
+      {editing ? (
+        <input
+          autoFocus
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          onBlur={() => {
+            setEditing(false)
+            data.onRename?.(title.trim() || 'Testo libero')
           }}
+          onKeyDown={e => {
+            if (e.key === 'Enter' || e.key === 'Escape') e.target.blur()
+            e.stopPropagation()
+          }}
+          style={{
+            border: 'none', outline: 'none', background: 'transparent',
+            fontSize: 13, color: '#222', width: '100%', fontFamily: 'inherit'
+          }}
+        />
+      ) : (
+        <p
+          style={{ fontSize: 13, color: '#333', margin: 0, lineHeight: 1.5, wordBreak: 'break-word' }}
+          onDoubleClick={e => { e.stopPropagation(); setEditing(true) }}
         >
-          T
-        </div>
+          {title}
+        </p>
+      )}
 
-        <div style={{ marginTop: 14 }}>
-          {editing ? (
-            <input
-              ref={inputRef}
-              value={title}
-              onChange={e => setTitle(e.target.value)}
-              onBlur={handleBlur}
-              onKeyDown={handleKeyDown}
-              className="bg-transparent border-none outline-none text-sm text-gray-800 w-full"
-              style={{ fontFamily: 'inherit', minWidth: 80 }}
-            />
-          ) : (
-            <p
-              className="text-sm text-gray-800 break-words leading-snug cursor-text"
-              onDoubleClick={handleDoubleClick}
-            >
-              {title || 'Testo libero'}
-            </p>
-          )}
-        </div>
-      </div>
-
-      {showActions && !editing && (
-        <div
-          className="absolute flex gap-1"
-          style={{ bottom: -30, left: '50%', transform: 'translateX(-50%)', zIndex: 10 }}
-        >
+      {hover && !editing && (
+        <div style={{
+          position: 'absolute', bottom: -34, left: '50%',
+          transform: 'translateX(-50%)', display: 'flex',
+          gap: 4, zIndex: 9999,
+        }}>
           <button
-            className="bg-white rounded-md shadow px-2 py-1 text-xs hover:bg-gray-50 border border-gray-200"
-            title="Converti in post-it"
-            onMouseDown={e => { e.stopPropagation(); data.onConvertToPostIt?.() }}
-          >
-            post-it
-          </button>
+            onMouseDown={e => e.stopPropagation()}
+            onClick={e => { e.stopPropagation(); data.handlersRef?.current?.onConvertToPostIt?.(data.card) }}
+            style={{ background: '#fff', border: '1px solid #d0d0d0', borderRadius: 4, padding: '3px 8px', fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap', boxShadow: '0 1px 4px rgba(0,0,0,0.1)' }}
+          >🗒 post-it</button>
           <button
-            className="bg-white rounded-md shadow px-2 py-1 text-xs hover:bg-gray-50 border border-gray-200"
-            title="Apri note"
-            onMouseDown={e => { e.stopPropagation(); data.onOpenNote?.() }}
-          >
-            note
-          </button>
+            onMouseDown={e => e.stopPropagation()}
+            onClick={e => { e.stopPropagation(); data.handlersRef?.current?.onNoteOpen?.(data.card) }}
+            style={{ background: '#fff', border: '1px solid #d0d0d0', borderRadius: 4, padding: '3px 8px', fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap', boxShadow: '0 1px 4px rgba(0,0,0,0.1)' }}
+          >↓ note</button>
           <button
-            className="bg-white rounded-md shadow px-2 py-1 text-xs hover:bg-gray-50 border border-gray-200"
-            title="Converti in cartella"
-            onMouseDown={e => { e.stopPropagation(); data.onConvertToFolder?.() }}
-          >
-            cartella
-          </button>
+            onMouseDown={e => e.stopPropagation()}
+            onClick={e => { e.stopPropagation(); data.handlersRef?.current?.onConvertToFolder?.(data.card) }}
+            style={{ background: '#fff', border: '1px solid #d0d0d0', borderRadius: 4, padding: '3px 8px', fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap', boxShadow: '0 1px 4px rgba(0,0,0,0.1)' }}
+          >📁</button>
         </div>
       )}
 
-      <Handle type="target" position={Position.Top} style={{ opacity: 0.5 }} />
-      <Handle type="source" position={Position.Bottom} style={{ opacity: 0.5 }} />
-      <Handle type="target" position={Position.Left} style={{ opacity: 0.5 }} />
-      <Handle type="source" position={Position.Right} style={{ opacity: 0.5 }} />
+      <Handle type="target" position={Position.Top} style={{ opacity: 0.4 }} />
+      <Handle type="source" position={Position.Right} style={{ opacity: 0.4 }} />
+      <Handle type="target" position={Position.Left} style={{ opacity: 0.4 }} />
+      <Handle type="source" position={Position.Bottom} style={{ opacity: 0.4 }} />
     </div>
   )
 }

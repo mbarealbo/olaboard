@@ -39,6 +39,8 @@ function makeNode(card, handlersRef) {
     data: {
       title: card.title,
       body: card.body,
+      card,
+      handlersRef,
       onRename: (title) => handlersRef.current.onRename(card.id, title),
       onOpenNote: () => handlersRef.current.onOpenNote(card),
       onConvertToFolder: () => handlersRef.current.onConvertToFolder(card),
@@ -120,23 +122,49 @@ function Inner({ canvasId, userId, canvases, onEnterFolder, onNoteOpen, onCanvas
     await updateCard(card.id, { is_folder: false, node_type: 'postit' })
     const updated = { ...card, is_folder: false, node_type: 'postit' }
     onSyncCard('update', updated)
-    setNodes(prev => prev.map(n =>
-      n.id === String(card.id)
-        ? makeNode({ ...updated, title: n.data.title, x: n.position.x, y: n.position.y }, handlersRef)
-        : n
-    ))
-  }, [onSyncCard])
+    setNodes(prev => prev.map(n => {
+      if (n.id !== String(card.id)) return n
+      return {
+        ...n,
+        type: 'postit',
+        data: {
+          title: card.title,
+          body: card.body,
+          card: card,
+          handlersRef: handlersRef,
+          onRename: (title) => onRename(card.id, title),
+          onOpenNote: () => onNoteOpen(card),
+          onConvertToPostIt: () => onConvertToPostIt(card),
+          onConvertToFolder: () => onConvertToFolder(card),
+          onConvertToText: () => onConvertToText(card),
+        }
+      }
+    }))
+  }, [onSyncCard, onRename, onNoteOpen, onConvertToFolder, onConvertToText])
 
   const onConvertToText = useCallback(async (card) => {
     await updateCard(card.id, { is_folder: false, node_type: 'text' })
     const updated = { ...card, is_folder: false, node_type: 'text' }
     onSyncCard('update', updated)
-    setNodes(prev => prev.map(n =>
-      n.id === String(card.id)
-        ? makeNode({ ...updated, title: n.data.title, x: n.position.x, y: n.position.y }, handlersRef)
-        : n
-    ))
-  }, [onSyncCard])
+    setNodes(prev => prev.map(n => {
+      if (n.id !== String(card.id)) return n
+      return {
+        ...n,
+        type: 'text',
+        data: {
+          title: card.title,
+          body: card.body,
+          card: card,
+          handlersRef: handlersRef,
+          onRename: (title) => onRename(card.id, title),
+          onOpenNote: () => onNoteOpen(card),
+          onConvertToPostIt: () => onConvertToPostIt(card),
+          onConvertToFolder: () => onConvertToFolder(card),
+          onConvertToText: () => onConvertToText(card),
+        }
+      }
+    }))
+  }, [onSyncCard, onRename, onNoteOpen, onConvertToPostIt, onConvertToFolder])
 
   const onEnterFolderCard = useCallback((card) => {
     const match = canvases.find(c => c.parent_id === canvasId && c.name === card.title)
@@ -157,6 +185,7 @@ function Inner({ canvasId, userId, canvases, onEnterFolder, onNoteOpen, onCanvas
 
   handlersRef.current = {
     onRename, onOpenNote, onConvertToFolder, onConvertToPostIt, onConvertToText, onEnterFolder: onEnterFolderCard,
+    onNoteOpen: onOpenNote,
   }
 
   useEffect(() => {

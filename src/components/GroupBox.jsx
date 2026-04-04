@@ -54,7 +54,7 @@ export function Group({ group, onTitleBarMouseDown, onResizeHandleMouseDown, onD
   )
 }
 
-export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit, onEndEdit, onTextChange, onDelete, onConnectDot }) {
+export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit, onEndEdit, onTextChange, onDelete, onConnectDot, onConvertToPostIt, onConvertToFolder }) {
   const elRef = useRef(null)
   const [hovered, setHovered] = useState(false)
 
@@ -114,11 +114,29 @@ export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit
       />
       {onConnectDot && (
         <>
-          <div className="connect-dot connect-dot-top"    onMouseDown={e => onConnectDot(e, 'top')} />
-          <div className="connect-dot connect-dot-right"  onMouseDown={e => onConnectDot(e, 'right')} />
-          <div className="connect-dot connect-dot-bottom" onMouseDown={e => onConnectDot(e, 'bottom')} />
-          <div className="connect-dot connect-dot-left"   onMouseDown={e => onConnectDot(e, 'left')} />
+          <div className="connect-dot connect-dot-top"    onMouseDown={e => { e.stopPropagation(); e.preventDefault(); onConnectDot(e, 'top') }} />
+          <div className="connect-dot connect-dot-right"  onMouseDown={e => { e.stopPropagation(); e.preventDefault(); onConnectDot(e, 'right') }} />
+          <div className="connect-dot connect-dot-bottom" onMouseDown={e => { e.stopPropagation(); e.preventDefault(); onConnectDot(e, 'bottom') }} />
+          <div className="connect-dot connect-dot-left"   onMouseDown={e => { e.stopPropagation(); e.preventDefault(); onConnectDot(e, 'left') }} />
         </>
+      )}
+      {(selected || hovered) && !editing && (
+        <div style={{
+          position: 'absolute', bottom: -30, left: '50%',
+          transform: 'translateX(-50%)', display: 'flex',
+          gap: 4, zIndex: 9999, pointerEvents: 'all',
+        }}>
+          <button
+            onMouseDown={e => e.stopPropagation()}
+            onClick={e => { e.stopPropagation(); onConvertToPostIt?.() }}
+            style={{ background: '#fff', border: '1px solid #d0d0d0', borderRadius: 4, padding: '3px 8px', fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap', boxShadow: '0 1px 4px rgba(0,0,0,0.1)' }}
+          >🗒 post-it</button>
+          <button
+            onMouseDown={e => e.stopPropagation()}
+            onClick={e => { e.stopPropagation(); onConvertToFolder?.() }}
+            style={{ background: '#fff', border: '1px solid #d0d0d0', borderRadius: 4, padding: '3px 8px', fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap', boxShadow: '0 1px 4px rgba(0,0,0,0.1)' }}
+          >📁</button>
+        </div>
       )}
     </div>
   )

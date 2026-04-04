@@ -103,21 +103,24 @@ export default function PostItNode({ data, selected }) {
           <button
             className="bg-white rounded-md shadow px-2 py-1 text-xs hover:bg-gray-50 border border-gray-200"
             title="Apri note"
-            onMouseDown={e => { e.stopPropagation(); data.onOpenNote?.() }}
+            onMouseDown={e => e.stopPropagation()}
+            onClick={e => { e.stopPropagation(); data.handlersRef?.current?.onNoteOpen?.(data.card) }}
           >
             ↓ note
           </button>
           <button
             className="bg-white rounded-md shadow px-2 py-1 text-xs hover:bg-gray-50 border border-gray-200"
             title="Converti in testo libero"
-            onMouseDown={e => { e.stopPropagation(); data.onConvertToText?.() }}
+            onMouseDown={e => e.stopPropagation()}
+            onClick={e => { e.stopPropagation(); data.handlersRef?.current?.onConvertToText?.(data.card) }}
           >
             T testo
           </button>
           <button
             className="bg-white rounded-md shadow px-2 py-1 text-xs hover:bg-gray-50 border border-gray-200"
             title="Converti in cartella"
-            onMouseDown={e => { e.stopPropagation(); data.onConvertToFolder?.() }}
+            onMouseDown={e => e.stopPropagation()}
+            onClick={e => { e.stopPropagation(); data.handlersRef?.current?.onConvertToFolder?.(data.card) }}
           >
             📁
           </button>

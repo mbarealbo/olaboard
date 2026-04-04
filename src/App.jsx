@@ -47,6 +47,8 @@ export default function App() {
   const [notePanelMode, setNotePanelMode] = useState('side')
   const [listSort, setListSort] = useState('az')
   const [selectedConn, setSelectedConn] = useState(null)
+  const [editingConnId, setEditingConnId] = useState(null)
+  const [editingConnValue, setEditingConnValue] = useState('')
 
   const currentIdRef = useRef('root')
 
@@ -155,10 +157,7 @@ export default function App() {
   }, [selectedConn])
 
   // ── connection label ──────────────────────────────────────────────────────
-  function updateConnLabel(connId) {
-    const conn = connections.find(c => c.id === connId)
-    const label = window.prompt('Etichetta freccia:', conn?.label || '')
-    if (label === null) return
+  function saveConnLabel(connId, label) {
     setDb(prev => {
       const cId = currentIdRef.current
       const canvas = prev[cId]
@@ -291,10 +290,10 @@ export default function App() {
               {/* SVG overlay – arrows in screen-space */}
               <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
                 <defs>
-                  <marker id="ah" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                  <marker id="ah" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
                     <polygon points="0 0, 10 3.5, 0 7" fill="#378ADD" />
                   </marker>
-                  <marker id="ah-sel" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                  <marker id="ah-sel" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
                     <polygon points="0 0, 10 3.5, 0 7" fill="#e53935" />
                   </marker>
                 </defs>
@@ -332,21 +331,39 @@ export default function App() {
                   const anchorDir = a => a === 'right' ? [1,0] : a === 'left' ? [-1,0] : a === 'bottom' ? [0,1] : [0,-1]
                   const [fdx, fdy] = anchorDir(fa)
                   const [tdx, tdy] = anchorDir(ta)
+                  const sx1 = x1, sy1 = y1, sx2 = x2, sy2 = y2
+                  const _ang = Math.atan2(sy2 - sy1, sx2 - sx1)
+                  const ex = sx2 - Math.cos(_ang) * 12
+                  const ey = sy2 - Math.sin(_ang) * 12
                   const cp1x = x1 + fdx * OFF, cp1y = y1 + fdy * OFF
-                  const cp2x = x2 + tdx * OFF, cp2y = y2 + tdy * OFF
+                  const cp2x = ex + tdx * OFF,  cp2y = ey + tdy * OFF
                   const t = 0.5
                   const mx = (1-t)**3*x1 + 3*(1-t)**2*t*cp1x + 3*(1-t)*t**2*cp2x + t**3*x2
                   const my = (1-t)**3*y1 + 3*(1-t)**2*t*cp1y + 3*(1-t)*t**2*cp2y + t**3*y2
-                  const d = `M${x1},${y1} C${cp1x},${cp1y} ${cp2x},${cp2y} ${x2},${y2}`
+                  const d = `M${x1},${y1} C${cp1x},${cp1y} ${cp2x},${cp2y} ${ex},${ey}`
                   const stroke = isSel ? '#e53935' : '#378ADD'
                   const markerEnd = isSel ? 'url(#ah-sel)' : 'url(#ah)'
                   return (
                     <g key={conn.id} style={{ pointerEvents: 'all' }} onClick={e => { e.stopPropagation(); setSelectedConn(isSel ? null : conn.id) }}>
                       <path d={d} fill="none" stroke="transparent" strokeWidth={12} style={{ cursor: 'pointer' }} />
                       <path d={d} fill="none" stroke={stroke} strokeWidth={isSel ? 3 : 2} markerEnd={markerEnd} style={{ pointerEvents: 'none' }} />
-                      <circle cx={mx} cy={my} r={7} fill={conn.label ? stroke : (isSel ? 'rgba(229,57,53,0.18)' : 'rgba(55,138,221,0.18)')} stroke="none" style={{ cursor: 'pointer' }} onClick={e => { e.stopPropagation(); updateConnLabel(conn.id) }} />
-                      {conn.label && (
+                      {editingConnId !== conn.id && (
+                        <circle cx={mx} cy={my} r={7} fill={conn.label ? stroke : (isSel ? 'rgba(229,57,53,0.18)' : 'rgba(55,138,221,0.18)')} stroke="none" style={{ cursor: 'pointer' }} onClick={e => { e.stopPropagation(); setEditingConnId(conn.id); setEditingConnValue(conn.label || '') }} />
+                      )}
+                      {conn.label && editingConnId !== conn.id && (
                         <text x={mx} y={my - 10} textAnchor="middle" fontSize={11} fill={stroke} style={{ pointerEvents: 'none' }}>{conn.label}</text>
+                      )}
+                      {editingConnId === conn.id && (
+                        <foreignObject x={mx - 60} y={my - 14} width={120} height={28}>
+                          <input
+                            autoFocus
+                            value={editingConnValue}
+                            onChange={e => setEditingConnValue(e.target.value)}
+                            onBlur={() => { saveConnLabel(editingConnId, editingConnValue); setEditingConnId(null) }}
+                            onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') setEditingConnId(null) }}
+                            style={{ width: '100%', height: '100%', border: '1px solid #378ADD', borderRadius: 4, padding: '2px 6px', fontSize: 11, background: 'white', outline: 'none', textAlign: 'center' }}
+                          />
+                        </foreignObject>
                       )}
                     </g>
                   )
@@ -439,6 +456,8 @@ export default function App() {
                           return { ...prev, [cId]: { ...canvas, cards: canvas.cards.filter(c => c.id !== card.id) } }
                         })}
                         onConnectDot={(e, anchor) => onConnectDotMouseDown(e, labelObj, anchor)}
+                        onConvertToPostIt={() => updateCardFn(card.id, { isLabel: false })}
+                        onConvertToFolder={() => updateCardFn(card.id, { isLabel: false, isFolder: true })}
                       />
                     )
                   }
