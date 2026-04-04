@@ -44,33 +44,52 @@ export default function TextNode({ data, selected }) {
       onMouseLeave={() => setShowActions(false)}
     >
       <div
+        className="rounded-sm shadow-sm select-none"
         style={{
-          minWidth: 120,
+          minWidth: 140,
           maxWidth: 260,
-          border: selected ? '1px dashed #378ADD' : '1px dashed #d1d5db',
-          borderRadius: 4,
-          padding: '6px 10px',
-          background: 'rgba(255,255,255,0.01)',
+          background: '#ffffff',
+          border: selected ? '2px solid #378ADD' : '2px solid #e5e7eb',
+          padding: '10px 14px',
+          position: 'relative',
         }}
       >
-        {editing ? (
-          <input
-            ref={inputRef}
-            value={title}
-            onChange={e => setTitle(e.target.value)}
-            onBlur={handleBlur}
-            onKeyDown={handleKeyDown}
-            className="bg-transparent border-none outline-none text-sm text-gray-800 w-full"
-            style={{ fontFamily: 'inherit', minWidth: 80 }}
-          />
-        ) : (
-          <p
-            className="text-sm text-gray-800 break-words leading-snug cursor-text select-none"
-            onDoubleClick={handleDoubleClick}
-          >
-            {title || 'Testo libero'}
-          </p>
-        )}
+        <div
+          style={{
+            position: 'absolute',
+            top: 6,
+            left: 10,
+            fontSize: 10,
+            color: '#9ca3af',
+            letterSpacing: '0.05em',
+            textTransform: 'uppercase',
+            fontWeight: 600,
+            userSelect: 'none',
+          }}
+        >
+          T
+        </div>
+
+        <div style={{ marginTop: 14 }}>
+          {editing ? (
+            <input
+              ref={inputRef}
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              onBlur={handleBlur}
+              onKeyDown={handleKeyDown}
+              className="bg-transparent border-none outline-none text-sm text-gray-800 w-full"
+              style={{ fontFamily: 'inherit', minWidth: 80 }}
+            />
+          ) : (
+            <p
+              className="text-sm text-gray-800 break-words leading-snug cursor-text"
+              onDoubleClick={handleDoubleClick}
+            >
+              {title || 'Testo libero'}
+            </p>
+          )}
+        </div>
       </div>
 
       {showActions && !editing && (
@@ -83,21 +102,21 @@ export default function TextNode({ data, selected }) {
             title="Converti in post-it"
             onMouseDown={e => { e.stopPropagation(); data.onConvertToPostIt?.() }}
           >
-            🗒 post-it
+            post-it
           </button>
           <button
             className="bg-white rounded-md shadow px-2 py-1 text-xs hover:bg-gray-50 border border-gray-200"
             title="Apri note"
             onMouseDown={e => { e.stopPropagation(); data.onOpenNote?.() }}
           >
-            ↓ note
+            note
           </button>
           <button
             className="bg-white rounded-md shadow px-2 py-1 text-xs hover:bg-gray-50 border border-gray-200"
             title="Converti in cartella"
             onMouseDown={e => { e.stopPropagation(); data.onConvertToFolder?.() }}
           >
-            📁
+            cartella
           </button>
         </div>
       )}
