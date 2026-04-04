@@ -327,13 +327,16 @@ export default function App() {
                   const [tpx, tpy] = toRes.isLabel   ? labelAnchorPoint(toRes.entity, ta)   : anchorPoint(toRes.entity, ta)
                   const [x1, y1] = w2s(fpx, fpy)
                   const [x2, y2] = w2s(tpx, tpy)
-                  const OFF = 60 * scaleRef.current
+                  const dist = Math.hypot(x2 - x1, y2 - y1)
+                  const OFF = Math.min(dist * 0.25, 40 * scaleRef.current)
                   const anchorDir = a => a === 'right' ? [1,0] : a === 'left' ? [-1,0] : a === 'bottom' ? [0,1] : [0,-1]
                   const [fdx, fdy] = anchorDir(fa)
                   const [tdx, tdy] = anchorDir(ta)
                   const cp1x = x1 + fdx * OFF, cp1y = y1 + fdy * OFF
                   const cp2x = x2 + tdx * OFF, cp2y = y2 + tdy * OFF
-                  const mx = (x1 + x2) / 2, my = (y1 + y2) / 2
+                  const t = 0.5
+                  const mx = (1-t)**3*x1 + 3*(1-t)**2*t*cp1x + 3*(1-t)*t**2*cp2x + t**3*x2
+                  const my = (1-t)**3*y1 + 3*(1-t)**2*t*cp1y + 3*(1-t)*t**2*cp2y + t**3*y2
                   const d = `M${x1},${y1} C${cp1x},${cp1y} ${cp2x},${cp2y} ${x2},${y2}`
                   const stroke = isSel ? '#e53935' : '#378ADD'
                   const markerEnd = isSel ? 'url(#ah-sel)' : 'url(#ah)'
