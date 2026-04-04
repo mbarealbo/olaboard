@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ReactFlow,
   Background,
@@ -30,7 +30,7 @@ function getNodeType(card) {
   return card.is_folder ? 'folder' : 'postit'
 }
 
-function makeNode(card, { onRename, onOpenNote, onConvertToFolder, onConvertToPostIt, onConvertToText, onEnterFolder }) {
+function makeNode(card, handlers) {
   const type = getNodeType(card)
   return {
     id: String(card.id),
@@ -39,12 +39,12 @@ function makeNode(card, { onRename, onOpenNote, onConvertToFolder, onConvertToPo
     data: {
       title: card.title,
       body: card.body,
-      onRename: (title) => onRename(card.id, title),
-      onOpenNote: () => onOpenNote(card),
-      onConvertToFolder: () => onConvertToFolder(card),
-      onConvertToPostIt: () => onConvertToPostIt(card),
-      onConvertToText: () => onConvertToText(card),
-      onEnter: () => onEnterFolder(card),
+      onRename: (title) => handlers.onRename(card.id, title),
+      onOpenNote: () => handlers.onOpenNote(card),
+      onConvertToFolder: () => handlers.onConvertToFolder(card),
+      onConvertToPostIt: () => handlers.onConvertToPostIt(card),
+      onConvertToText: () => handlers.onConvertToText(card),
+      onEnter: () => handlers.onEnterFolder(card),
     },
   }
 }
@@ -66,6 +66,8 @@ function Inner({ canvasId, userId, canvases, onEnterFolder, onNoteOpen, onCanvas
   const [loading, setLoading] = useState(true)
   const { screenToFlowPosition } = useReactFlow()
 
+  const handlersRef = useRef(null)
+
   const onRename = useCallback(async (cardId, title) => {
     const updated = await updateCard(cardId, { title })
     onSyncCard('update', updated)
@@ -78,32 +80,35 @@ function Inner({ canvasId, userId, canvases, onEnterFolder, onNoteOpen, onCanvas
 
   const onConvertToFolder = useCallback(async (card) => {
     const canvas = await createCanvas({ name: card.title || 'Cartella', parent_id: canvasId, user_id: userId })
-    const updated = await updateCard(card.id, { is_folder: true, node_type: 'folder' })
+    await updateCard(card.id, { is_folder: true, node_type: 'folder' })
     onCanvasCreated(canvas)
-    onSyncCard('update', updated)
+    onSyncCard('update', { ...card, is_folder: true, node_type: 'folder' })
+    const h = handlersRef.current
     setNodes(prev => prev.map(n =>
       n.id === String(card.id)
-        ? { ...n, type: 'folder', data: { ...n.data, onEnter: () => onEnterFolder(canvas.id) } }
+        ? makeNode({ ...card, is_folder: true, node_type: 'folder' }, { ...h, onEnterFolder: () => onEnterFolder(canvas.id) })
         : n
     ))
   }, [canvasId, userId, onCanvasCreated, onSyncCard, onEnterFolder])
 
   const onConvertToPostIt = useCallback(async (card) => {
-    const updated = await updateCard(card.id, { is_folder: false, node_type: 'postit' })
-    onSyncCard('update', updated)
+    await updateCard(card.id, { is_folder: false, node_type: 'postit' })
+    onSyncCard('update', { ...card, is_folder: false, node_type: 'postit' })
+    const h = handlersRef.current
     setNodes(prev => prev.map(n =>
       n.id === String(card.id)
-        ? { ...n, type: 'postit' }
+        ? makeNode({ ...card, is_folder: false, node_type: 'postit' }, h)
         : n
     ))
   }, [onSyncCard])
 
   const onConvertToText = useCallback(async (card) => {
-    const updated = await updateCard(card.id, { is_folder: false, node_type: 'text' })
-    onSyncCard('update', updated)
+    await updateCard(card.id, { is_folder: false, node_type: 'text' })
+    onSyncCard('update', { ...card, is_folder: false, node_type: 'text' })
+    const h = handlersRef.current
     setNodes(prev => prev.map(n =>
       n.id === String(card.id)
-        ? { ...n, type: 'text' }
+        ? makeNode({ ...card, is_folder: false, node_type: 'text' }, h)
         : n
     ))
   }, [onSyncCard])
@@ -125,16 +130,15 @@ function Inner({ canvasId, userId, canvases, onEnterFolder, onNoteOpen, onCanvas
     setEdges(prev => prev.map(e => e.id === edgeId ? { ...e, data: { ...e.data, label } } : e))
   }, [])
 
-  const buildHandlers = useCallback(() => ({
+  handlersRef.current = {
     onRename, onOpenNote, onConvertToFolder, onConvertToPostIt, onConvertToText, onEnterFolder: onEnterFolderCard,
-  }), [onRename, onOpenNote, onConvertToFolder, onConvertToPostIt, onConvertToText, onEnterFolderCard])
+  }
 
   useEffect(() => {
     if (!canvasId) return
     setLoading(true)
-    const h = buildHandlers()
     Promise.all([fetchCards(canvasId), fetchConnections(canvasId)]).then(([cards, conns]) => {
-      setNodes(cards.map(c => makeNode(c, h)))
+      setNodes(cards.map(c => makeNode(c, handlersRef.current)))
       setEdges(conns.map(c => makeEdge(c, onLabelChange)))
       setLoading(false)
     })
@@ -166,9 +170,8 @@ function Inner({ canvasId, userId, canvases, onEnterFolder, onNoteOpen, onCanvas
       node_type: 'postit',
     })
     onSyncCard('add', card)
-    const h = buildHandlers()
-    setNodes(prev => [...prev, makeNode(card, h)])
-  }, [canvasId, screenToFlowPosition, onSyncCard, buildHandlers])
+    setNodes(prev => [...prev, makeNode(card, handlersRef.current)])
+  }, [canvasId, screenToFlowPosition, onSyncCard])
 
   const onNodeDragStop = useCallback(async (_e, node) => {
     await updateCard(node.id, { x: node.position.x, y: node.position.y })

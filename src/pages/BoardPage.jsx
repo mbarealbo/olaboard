@@ -36,6 +36,7 @@ export default function BoardPage({ user, isDemo }) {
   const [loading, setLoading] = useState(true)
   const [editingCanvasName, setEditingCanvasName] = useState(false)
   const [canvasNameDraft, setCanvasNameDraft] = useState('')
+  const [hoveringCanvasName, setHoveringCanvasName] = useState(false)
 
   // Carica tutti i canvas e crea quello di default se mancante
   useEffect(() => {
@@ -181,7 +182,11 @@ export default function BoardPage({ user, isDemo }) {
 
           <Breadcrumb canvases={canvases} currentCanvasId={currentCanvasId} onNavigate={navigate} />
 
-          <div className="flex items-center gap-1 group">
+          <div
+            className="flex items-center gap-1"
+            onMouseEnter={() => setHoveringCanvasName(true)}
+            onMouseLeave={() => setHoveringCanvasName(false)}
+          >
             {editingCanvasName ? (
               <input
                 autoFocus
@@ -197,7 +202,8 @@ export default function BoardPage({ user, isDemo }) {
                 <span className="text-sm font-semibold text-gray-800">{currentCanvas?.name}</span>
                 <button
                   onClick={startEditingCanvasName}
-                  className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-gray-700 transition-all p-0.5 rounded"
+                  style={{ opacity: hoveringCanvasName ? 1 : 0, transition: 'opacity 0.15s' }}
+                  className="text-gray-400 hover:text-gray-700 p-0.5 rounded"
                   title="Rinomina"
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
