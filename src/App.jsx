@@ -398,7 +398,7 @@ export default function App() {
                         label={labelObj}
                         selected={selectedLabel === card.id}
                         editing={editingLabelId === card.id}
-                        onMouseDown={e => onLabelMouseDown(e, labelObj)}
+                        onMouseDown={e => onLabelMouseDown(e, labelObj, true)}
                         onStartEdit={() => setEditingLabelId(card.id)}
                         onEndEdit={() => setEditingLabelId(null)}
                         onTextChange={text => updateCardFn(card.id, { title: text })}

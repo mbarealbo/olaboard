@@ -135,12 +135,19 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
         const o = offsetRef.current, s = scaleRef.current
         const wx = (e.clientX - r.left - o.x) / s
         const wy = (e.clientY - r.top  - o.y) / s
+        const nx = d.origX + (wx - d.startWX)
+        const ny = d.origY + (wy - d.startWY)
         setDb(prev => {
           const cId = currentIdRef.current
           const canvas = prev[cId]
           if (!canvas) return prev
+          if (d.isCardLabel) {
+            return { ...prev, [cId]: { ...canvas, cards: canvas.cards.map(c =>
+              c.id === d.labelId ? { ...c, x: nx, y: ny } : c
+            )}}
+          }
           return { ...prev, [cId]: { ...canvas, labels: (canvas.labels||[]).map(l =>
-            l.id === d.labelId ? { ...l, x: d.origX + (wx - d.startWX), y: d.origY + (wy - d.startWY) } : l
+            l.id === d.labelId ? { ...l, x: nx, y: ny } : l
           )}}
         })
       }
@@ -360,14 +367,14 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
   }
 
   // ── label event handlers ────────────────────────────────────��─────────────
-  function onLabelMouseDown(e, label) {
+  function onLabelMouseDown(e, label, isCardLabel) {
     e.stopPropagation()
     setSelectedLabel(label.id); setSelected(null)
     const r = boardRef.current.getBoundingClientRect()
     const o = offsetRef.current, s = scaleRef.current
     const wx = (e.clientX - r.left - o.x) / s
     const wy = (e.clientY - r.top  - o.y) / s
-    dragging.current = { type: 'label', labelId: label.id, startWX: wx, startWY: wy, origX: label.x, origY: label.y }
+    dragging.current = { type: 'label', labelId: label.id, startWX: wx, startWY: wy, origX: label.x, origY: label.y, isCardLabel: !!isCardLabel }
   }
 
   // ── zoom buttons ────────────────────────────────���─────────────────────────
