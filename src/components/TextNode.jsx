@@ -47,10 +47,10 @@ export default function TextNode({ data, selected }) {
         style={{
           minWidth: 120,
           maxWidth: 260,
-          border: selected ? '1px dashed #378ADD' : '1px dashed transparent',
+          border: selected ? '1px dashed #378ADD' : '1px dashed #d1d5db',
           borderRadius: 4,
           padding: '6px 10px',
-          background: 'transparent',
+          background: 'rgba(255,255,255,0.01)',
         }}
       >
         {editing ? (
