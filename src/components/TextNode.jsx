@@ -44,12 +44,13 @@ export default function TextNode({ data, selected }) {
       onMouseLeave={() => setShowActions(false)}
     >
       <div
-        className="rounded-sm shadow-sm select-none"
+        className="rounded-sm select-none"
         style={{
           minWidth: 140,
           maxWidth: 260,
           background: '#ffffff',
-          border: selected ? '2px solid #378ADD' : '2px solid #e5e7eb',
+          border: selected ? '2px solid #378ADD' : '1px solid #d1d5db',
+          boxShadow: selected ? '0 0 0 3px rgba(55,138,221,0.15)' : '0 1px 4px rgba(0,0,0,0.10)',
           padding: '10px 14px',
           position: 'relative',
         }}

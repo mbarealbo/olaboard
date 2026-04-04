@@ -231,26 +231,37 @@ function Inner({ canvasId, userId, canvases, onEnterFolder, onNoteOpen, onCanvas
     for (const e of deleted) await deleteConnection(e.id)
   }, [])
 
-  const onKeyDown = useCallback((e) => {
-    if (e.key === 'Escape') {
-      setPendingNodeType(null)
-      return
-    }
-    if (e.key !== 'Delete' && e.key !== 'Backspace') return
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
-    e.preventDefault()
-    setNodes(prev => {
-      prev.filter(n => n.selected).forEach(n => {
-        deleteCard(n.id)
-        onSyncCard('remove', { id: n.id })
+  const nodesRef = useRef(nodes)
+  const edgesRef = useRef(edges)
+  nodesRef.current = nodes
+  edgesRef.current = edges
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === 'Escape') {
+        setPendingNodeType(null)
+        return
+      }
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return
+      e.preventDefault()
+      setNodes(prev => {
+        prev.filter(n => n.selected).forEach(n => {
+          deleteCard(n.id)
+          onSyncCard('remove', { id: n.id })
+        })
+        return prev.filter(n => !n.selected)
       })
-      return prev.filter(n => !n.selected)
-    })
-    setEdges(prev => {
-      prev.filter(e => e.selected).forEach(e => deleteConnection(e.id))
-      return prev.filter(e => !e.selected)
-    })
+      setEdges(prev => {
+        prev.filter(ed => ed.selected).forEach(ed => deleteConnection(ed.id))
+        return prev.filter(ed => !ed.selected)
+      })
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
   }, [onSyncCard])
+
+  const onKeyDown = useCallback((e) => {}, [])
 
   if (loading) return (
     <div className="flex-1 flex items-center justify-center bg-gray-100">
