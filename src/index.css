@@ -48,11 +48,8 @@ body { font-family: system-ui, sans-serif; background: #f0f0f0; height: 100vh; o
 }
 .connect-dot {
   position: absolute;
-  right: -8px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   background: #378ADD;
   border: 2px solid #fff;
@@ -60,7 +57,12 @@ body { font-family: system-ui, sans-serif; background: #f0f0f0; height: 100vh; o
   display: none;
   z-index: 10;
 }
+.connect-dot-top    { top: -7px;  left: 50%; transform: translateX(-50%); }
+.connect-dot-bottom { bottom: -7px; left: 50%; transform: translateX(-50%); }
+.connect-dot-left   { left: -7px; top: 50%; transform: translateY(-50%); }
+.connect-dot-right  { right: -7px; top: 50%; transform: translateY(-50%); }
 .postit:hover .connect-dot { display: block; }
+.connect-dot.anchor-hover { display: block; background: #1a5fa8; transform: scale(1.35); }
 
 /* ── Block editor ───────────────────────────────────────────────────────────── */
 .block-editor-block:empty::before {
