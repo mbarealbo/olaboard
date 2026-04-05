@@ -1,4 +1,5 @@
 import { useRef, useEffect } from 'react'
+import { Folder, FileText, Type } from 'lucide-react'
 
 const COLOR_MAP = {
   yellow: '#FAC775', orange: '#EF9F27', green: '#b8e986',
@@ -88,9 +89,9 @@ export default function PostIt({ card, selected, onMouseDown, onDblClick, onRena
       ) : null}
 
       <div className="postit-actions">
-        <button className="paction" title="Apri note" onMouseDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onNoteOpen() }}>☰</button>
-        <button className="paction" title={card.isFolder ? 'Rimuovi cartella' : 'Converti in cartella'} onMouseDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onToggleFolder() }}>📁</button>
-        <button className="paction" title="Converti in etichetta" onMouseDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onConvertToLabel() }}>T</button>
+        <button className="paction" title="Apri note" onMouseDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onNoteOpen() }}><FileText size={12} /></button>
+        <button className="paction" title={card.isFolder ? 'Rimuovi cartella' : 'Converti in cartella'} onMouseDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onToggleFolder() }}><Folder size={12} /></button>
+        <button className="paction" title="Converti in etichetta" onMouseDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onConvertToLabel() }}><Type size={12} /></button>
       </div>
 
       <div className="connect-dot connect-dot-top"    onMouseDown={e => onConnectDot(e, 'top')} />

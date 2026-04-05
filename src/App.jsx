@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { Trash2, Moon, Sun, Monitor, Zap, User, Folder } from 'lucide-react'
 import BlockEditor from './components/BlockEditor'
 import PostIt from './components/PostIt'
 import { Group, CanvasLabel } from './components/GroupBox'
@@ -38,7 +39,7 @@ function FolderTree({ db, currentId, onNavigate, id, depth }) {
         }}
         onClick={() => onNavigate(id)}
       >
-        <span>{depth === 0 ? '🏠' : '📁'}</span>
+        <span>{depth === 0 ? '🏠' : <Folder size={14} />}</span>
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{canvas.name}</span>
       </div>
       {subFolders.map(f => {
@@ -502,7 +503,7 @@ export default function App() {
                           setBoards(prev => prev.filter(b => b.id !== board.id))
                           setDb(prev => { const next = { ...prev }; delete next[board.id]; return next })
                         }}
-                      >🗑</button>
+                      ><Trash2 size={14} /></button>
                     )}
                   </div>
                   {/* Folder tree when active */}
@@ -534,7 +535,7 @@ export default function App() {
               onMouseEnter={e => { e.currentTarget.style.background = '#f5f5f5' }}
               onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
               onClick={() => alert('Coming soon')}
-            >👤 Account</button>
+            ><User size={14} /> Account</button>
           </div>
         </div>
       )}
@@ -584,7 +585,7 @@ export default function App() {
                 style={{ ...smallBtn, background: autoCreate ? 'var(--accent)' : 'var(--btn-bg)', color: autoCreate ? '#fff' : 'var(--btn-text)', borderColor: autoCreate ? 'var(--accent)' : 'var(--btn-border)', ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }}
                 onClick={view === 'canvas' ? () => setAutoCreate(v => !v) : undefined}
                 title="Crea elemento al termine della freccia"
-              >⚡ Quick</button>
+              ><Zap size={14} /> Quick</button>
               <button
                 disabled={view !== 'canvas'}
                 style={{ ...smallBtn, background: selectMode ? 'var(--accent)' : 'var(--btn-bg)', color: selectMode ? '#fff' : 'var(--btn-text)', borderColor: selectMode ? 'var(--accent)' : 'var(--btn-border)', ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }}
@@ -882,7 +883,8 @@ export default function App() {
               </div>
               {listItems.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Nessun elemento in questo canvas.</p>}
               {listItems.map(item => {
-                const badge = item.type === 'folder' ? '📁 Cartella' : item.type === 'label' ? 'T Testo' : '📝 Nota'
+                const badgeIcon = item.type === 'folder' ? <Folder size={12} /> : item.type === 'label' ? <span style={{fontSize:11}}>T</span> : <span style={{fontSize:11}}>✎</span>
+                const badgeLabel = item.type === 'folder' ? 'Cartella' : item.type === 'label' ? 'Testo' : 'Nota'
                 const dateStr = item.createdAt
                   ? new Date(item.createdAt).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' })
                   : '—'
@@ -897,7 +899,7 @@ export default function App() {
                     style={{ background: 'var(--bg-panel)', borderRadius: 6, padding: '10px 14px', marginBottom: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, border: '1px solid var(--border)' }}
                     onClick={handleClick}
                   >
-                    <span style={{ fontSize: 11, color: 'var(--text-muted)', minWidth: 70, flexShrink: 0 }}>{badge}</span>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)', minWidth: 70, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4 }}>{badgeIcon}{badgeLabel}</span>
                     <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</span>
                     <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{dateStr}</span>
                   </div>
@@ -927,7 +929,7 @@ export default function App() {
       <button
         onClick={() => setTheme(t => t === 'light' ? 'dark' : t === 'dark' ? 'high-contrast' : 'light')}
         style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 9999, background: 'var(--bg-panel)', border: '1px solid var(--border)', borderRadius: 20, padding: '6px 12px', fontSize: 13, boxShadow: '0 2px 8px rgba(0,0,0,0.15)', cursor: 'pointer', color: 'var(--text)' }}
-      >{theme === 'light' ? '☀️' : theme === 'dark' ? '🌙' : '💾'}</button>
+      >{theme === 'light' ? <Sun size={14} /> : theme === 'dark' ? <Moon size={14} /> : <Monitor size={14} />}</button>
 
     </div>
   )

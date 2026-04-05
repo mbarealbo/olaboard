@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect } from 'react'
+import { Folder } from 'lucide-react'
 
 const RESIZE_HANDLES = [
   { id: 'nw', style: { top: -4, left:  -4, cursor: 'nw-resize' } },
@@ -136,7 +137,7 @@ export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit
             onMouseDown={e => e.stopPropagation()}
             onClick={e => { e.stopPropagation(); onConvertToFolder?.() }}
             style={{ background: '#fff', border: '1px solid #d0d0d0', borderRadius: 4, padding: '3px 8px', fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap', boxShadow: '0 1px 4px rgba(0,0,0,0.1)' }}
-          >📁</button>
+          ><Folder size={12} /></button>
         </div>
       )}
     </div>
