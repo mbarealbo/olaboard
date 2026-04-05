@@ -3,9 +3,10 @@ import BlockEditor from './components/BlockEditor'
 import PostIt from './components/PostIt'
 import { Group, CanvasLabel } from './components/GroupBox'
 import { useCanvas } from './hooks/useCanvas'
-import { STORAGE_KEY, CARD_W, CARD_H_HALF, uid, loadDb, buildPath } from './utils'
+import { STORAGE_KEY, CARD_W, CARD_H_HALF, uid, loadDb } from './utils'
 
 const BOARDS_KEY = 'olaboard_boards'
+const STACK_KEY = 'olaboard_stack'
 
 function loadBoards() {
   try {
@@ -20,7 +21,8 @@ function FolderTree({ db, currentId, onNavigate, id, depth }) {
   depth = depth ?? 0
   const canvas = db[id]
   if (!canvas) return null
-  const isActive = id === currentId
+  const isActive = id === currentId ||
+    canvas.cards.some(c => c.isFolder && c.id === currentId)
   const subFolders = canvas.cards.filter(c => c.isFolder && !c.isLabel)
   return (
     <>
@@ -39,9 +41,22 @@ function FolderTree({ db, currentId, onNavigate, id, depth }) {
         <span>{depth === 0 ? '🏠' : '📁'}</span>
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{canvas.name}</span>
       </div>
-      {subFolders.map(f => (
-        <FolderTree key={f.id} db={{ ...db, [f.id]: db[f.id] || { id: f.id, name: f.title, cards: [], connections: [], groups: [], labels: [] } }} currentId={currentId} onNavigate={onNavigate} id={f.id} depth={depth + 1} />
-      ))}
+      {subFolders.map(f => {
+        const fCanvas = db[f.id] || {
+          id: f.id, name: f.title,
+          cards: [], connections: [], groups: [], labels: []
+        }
+        return (
+          <FolderTree
+            key={f.id}
+            db={{ ...db, [f.id]: fCanvas }}
+            currentId={currentId}
+            onNavigate={onNavigate}
+            id={f.id}
+            depth={depth + 1}
+          />
+        )
+      })}
     </>
   )
 }
@@ -51,7 +66,19 @@ export default function App() {
   const [db, setDb] = useState(loadDb)
   const [boards, setBoards] = useState(loadBoards)
   const [renamingBoardId, setRenamingBoardId] = useState(null)
-  const [stack, setStack] = useState(['root'])
+  const [stack, setStack] = useState(() => {
+    try {
+      const savedStack = JSON.parse(localStorage.getItem(STACK_KEY))
+      const savedBoards = JSON.parse(localStorage.getItem(BOARDS_KEY)) || []
+      if (Array.isArray(savedStack) && savedStack.length > 0) {
+        const boardExists = savedBoards.some(b => b.id === savedStack[0]) ||
+                           savedStack[0] === 'root'
+        if (boardExists) return savedStack
+      }
+      const firstBoard = savedBoards[0]
+      return firstBoard ? [firstBoard.id] : ['root']
+    } catch { return ['root'] }
+  })
   const [view, setView] = useState('canvas')
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [activeNoteId, setActiveNoteId] = useState(null)
@@ -70,9 +97,14 @@ export default function App() {
   const [editingConnValue, setEditingConnValue] = useState('')
 
   const currentIdRef = useRef('root')
+  const dbRef = useRef(db)
+  useEffect(() => { dbRef.current = db }, [db])
+  const boardsRef = useRef(boards)
+  useEffect(() => { boardsRef.current = boards }, [boards])
 
   useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(db)) }, [db])
   useEffect(() => { localStorage.setItem(BOARDS_KEY, JSON.stringify(boards)) }, [boards])
+  useEffect(() => { console.log('stack changed:', stack); localStorage.setItem(STACK_KEY, JSON.stringify(stack)) }, [stack])
 
   const currentId = stack[stack.length - 1]
   useEffect(() => { currentIdRef.current = currentId }, [currentId])
@@ -128,20 +160,82 @@ export default function App() {
   useEffect(() => { multiSelectedRef.current = multiSelected }, [multiSelected, multiSelectedRef])
 
   // ── navigation ───────────────────────────────────────────────────────────
+  function centerCanvas(canvasId) {
+    const canvas = db[canvasId]
+    if (!canvas) { setOffset({ x: 0, y: 0 }); setScale(1); return }
+    const elements = [
+      ...(canvas.cards || []).map(c => ({ x: c.x, y: c.y, w: CARD_W, h: CARD_H_HALF * 2 })),
+      ...(canvas.groups || []).map(g => ({ x: g.x, y: g.y, w: g.width, h: g.height })),
+      ...(canvas.labels || []).map(l => ({ x: l.x, y: l.y, w: 100, h: 30 })),
+    ]
+    if (elements.length === 0) { setOffset({ x: 0, y: 0 }); setScale(1); return }
+    const minX = Math.min(...elements.map(e => e.x))
+    const minY = Math.min(...elements.map(e => e.y))
+    const maxX = Math.max(...elements.map(e => e.x + e.w))
+    const maxY = Math.max(...elements.map(e => e.y + e.h))
+    const contentW = maxX - minX
+    const contentH = maxY - minY
+    const contentCX = minX + contentW / 2
+    const contentCY = minY + contentH / 2
+    const vpW = window.innerWidth - 200
+    const vpH = window.innerHeight - 44
+    const scaleX = (vpW * 0.8) / contentW
+    const scaleY = (vpH * 0.8) / contentH
+    const newScale = Math.min(1, Math.max(0.2, Math.min(scaleX, scaleY)))
+    setScale(newScale)
+    setOffset({ x: vpW / 2 - contentCX * newScale, y: vpH / 2 - contentCY * newScale })
+  }
+
   function enterCanvas(id, name) {
     setDb(prev => prev[id] ? prev : { ...prev, [id]: { id, name: name || 'Cartella', cards: [], connections: [], groups: [], labels: [] } })
     setStack(prev => [...prev, id])
     setSelected(null); setActiveNoteId(null)
-    setOffset({ x: 0, y: 0 }); setScale(1)
+    setTimeout(() => centerCanvas(id), 50)
   }
 
   function navigateTo(idx) {
+    const targetId = stack[idx]
     setStack(prev => prev.slice(0, idx + 1))
     setSelected(null); setActiveNoteId(null)
+    setTimeout(() => centerCanvas(targetId), 50)
   }
 
   const handleSidebarNavigate = useCallback((targetId) => {
     if (targetId === currentIdRef.current) return
+
+    function findPath(canvasId, target, pathSoFar) {
+      if (canvasId === target) return [...pathSoFar, canvasId]
+      const canvas = dbRef.current[canvasId]
+      if (!canvas) return null
+      for (const card of (canvas.cards || [])) {
+        if (!card.isFolder) continue
+        if (card.id === target) return [...pathSoFar, canvasId, card.id]
+        const result = findPath(card.id, target, [...pathSoFar, canvasId])
+        if (result) return result
+      }
+      return null
+    }
+
+    const boardsList = dbRef.current.boards || [{ id: 'root' }]
+    let path = null
+    for (const board of boardsList) {
+      path = findPath(board.id, targetId, [])
+      if (path) break
+    }
+    if (!path) path = [targetId]
+
+    const currentBoards = boardsRef.current
+    const boardIds = currentBoards.map(b => b.id)
+    if (path.length === 1 && !boardIds.includes(path[0])) {
+      for (const board of currentBoards) {
+        const fullPath = findPath(board.id, targetId, [])
+        if (fullPath && fullPath.length > 1) {
+          path = fullPath
+          break
+        }
+      }
+    }
+
     setDb(prev => {
       if (prev[targetId]) return prev
       function findCard(canvasId) {
@@ -149,15 +243,27 @@ export default function App() {
         if (!cv) return null
         const found = cv.cards.find(c => c.id === targetId)
         if (found) return found
-        for (const c of cv.cards) if (c.isFolder) { const r = findCard(c.id); if (r) return r }
+        for (const c of cv.cards) if (c.isFolder) {
+          const r = findCard(c.id); if (r) return r
+        }
         return null
       }
       const fc = findCard('root')
-      return { ...prev, [targetId]: { id: targetId, name: fc?.title || 'Cartella', cards: [], connections: [], groups: [], labels: [] } }
+      return {
+        ...prev,
+        [targetId]: {
+          id: targetId,
+          name: fc?.title || 'Cartella',
+          cards: [], connections: [], groups: [], labels: []
+        }
+      }
     })
-    setStack(buildPath(db, targetId))
-    setSelected(null); setActiveNoteId(null)
-  }, [db])
+
+    setStack(path)
+    setSelected(null)
+    setActiveNoteId(null)
+    setTimeout(() => centerCanvas(targetId), 50)
+  }, [])
 
   // ── connection delete ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -197,37 +303,70 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [selectedConn, multiSelected])
 
-  // ── board delete (keyboard) ───────────────────────────────────────────────
+  // ── board / subfolder delete (keyboard) ──────────────────────────────────
   useEffect(() => {
     function onKey(e) {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selected === null && boards.length > 1) {
-        const boardId = stack[0]
-        if (!window.confirm('Eliminare questa lavagna e tutto il suo contenuto?')) return
-        // collect all canvas IDs rooted at boardId
-        function collectIds(db, id) {
-          const canvas = db[id]
-          if (!canvas) return [id]
-          const ids = [id]
-          for (const c of canvas.cards) {
-            if (c.isFolder && !c.isLabel) ids.push(...collectIds(db, c.id))
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selected === null) {
+        const cId = stack[stack.length - 1]
+        const isSubfolder = stack.length > 1
+
+        if (isSubfolder) {
+          // Delete current subfolder canvas
+          if (!window.confirm('Eliminare questa cartella e tutto il suo contenuto?')) return
+          function collectIds(db, id) {
+            const canvas = db[id]
+            if (!canvas) return [id]
+            const ids = [id]
+            for (const c of canvas.cards) {
+              if (c.isFolder && !c.isLabel) ids.push(...collectIds(db, c.id))
+            }
+            return ids
           }
-          return ids
-        }
-        setBoards(prev => {
-          const next = prev.filter(b => b.id !== boardId)
-          const firstId = next[0].id
-          setDb(prev2 => {
-            const idsToRemove = collectIds(prev2, boardId)
-            const next2 = { ...prev2 }
-            for (const id of idsToRemove) delete next2[id]
-            return next2
+          setDb(prev => {
+            const idsToRemove = collectIds(prev, cId)
+            const next = { ...prev }
+            for (const id of idsToRemove) delete next[id]
+            // Also remove the card from parent canvas
+            const parentId = stack[stack.length - 2]
+            if (next[parentId]) {
+              next[parentId] = {
+                ...next[parentId],
+                cards: next[parentId].cards.filter(c => c.id !== cId),
+                connections: next[parentId].connections.filter(c => c.from !== cId && c.to !== cId),
+              }
+            }
+            return next
           })
-          setStack([firstId])
-          setSelected(null); setActiveNoteId(null)
-          setOffset({ x: 0, y: 0 }); setScale(1)
-          return next
-        })
+          navigateTo(stack.length - 2)
+        } else if (boards.length > 1) {
+          // Delete entire board
+          const boardId = stack[0]
+          if (!window.confirm('Eliminare questa lavagna e tutto il suo contenuto?')) return
+          function collectIds(db, id) {
+            const canvas = db[id]
+            if (!canvas) return [id]
+            const ids = [id]
+            for (const c of canvas.cards) {
+              if (c.isFolder && !c.isLabel) ids.push(...collectIds(db, c.id))
+            }
+            return ids
+          }
+          setBoards(prev => {
+            const next = prev.filter(b => b.id !== boardId)
+            const firstId = next[0].id
+            setDb(prev2 => {
+              const idsToRemove = collectIds(prev2, boardId)
+              const next2 = { ...prev2 }
+              for (const id of idsToRemove) delete next2[id]
+              return next2
+            })
+            setStack([firstId])
+            setSelected(null); setActiveNoteId(null)
+            setOffset({ x: 0, y: 0 }); setScale(1)
+            return next
+          })
+        }
       }
     }
     window.addEventListener('keydown', onKey)
@@ -385,7 +524,7 @@ export default function App() {
                 const name = 'Nuova lavagna'
                 setBoards(prev => [...prev, { id, name }])
                 setDb(prev => ({ ...prev, [id]: { id, name, cards: [], connections: [], groups: [], labels: [] } }))
-                setStack([id]); setSelected(null); setActiveNoteId(null)
+                setStack([id]); localStorage.setItem(STACK_KEY, JSON.stringify([id])); setSelected(null); setActiveNoteId(null)
                 setOffset({ x: 0, y: 0 }); setScale(1)
                 setRenamingBoardId(id)
               }}
@@ -407,21 +546,8 @@ export default function App() {
         <div style={{ height: 44, background: 'var(--topbar-bg)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', flexShrink: 0 }}>
           <button style={iconBtn} onClick={() => setSidebarOpen(v => !v)}>☰</button>
 
-          {/* Breadcrumb */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, overflow: 'hidden' }}>
-            {stack.map((id, i) => {
-              const isLast = i === stack.length - 1
-              return (
-                <span key={id} style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                  {i > 0 && <span style={{ color: '#ddd' }}>/</span>}
-                  <span
-                    style={{ cursor: isLast ? 'default' : 'pointer', color: isLast ? 'var(--text)' : 'var(--accent)', fontWeight: isLast ? 600 : 400 }}
-                    onClick={() => !isLast && navigateTo(i)}
-                  >{db[id]?.name || id}</span>
-                </span>
-              )
-            })}
-          </div>
+          {/* Current canvas name */}
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{db[currentId]?.name || currentId}</span>
 
           <div style={{ flex: 1 }} />
 
@@ -711,10 +837,39 @@ export default function App() {
                       onConnectDot={(e, anchor) => onConnectDotMouseDown(e, card, anchor)}
                       initialEditing={editingCardId === card.id}
                       onEditStarted={() => setEditingCardId(null)}
+                      cardColor={card.color || 'yellow'}
+                      theme={theme}
                     />
                   )
                 })}
               </div>
+              {/* Breadcrumb overlay */}
+              {stack.length > 1 && (
+                <div style={{
+                  position: 'absolute', bottom: 16, left: 16, zIndex: 100,
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  background: theme === 'light' ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.6)',
+                  backdropFilter: 'blur(4px)', borderRadius: 20,
+                  padding: '4px 12px', fontSize: 12,
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                  pointerEvents: 'all',
+                }}>
+                  {stack.map((id, i) => {
+                    const isLast = i === stack.length - 1
+                    return (
+                      <span key={id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        {i > 0 && <span style={{ color: 'var(--text-muted)' }}>›</span>}
+                        <span
+                          style={{ fontWeight: isLast ? 600 : 400, color: isLast ? 'var(--text)' : 'var(--accent)', cursor: isLast ? 'default' : 'pointer', textDecoration: 'none' }}
+                          onMouseEnter={e => { if (!isLast) e.currentTarget.style.textDecoration = 'underline' }}
+                          onMouseLeave={e => { e.currentTarget.style.textDecoration = 'none' }}
+                          onClick={() => !isLast && navigateTo(i)}
+                        >{db[id]?.name || id}</span>
+                      </span>
+                    )
+                  })}
+                </div>
+              )}
             </div>
 
           ) : (
@@ -759,7 +914,10 @@ export default function App() {
               onChangeForm={setNoteForm}
               onSave={saveNote}
               onClose={() => setActiveNoteId(null)}
+              activeCard={cards.find(c => c.id === activeNoteId)}
+              onColorChange={color => updateCardFn(activeNoteId, { color })}
               onToggleMode={() => setNotePanelMode(m => m === 'side' ? 'full' : 'side')}
+              theme={theme}
             />
           )}
         </div>
@@ -776,7 +934,19 @@ export default function App() {
 }
 
 // ─── NotePanel ────────────────────────────────────────────────────────────────
-function NotePanel({ mode, noteForm, onChangeForm, onSave, onClose, onToggleMode }) {
+const NOTE_COLOR_MAP = {
+  yellow: '#FAC775', orange: '#EF9F27', green: '#b8e986',
+  blue: '#89cff0', pink: '#ffb3c6', purple: '#d4a8ff',
+  white: '#f5f5f5', red: '#ff8a80',
+}
+
+const HC_NOTE_COLOR_MAP = {
+  yellow: '#00ffff', orange: '#ff00ff', green: '#00ff41',
+  blue: '#ffff00', pink: '#ff6600', purple: '#ff00ff',
+  white: '#000099', red: '#ff0000',
+}
+
+function NotePanel({ mode, noteForm, onChangeForm, onSave, onClose, onToggleMode, activeCard, onColorChange, theme }) {
   const isFull = mode === 'full'
   const [titleFocused, setTitleFocused] = useState(false)
 
@@ -802,6 +972,32 @@ function NotePanel({ mode, noteForm, onChangeForm, onSave, onClose, onToggleMode
             onBlur={() => setTitleFocused(false)}
             style={{ width: '100%', border: 'none', outline: 'none', borderBottom: `2px solid ${titleFocused ? 'var(--accent)' : 'var(--border)'}`, padding: '12px 20px', fontSize: 16, fontWeight: 600, color: 'var(--text)', fontFamily: 'inherit', background: 'transparent' }}
           />
+          {activeCard && !activeCard.isFolder && onColorChange && (
+            <div style={{ padding: '8px 20px', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 }}>Colore</div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {Object.entries(NOTE_COLOR_MAP).map(([name]) => {
+                  const circleColor = theme === 'high-contrast' ? HC_NOTE_COLOR_MAP[name] : NOTE_COLOR_MAP[name]
+                  const active = (activeCard.color || 'yellow') === name
+                  return (
+                    <div
+                      key={name}
+                      onClick={() => onColorChange(name)}
+                      style={{
+                        width: 18, height: 18, borderRadius: '50%',
+                        background: circleColor,
+                        border: active ? '2px solid #333' : '2px solid transparent',
+                        cursor: 'pointer',
+                        transform: active ? 'scale(1.2)' : 'scale(1)',
+                        transition: 'transform 0.1s',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                      }}
+                    />
+                  )
+                })}
+              </div>
+            </div>
+          )}
           <BlockEditor value={noteForm.body} onChange={body => onChangeForm(f => ({ ...f, body }))} />
         </div>
       </div>

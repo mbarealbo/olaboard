@@ -26,7 +26,7 @@
 
 ### Card
 ```js
-{ id, x, y, title, body, isFolder, isLabel, createdAt }
+{ id, x, y, title, body, color, isFolder, isLabel, createdAt }
 ```
 
 ### Connection
@@ -55,13 +55,16 @@
 - Etichette frecce: input inline su click del cerchio centrale, cancellabile svuotando il campo
 - Pannello note: side mode (380px) e full mode (larghezza totale, max-width 800px centrato)
 - BlockEditor stile Notion: blocchi p/h1/h2/h3/ul/ol/quote/code, slash commands, shortcut markdown (# spazio → h1, - spazio → ul, ecc.), bullet rossi stile Bear
+  - Fix: emit() non più chiamata dentro setBlocks() updater (evita React warning "update during render")
 - Preview body sui post-it (max 3 righe)
 - Vista Elenco: tutti gli elementi (note, cartelle, testi liberi, label) con badge tipo e data creazione
 - Sidebar: multiple lavagne, espandi/collassa, rinomina inline, cancella con 🗑, Delete/Backspace con confirm, + Nuova lavagna, 👤 Account placeholder
-- Breadcrumb navigazione con stack di canvas annidati
+- Breadcrumb overlay bottom-left del canvas (visibile solo quando annidati, stack.length > 1)
 - Export markdown del canvas corrente (↓ MD)
 - Delete/Backspace elimina elemento selezionato (card, label, group)
 - FolderTree in sidebar aggiornato in real-time alla creazione cartelle
+  - isActive evidenzia anche i nodi parent del canvas corrente
+  - Fallback per cartelle non ancora visitate (nessun db entry)
 - Griglia puntini toggle (⊞ Grid): background-image radial-gradient, segue pan/zoom
 - activeTool modale ('note'|'text'|'group'): doppio click sulla lavagna crea il tipo attivo; i bottoni toolbar si evidenziano in blu quando attivi
 - ⚡ Quick (autoCreate): se attivo, trascinare una freccia sul canvas crea automaticamente una nuova card collegata
@@ -71,6 +74,22 @@
 - Multi-drag: se si trascina una card dentro una selezione multipla, tutte le card selezionate si muovono insieme (type:'multi' in dragging.current)
 - Tema: toggle ☀️/🌙/💾 in basso a destra, CSS variables (--bg, --bg-panel, --border, --text, --text-muted, --accent, --btn-bg, --btn-text, --btn-border, --postit-bg, --folder-bg, --grid-dot, --sidebar-bg, --topbar-bg), tre temi: light/dark/high-contrast
 - Toolbar in list view: tutti i bottoni canvas rimangono visibili ma disabled + opacity 0.4 + cursor not-allowed
+- Colori post-it personalizzati: 8 colori (yellow/orange/green/blue/pink/purple/white/red), selezionabili nel pannello note
+  - COLOR_MAP per temi light/dark, HC_COLOR_MAP per high-contrast (colori stile Commodore 64)
+  - getTextColor(bgHex): luminance-based, sceglie testo scuro o chiaro automaticamente
+  - Color picker nascosto in HC (usa HC_COLOR_MAP direttamente); nel pannello note mostra i colori del tema attivo
+- Stack navigazione persistito in localStorage (STACK_KEY='olaboard_stack')
+  - Inizializzazione con validazione: verifica che stack[0] sia una board esistente
+  - centerCanvas: auto-fit viewport quando si naviga in un canvas
+- handleSidebarNavigate: usa dbRef.current + boardsRef.current per evitare stale closure
+  - findPath ricorsivo senza guard su db entry (cartelle non visitate supportate)
+  - Se path.length===1 e non è una board root, cerca il board contenitore e prepende l'id
+
+## Refs in App.jsx
+- `dbRef` – sempre aggiornato a db corrente
+- `boardsRef` – sempre aggiornato a boards corrente
+- `currentIdRef` – id del canvas corrente
+- Passati a useCanvas: `activeAutoCreateRef`, `activeToolRef`, `multiSelectedRef`
 
 ## Logica frecce (exitPoint)
 ```js
@@ -98,7 +117,5 @@ function exitPoint(entity, isLbl, goingRight, goingDown, isHoriz, isSource) {
 ## Prossimi step
 1. Supabase + auth magic link
 2. Immagini nel canvas e nelle note
-3. Colori personalizzati post-it
-4. Modalità toolbar (doppio click crea il tipo selezionato dalla toolbar) ✅ implementato
-5. Export PDF / screenshot canvas
-6. Ricerca full-text tra le idee
+3. Export PDF / screenshot canvas
+4. Ricerca full-text tra le idee

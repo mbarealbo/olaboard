@@ -39,8 +39,8 @@
   --text: #00ff41;
   --text-muted: #00cc33;
   --accent: #ffff00;
-  --postit-bg: #000099;
-  --folder-bg: #0000cc;
+  --postit-bg: #00ffff;
+  --folder-bg: #ff00ff;
   --grid-dot: #003300;
   --sidebar-bg: #000044;
   --topbar-bg: #000055;
@@ -65,6 +65,16 @@ body { font-family: system-ui, sans-serif; background: var(--bg); height: 100vh;
   box-shadow: 2px 3px 7px rgba(0,0,0,0.13);
 }
 .postit.is-folder { background: var(--folder-bg); }
+.postit.is-folder::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: 12px;
+  width: 40px;
+  height: 10px;
+  background: var(--folder-bg);
+  border-radius: 4px 4px 0 0;
+}
 
 [data-theme="high-contrast"] .postit {
   border: 2px solid var(--border);

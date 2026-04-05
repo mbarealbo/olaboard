@@ -246,11 +246,9 @@ export default function BlockEditor({ value, onChange }) {
   function convertBlock(blockId, type) {
     const el = domRefs.current[blockId]
     if (el) el.innerHTML = ''
-    setBlocks(prev => {
-      const updated = prev.map(b => b.id === blockId ? { ...b, type, content: '' } : b)
-      emit(updated)
-      return updated
-    })
+    const updated = blocksRef.current.map(b => b.id === blockId ? { ...b, type, content: '' } : b)
+    emit(updated)
+    setBlocks(updated)
     pendingFocus.current = { id: blockId, atEnd: false }
     setSlashMenu(null)
   }
@@ -297,12 +295,10 @@ export default function BlockEditor({ value, onChange }) {
       e.preventDefault()
       const content = getContent(block.id)
       const newBlock = { id: uid(), type: 'p', content: '' }
-      setBlocks(prev => {
-        const updated = prev.map(b => b.id === block.id ? { ...b, content } : b)
-        const next = [...updated.slice(0, idx + 1), newBlock, ...updated.slice(idx + 1)]
-        emit(next)
-        return next
-      })
+      const updated = blocksRef.current.map(b => b.id === block.id ? { ...b, content } : b)
+      const next = [...updated.slice(0, idx + 1), newBlock, ...updated.slice(idx + 1)]
+      emit(next)
+      setBlocks(next)
       pendingFocus.current = { id: newBlock.id, atEnd: false }
       setSlashMenu(null)
       return
@@ -314,11 +310,9 @@ export default function BlockEditor({ value, onChange }) {
         e.preventDefault()
         const prevBlock = cur[idx - 1]
         if (!prevBlock) return
-        setBlocks(prev => {
-          const next = prev.filter(b => b.id !== block.id)
-          emit(next)
-          return next
-        })
+        const next = blocksRef.current.filter(b => b.id !== block.id)
+        emit(next)
+        setBlocks(next)
         pendingFocus.current = { id: prevBlock.id, atEnd: true }
         setSlashMenu(null)
         return
@@ -377,11 +371,9 @@ export default function BlockEditor({ value, onChange }) {
     const content = getContent(block.id)
     const el = domRefs.current[block.id]
     if (el && el.innerHTML === '<br>') el.innerHTML = ''
-    setBlocks(prev => {
-      const updated = prev.map(b => b.id === block.id ? { ...b, content } : b)
-      emit(updated)
-      return updated
-    })
+    const updated = blocksRef.current.map(b => b.id === block.id ? { ...b, content } : b)
+    emit(updated)
+    setBlocks(updated)
   }
 
   const menuItems = slashMenu
