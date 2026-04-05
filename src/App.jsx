@@ -722,7 +722,7 @@ export default function App() {
             <div style={{ flex: 1, overflowY: 'auto', padding: 24, background: 'var(--bg)' }}>
               <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
                 {[['az', 'A→Z'], ['za', 'Z→A'], ['date', 'Creazione']].map(([v, l]) => (
-                  <button key={v} onClick={() => setListSort(v)} style={{ ...smallBtn, fontWeight: listSort === v ? 700 : 400, background: listSort === v ? '#EBF4FF' : '#fff', color: listSort === v ? '#378ADD' : '#555' }}>{l}</button>
+                  <button key={v} onClick={() => setListSort(v)} style={{ ...smallBtn, fontWeight: listSort === v ? 700 : 400, background: listSort === v ? 'var(--accent)' : 'var(--btn-bg)', color: listSort === v ? '#fff' : 'var(--btn-text)', border: '1px solid var(--border)' }}>{l}</button>
                 ))}
               </div>
               {listItems.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Nessun elemento in questo canvas.</p>}
@@ -739,7 +739,7 @@ export default function App() {
                 return (
                   <div
                     key={item.id}
-                    style={{ background: '#fff', borderRadius: 6, padding: '10px 14px', marginBottom: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}
+                    style={{ background: 'var(--bg-panel)', borderRadius: 6, padding: '10px 14px', marginBottom: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, border: '1px solid var(--border)' }}
                     onClick={handleClick}
                   >
                     <span style={{ fontSize: 11, color: 'var(--text-muted)', minWidth: 70, flexShrink: 0 }}>{badge}</span>
