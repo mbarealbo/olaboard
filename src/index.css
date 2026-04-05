@@ -1,19 +1,78 @@
+:root, [data-theme="light"] {
+  --bg: #f0f0f0;
+  --bg-panel: #ffffff;
+  --border: #e5e7eb;
+  --text: #333333;
+  --text-muted: #888888;
+  --accent: #378ADD;
+  --postit-bg: #FAC775;
+  --folder-bg: #EF9F27;
+  --grid-dot: #c0c0c0;
+  --sidebar-bg: #ffffff;
+  --topbar-bg: #ffffff;
+  --btn-bg: #ffffff;
+  --btn-text: #333333;
+  --btn-border: #e5e7eb;
+}
+
+[data-theme="dark"] {
+  --bg: #1a1a2e;
+  --bg-panel: #16213e;
+  --border: #2d3561;
+  --text: #e0e0e0;
+  --text-muted: #888888;
+  --accent: #4fc3f7;
+  --postit-bg: #e6a817;
+  --folder-bg: #c47f0a;
+  --grid-dot: #2d3561;
+  --sidebar-bg: #16213e;
+  --topbar-bg: #0f3460;
+  --btn-bg: #1e3a5f;
+  --btn-text: #e0e0e0;
+  --btn-border: #2d5a8e;
+}
+
+[data-theme="high-contrast"] {
+  --bg: #000033;
+  --bg-panel: #000066;
+  --border: #00ff41;
+  --text: #00ff41;
+  --text-muted: #00cc33;
+  --accent: #ffff00;
+  --postit-bg: #000099;
+  --folder-bg: #0000cc;
+  --grid-dot: #003300;
+  --sidebar-bg: #000044;
+  --topbar-bg: #000055;
+  --btn-bg: #000066;
+  --btn-text: #00ff41;
+  --btn-border: #00ff41;
+}
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: system-ui, sans-serif; background: #f0f0f0; height: 100vh; overflow: hidden; }
+body { font-family: system-ui, sans-serif; background: var(--bg); height: 100vh; overflow: hidden; }
 #root { height: 100vh; }
 
 .postit {
   position: absolute;
   width: 130px;
   min-height: 74px;
-  background: #FAC775;
+  background: var(--postit-bg);
   border-radius: 2px;
   padding: 8px 10px 30px;
   cursor: grab;
   user-select: none;
   box-shadow: 2px 3px 7px rgba(0,0,0,0.13);
 }
-.postit.is-folder { background: #EF9F27; }
+.postit.is-folder { background: var(--folder-bg); }
+
+[data-theme="high-contrast"] .postit {
+  border: 2px solid var(--border);
+  color: var(--text);
+  font-family: monospace;
+  box-shadow: none;
+}
+[data-theme="high-contrast"] .postit-title { color: var(--text); }
 .postit.selected { outline: 2px solid #378ADD; outline-offset: 2px; }
 .postit-title {
   font-size: 11px;

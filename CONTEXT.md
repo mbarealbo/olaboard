@@ -57,11 +57,20 @@
 - BlockEditor stile Notion: blocchi p/h1/h2/h3/ul/ol/quote/code, slash commands, shortcut markdown (# spazio → h1, - spazio → ul, ecc.), bullet rossi stile Bear
 - Preview body sui post-it (max 3 righe)
 - Vista Elenco: tutti gli elementi (note, cartelle, testi liberi, label) con badge tipo e data creazione
-- Sidebar: multiple lavagne, espandi/collassa, rinomina inline, cancella con ×, Delete/Backspace con confirm, + Nuova lavagna, 👤 Account placeholder
+- Sidebar: multiple lavagne, espandi/collassa, rinomina inline, cancella con 🗑, Delete/Backspace con confirm, + Nuova lavagna, 👤 Account placeholder
 - Breadcrumb navigazione con stack di canvas annidati
 - Export markdown del canvas corrente (↓ MD)
 - Delete/Backspace elimina elemento selezionato (card, label, group)
 - FolderTree in sidebar aggiornato in real-time alla creazione cartelle
+- Griglia puntini toggle (⊞ Grid): background-image radial-gradient, segue pan/zoom
+- activeTool modale ('note'|'text'|'group'): doppio click sulla lavagna crea il tipo attivo; i bottoni toolbar si evidenziano in blu quando attivi
+- ⚡ Quick (autoCreate): se attivo, trascinare una freccia sul canvas crea automaticamente una nuova card collegata
+- ⬚ Select (lasso multi-selezione): drag sulla lavagna seleziona tutte le card/label/group nell'area; Delete rimuove tutti gli elementi selezionati
+- Zoom scroll: wheel handler legge scale e offset dai ref (scaleRef, offsetRef) in modo sincrono, aggiorna i ref immediatamente dopo setState per evitare stale closure su scroll rapido
+- Group drag: cardOrigins calcolato dinamicamente in base ai bounds del gruppo (non più da cardIds); cardIds risincronizzato al mouseup
+- Multi-drag: se si trascina una card dentro una selezione multipla, tutte le card selezionate si muovono insieme (type:'multi' in dragging.current)
+- Tema: toggle ☀️/🌙/💾 in basso a destra, CSS variables (--bg, --bg-panel, --border, --text, --text-muted, --accent, --btn-bg, --btn-text, --btn-border, --postit-bg, --folder-bg, --grid-dot, --sidebar-bg, --topbar-bg), tre temi: light/dark/high-contrast
+- Toolbar in list view: tutti i bottoni canvas rimangono visibili ma disabled + opacity 0.4 + cursor not-allowed
 
 ## Logica frecce (exitPoint)
 ```js
@@ -90,6 +99,6 @@ function exitPoint(entity, isLbl, goingRight, goingDown, isHoriz, isSource) {
 1. Supabase + auth magic link
 2. Immagini nel canvas e nelle note
 3. Colori personalizzati post-it
-4. Modalità toolbar (doppio click crea il tipo selezionato dalla toolbar)
+4. Modalità toolbar (doppio click crea il tipo selezionato dalla toolbar) ✅ implementato
 5. Export PDF / screenshot canvas
 6. Ricerca full-text tra le idee

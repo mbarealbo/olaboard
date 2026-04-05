@@ -1,12 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { uid, anchorPoint } from '../utils'
 
-export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnectionFn, setActiveNoteId, view }) {
+export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnectionFn, setActiveNoteId, view, activeTool, setActiveTool, selectMode, setMultiSelected, setSelectionRect }) {
   const [offset, setOffset] = useState({ x: 0, y: 0 })
   const [scale, setScale] = useState(1)
   const [connectLine, setConnectLine] = useState(null)
-  const [drawingGroup, setDrawingGroup] = useState(false)
-  const [textMode, setTextMode] = useState(false)
   const [groupDrawPreview, setGroupDrawPreview] = useState(null)
   const [selectedLabel, setSelectedLabel] = useState(null)
   const [editingLabelId, setEditingLabelId] = useState(null)
@@ -20,6 +18,9 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
   const connecting = useRef(null)
   const groupDrawing = useRef(null)
   const dbRef = useRef(db)
+  const activeAutoCreateRef = useRef(false)
+  const activeToolRef = useRef('note')
+  const multiSelectedRef = useRef([])
 
   useEffect(() => { offsetRef.current = offset }, [offset])
   useEffect(() => { scaleRef.current = scale }, [scale])
@@ -93,6 +94,23 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
         const wx = (e.clientX - r.left - o.x) / s
         const wy = (e.clientY - r.top  - o.y) / s
         updateCardFn(d.cardId, { x: d.origX + (wx - d.startWX), y: d.origY + (wy - d.startWY) })
+      } else if (d.type === 'multi') {
+        const r = getBoardRect()
+        const o = offsetRef.current, s = scaleRef.current
+        const wx = (e.clientX - r.left - o.x) / s
+        const wy = (e.clientY - r.top  - o.y) / s
+        const dx = wx - d.startWX, dy = wy - d.startWY
+        setDb(prev => {
+          const cId = currentIdRef.current
+          const canvas = prev[cId]
+          if (!canvas) return prev
+          const updatedCards = canvas.cards.map(c => {
+            const origin = d.cardOrigins.find(o => o.id === c.id)
+            if (!origin) return c
+            return { ...c, x: origin.x + dx, y: origin.y + dy }
+          })
+          return { ...prev, [cId]: { ...canvas, cards: updatedCards } }
+        })
       } else if (d.type === 'group') {
         const r = getBoardRect()
         const o = offsetRef.current, s = scaleRef.current
@@ -129,6 +147,15 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
           const canvas = prev[cId]
           if (!canvas) return prev
           return { ...prev, [cId]: { ...canvas, groups: (canvas.groups||[]).map(g => g.id === d.groupId ? { ...g, x, y, width, height } : g) } }
+        })
+      } else if (d.type === 'select') {
+        const r = getBoardRect()
+        const o = offsetRef.current, s = scaleRef.current
+        const wx = (e.clientX - r.left - o.x) / s
+        const wy = (e.clientY - r.top  - o.y) / s
+        setSelectionRect({
+          x: Math.min(wx, d.startWX), y: Math.min(wy, d.startWY),
+          w: Math.abs(wx - d.startWX), h: Math.abs(wy - d.startWY),
         })
       } else if (d.type === 'label') {
         const r = getBoardRect()
@@ -177,7 +204,7 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
         }
         groupDrawing.current = null
         setGroupDrawPreview(null)
-        setDrawingGroup(false)
+        setActiveTool('note')
         return
       }
 
@@ -194,10 +221,83 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
             if (!canvas) return prev
             return { ...prev, [cId]: { ...canvas, connections: [...canvas.connections, { id: uid(), from: fromId, to: toId, fromAnchor, toAnchor, label: '' }] } }
           })
+        } else if (activeAutoCreateRef.current) {
+          const r = getBoardRect()
+          const o = offsetRef.current, s = scaleRef.current
+          const wx = (e.clientX - r.left - o.x) / s
+          const wy = (e.clientY - r.top  - o.y) / s
+          const isText = activeToolRef.current === 'text'
+          const newId = uid()
+          const newCard = isText
+            ? { id: newId, isLabel: true, title: 'Testo libero', x: wx - 56, y: wy - 20 }
+            : { id: newId, isLabel: false, title: 'Nuova idea', x: wx - 65, y: wy - 37 }
+          setDb(prev => {
+            const cId = currentIdRef.current
+            const canvas = prev[cId]
+            if (!canvas) return prev
+            return {
+              ...prev,
+              [cId]: {
+                ...canvas,
+                cards: [...canvas.cards, newCard],
+                connections: [...canvas.connections, { id: uid(), from: fromId, to: newId, fromAnchor, toAnchor, label: '' }],
+              },
+            }
+          })
         }
         connecting.current = null
         setConnectLine(null)
         return
+      }
+
+      // Select lasso completion
+      if (dragging.current?.type === 'select') {
+        const { startWX, startWY } = dragging.current
+        const r = getBoardRect()
+        const o = offsetRef.current, s = scaleRef.current
+        const wx = (e.clientX - r.left - o.x) / s
+        const wy = (e.clientY - r.top  - o.y) / s
+        const rx = Math.min(wx, startWX), ry = Math.min(wy, startWY)
+        const rw = Math.abs(wx - startWX), rh = Math.abs(wy - startWY)
+        const canvas = dbRef.current[currentIdRef.current]
+        if (canvas) {
+          const ids = []
+          for (const c of canvas.cards) {
+            const cx = c.x + (c.isLabel ? 56 : 65), cy = c.y + (c.isLabel ? 20 : 37)
+            if (cx >= rx && cx <= rx + rw && cy >= ry && cy <= ry + rh) ids.push(c.id)
+          }
+          for (const g of (canvas.groups || [])) {
+            if (g.x < rx + rw && g.x + g.width > rx && g.y < ry + rh && g.y + g.height > ry) ids.push(g.id)
+          }
+          for (const l of (canvas.labels || [])) {
+            if (l.x >= rx && l.x <= rx + rw && l.y >= ry && l.y <= ry + rh) ids.push(l.id)
+          }
+          setMultiSelected(ids)
+        }
+        setSelectionRect(null)
+        dragging.current = null
+        return
+      }
+
+      // Group drop: sync cardIds based on final positions
+      if (dragging.current?.type === 'group') {
+        const groupId = dragging.current.groupId
+        setDb(prev => {
+          const cId = currentIdRef.current
+          const canvas = prev[cId]
+          if (!canvas) return prev
+          const grp = (canvas.groups || []).find(g => g.id === groupId)
+          if (!grp) return prev
+          const newCardIds = canvas.cards
+            .filter(c => {
+              const cx = c.x + 65, cy = c.y + 37
+              return cx >= grp.x && cx <= grp.x + grp.width &&
+                     cy >= grp.y && cy <= grp.y + grp.height
+            })
+            .map(c => c.id)
+          const newGroups = (canvas.groups || []).map(g => g.id === groupId ? { ...g, cardIds: newCardIds } : g)
+          return { ...prev, [cId]: { ...canvas, groups: newGroups } }
+        })
       }
 
       // Card drop: recalculate group membership
@@ -279,14 +379,20 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
     function onWheel(e) {
       e.preventDefault()
       const r = el.getBoundingClientRect()
-      const cx = e.clientX - r.left, cy = e.clientY - r.top
+      const cx = e.clientX - r.left
+      const cy = e.clientY - r.top
       const factor = e.deltaY < 0 ? 1.1 : 0.9
-      setScale(s => {
-        const next = Math.max(0.15, Math.min(4, s * factor))
-        const ratio = next / s
-        setOffset(o => ({ x: cx - ratio * (cx - o.x), y: cy - ratio * (cy - o.y) }))
-        return next
-      })
+      const s = scaleRef.current
+      const o = offsetRef.current
+      const next = Math.max(0.15, Math.min(4, s * factor))
+      const newOffset = {
+        x: cx - (cx - o.x) * (next / s),
+        y: cy - (cy - o.y) * (next / s),
+      }
+      scaleRef.current = next
+      offsetRef.current = newOffset
+      setScale(next)
+      setOffset(newOffset)
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
@@ -296,7 +402,17 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
   function onBoardMouseDown(e) {
     if (e.target.closest('.postit')) return
 
-    if (drawingGroup) {
+    if (selectMode) {
+      const r = boardRef.current.getBoundingClientRect()
+      const o = offsetRef.current, s = scaleRef.current
+      const wx = (e.clientX - r.left - o.x) / s
+      const wy = (e.clientY - r.top  - o.y) / s
+      setMultiSelected([])
+      dragging.current = { type: 'select', startWX: wx, startWY: wy }
+      return
+    }
+
+    if (activeTool === 'group') {
       const r = boardRef.current.getBoundingClientRect()
       const o = offsetRef.current, s = scaleRef.current
       const wx = (e.clientX - r.left - o.x) / s
@@ -305,40 +421,45 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
       return
     }
 
-    if (textMode) {
-      const r = boardRef.current.getBoundingClientRect()
-      const o = offsetRef.current, s = scaleRef.current
-      const wx = (e.clientX - r.left - o.x) / s
-      const wy = (e.clientY - r.top  - o.y) / s
-      const labelId = createLabel(wx, wy)
-      setTextMode(false)
-      setSelectedLabel(labelId)
-      setEditingLabelId(labelId)
-      return
-    }
-
     setSelected(null); setSelectedLabel(null)
     dragging.current = { type: 'pan', sx: e.clientX, sy: e.clientY, ox: offset.x, oy: offset.y }
   }
 
   function onBoardDblClick(e) {
-    if (drawingGroup || textMode) return
+    if (activeTool === 'group') return
     if (e.target.closest('.postit')) return
     const r = boardRef.current.getBoundingClientRect()
     const wx = (e.clientX - r.left - offset.x) / scale
     const wy = (e.clientY - r.top  - offset.y) / scale
+    if (activeTool === 'text') {
+      const labelId = createLabel(wx, wy)
+      setActiveTool('note')
+      setSelectedLabel(labelId)
+      setEditingLabelId(labelId)
+      return
+    }
     const id = createCard(wx, wy)
     setSelected(id); setEditingCardId(id)
   }
 
   function onCardMouseDown(e, card) {
     e.stopPropagation()
-    setSelected(card.id); setSelectedLabel(null)
     const r = boardRef.current.getBoundingClientRect()
     const o = offsetRef.current, s = scaleRef.current
     const wx = (e.clientX - r.left - o.x) / s
     const wy = (e.clientY - r.top  - o.y) / s
-    dragging.current = { type: 'card', cardId: card.id, startWX: wx, startWY: wy, origX: card.x, origY: card.y }
+    const ms = multiSelectedRef.current
+    if (ms.length > 0 && ms.includes(card.id)) {
+      const allCards = dbRef.current[currentIdRef.current]?.cards || []
+      const cardOrigins = ms
+        .map(id => allCards.find(c => c.id === id))
+        .filter(Boolean)
+        .map(c => ({ id: c.id, x: c.x, y: c.y }))
+      dragging.current = { type: 'multi', startWX: wx, startWY: wy, cardOrigins }
+    } else {
+      setSelected(card.id); setSelectedLabel(null)
+      dragging.current = { type: 'card', cardId: card.id, startWX: wx, startWY: wy, origX: card.x, origY: card.y }
+    }
   }
 
   function onConnectDotMouseDown(e, card, anchor) {
@@ -358,10 +479,13 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
     const wx = (e.clientX - r.left - o.x) / s
     const wy = (e.clientY - r.top  - o.y) / s
     const cards = dbRef.current[currentIdRef.current]?.cards || []
-    const cardOrigins = (group.cardIds || []).map(cid => {
-      const card = cards.find(c => c.id === cid)
-      return card ? { id: cid, x: card.x, y: card.y } : null
-    }).filter(Boolean)
+    const cardOrigins = cards
+      .filter(card => {
+        const cx = card.x + 65, cy = card.y + 37
+        return cx >= group.x && cx <= group.x + group.width &&
+               cy >= group.y && cy <= group.y + group.height
+      })
+      .map(card => ({ id: card.id, x: card.x, y: card.y }))
     dragging.current = { type: 'group', groupId: group.id, startWX: wx, startWY: wy, origGX: group.x, origGY: group.y, cardOrigins }
   }
 
@@ -432,15 +556,13 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
     })
   }
 
-  const boardCursor = drawingGroup || textMode ? 'crosshair' : 'grab'
+  const boardCursor = selectMode ? 'crosshair' : activeTool === 'text' ? 'text' : activeTool === 'group' ? 'crosshair' : 'grab'
 
   return {
     offset, setOffset,
     scale, setScale,
     scaleRef,
     connectLine,
-    drawingGroup, setDrawingGroup,
-    textMode, setTextMode,
     groupDrawPreview,
     selectedLabel, setSelectedLabel,
     editingLabelId, setEditingLabelId,
@@ -454,5 +576,6 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
     onGroupTitleBarMouseDown, onGroupResizeHandleMouseDown,
     onLabelMouseDown, zoomBy,
     createLabel, updateLabel,
+    activeAutoCreateRef, activeToolRef, multiSelectedRef,
   }
 }

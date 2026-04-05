@@ -30,7 +30,7 @@ function FolderTree({ db, currentId, onNavigate, id, depth }) {
           paddingTop: 4, paddingBottom: 4,
           cursor: 'pointer', fontSize: 12,
           background: isActive ? '#EBF4FF' : 'transparent',
-          color: isActive ? '#378ADD' : '#333',
+          color: isActive ? 'var(--accent)' : 'var(--text)',
           display: 'flex', alignItems: 'center', gap: 4,
           userSelect: 'none',
         }}
@@ -58,6 +58,13 @@ export default function App() {
   const [noteForm, setNoteForm] = useState({ title: '', body: '' })
   const [notePanelMode, setNotePanelMode] = useState('side')
   const [listSort, setListSort] = useState('az')
+  const [showGrid, setShowGrid] = useState(true)
+  const [theme, setTheme] = useState('light')
+  const [activeTool, setActiveTool] = useState('note')
+  const [autoCreate, setAutoCreate] = useState(false)
+  const [selectMode, setSelectMode] = useState(false)
+  const [multiSelected, setMultiSelected] = useState([])
+  const [selectionRect, setSelectionRect] = useState(null)
   const [selectedConn, setSelectedConn] = useState(null)
   const [editingConnId, setEditingConnId] = useState(null)
   const [editingConnValue, setEditingConnValue] = useState('')
@@ -101,8 +108,6 @@ export default function App() {
     offset, setOffset,
     scale, setScale,
     connectLine,
-    drawingGroup, setDrawingGroup,
-    textMode, setTextMode,
     groupDrawPreview,
     selectedLabel,
     editingLabelId, setEditingLabelId,
@@ -115,7 +120,12 @@ export default function App() {
     onCardMouseDown, onConnectDotMouseDown,
     onGroupTitleBarMouseDown, onGroupResizeHandleMouseDown,
     onLabelMouseDown, zoomBy,
-  } = useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnectionFn, setActiveNoteId, view })
+    activeAutoCreateRef, activeToolRef, multiSelectedRef,
+  } = useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnectionFn, setActiveNoteId, view, activeTool, setActiveTool, selectMode, setMultiSelected, setSelectionRect })
+
+  useEffect(() => { activeAutoCreateRef.current = autoCreate }, [autoCreate, activeAutoCreateRef])
+  useEffect(() => { activeToolRef.current = activeTool }, [activeTool, activeToolRef])
+  useEffect(() => { multiSelectedRef.current = multiSelected }, [multiSelected, multiSelectedRef])
 
   // ── navigation ───────────────────────────────────────────────────────────
   function enterCanvas(id, name) {
@@ -153,19 +163,39 @@ export default function App() {
   useEffect(() => {
     function onKey(e) {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedConn) {
-        setDb(prev => {
-          const cId = currentIdRef.current
-          const canvas = prev[cId]
-          if (!canvas) return prev
-          return { ...prev, [cId]: { ...canvas, connections: canvas.connections.filter(c => c.id !== selectedConn) } }
-        })
-        setSelectedConn(null)
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (multiSelected.length > 0) {
+          const ids = new Set(multiSelected)
+          setDb(prev => {
+            const cId = currentIdRef.current
+            const canvas = prev[cId]
+            if (!canvas) return prev
+            return {
+              ...prev, [cId]: {
+                ...canvas,
+                cards: canvas.cards.filter(c => !ids.has(c.id)),
+                groups: (canvas.groups || []).filter(g => !ids.has(g.id)),
+                labels: (canvas.labels || []).filter(l => !ids.has(l.id)),
+              }
+            }
+          })
+          setMultiSelected([])
+          return
+        }
+        if (selectedConn) {
+          setDb(prev => {
+            const cId = currentIdRef.current
+            const canvas = prev[cId]
+            if (!canvas) return prev
+            return { ...prev, [cId]: { ...canvas, connections: canvas.connections.filter(c => c.id !== selectedConn) } }
+          })
+          setSelectedConn(null)
+        }
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selectedConn])
+  }, [selectedConn, multiSelected])
 
   // ── board delete (keyboard) ───────────────────────────────────────────────
   useEffect(() => {
@@ -273,14 +303,14 @@ export default function App() {
 
   // ── render ────────────────────────────────────────────────────────────────
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: 'system-ui, sans-serif' }}>
+    <div data-theme={theme} style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: 'system-ui, sans-serif' }}>
 
       {/* ── Sidebar ──────────────────────────────────────────────────────── */}
       {sidebarOpen && (
-        <div style={{ width: 210, flexShrink: 0, background: '#fff', borderRight: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ width: 210, flexShrink: 0, background: 'var(--sidebar-bg)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           {/* Top scrollable section */}
           <div style={{ flex: 1, overflowY: 'auto' }}>
-            <div style={{ padding: '10px 12px 4px', fontSize: 10, fontWeight: 700, color: '#bbb', letterSpacing: 1, textTransform: 'uppercase' }}>Lavagne</div>
+            <div style={{ padding: '10px 12px 4px', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: 1, textTransform: 'uppercase' }}>Lavagne</div>
             {boards.map(board => {
               const isActive = stack[0] === board.id
               const isRenaming = renamingBoardId === board.id
@@ -288,7 +318,7 @@ export default function App() {
                 <div key={board.id}>
                   {/* Board row */}
                   <div
-                    style={{ padding: '6px 12px', fontSize: 13, fontWeight: isActive ? 600 : 400, color: isActive ? '#111' : '#666', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, background: 'transparent' }}
+                    style={{ padding: '6px 12px', fontSize: 13, fontWeight: isActive ? 600 : 400, color: isActive ? 'var(--text)' : 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, background: 'transparent' }}
                     onClick={() => {
                       if (isRenaming) return
                       if (!isActive) {
@@ -308,7 +338,7 @@ export default function App() {
                       <input
                         autoFocus
                         defaultValue={board.name}
-                        style={{ border: 'none', outline: 'none', fontSize: 13, fontWeight: 600, color: '#111', background: 'transparent', width: '100%', fontFamily: 'inherit' }}
+                        style={{ border: 'none', outline: 'none', fontSize: 13, fontWeight: 600, color: 'var(--text)', background: 'transparent', width: '100%', fontFamily: 'inherit' }}
                         onBlur={e => {
                           const name = e.target.value.trim() || board.name
                           setBoards(prev => prev.map(b => b.id === board.id ? { ...b, name } : b))
@@ -323,16 +353,17 @@ export default function App() {
                     )}
                     {!isActive && boards.length > 1 && (
                       <button
-                        style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#bbb', fontSize: 12, lineHeight: 1, padding: '0 2px', flexShrink: 0 }}
+                        style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 12, lineHeight: 1, padding: '0 2px', flexShrink: 0 }}
                         onMouseEnter={e => { e.currentTarget.style.color = '#e53935' }}
                         onMouseLeave={e => { e.currentTarget.style.color = '#bbb' }}
                         onMouseDown={e => e.stopPropagation()}
                         onClick={e => {
                           e.stopPropagation()
+                          if (!window.confirm('Eliminare questa lavagna e tutto il suo contenuto?')) return
                           setBoards(prev => prev.filter(b => b.id !== board.id))
                           setDb(prev => { const next = { ...prev }; delete next[board.id]; return next })
                         }}
-                      >×</button>
+                      >🗑</button>
                     )}
                   </div>
                   {/* Folder tree when active */}
@@ -344,9 +375,9 @@ export default function App() {
             })}
           </div>
           {/* Bottom fixed section */}
-          <div style={{ borderTop: '1px solid #e5e7eb', flexShrink: 0 }}>
+          <div style={{ borderTop: '1px solid var(--border)', flexShrink: 0 }}>
             <button
-              style={{ width: '100%', textAlign: 'left', padding: '10px 12px', fontSize: 13, border: 'none', background: 'none', cursor: 'pointer', color: '#378ADD' }}
+              style={{ width: '100%', textAlign: 'left', padding: '10px 12px', fontSize: 13, border: 'none', background: 'none', cursor: 'pointer', color: 'var(--accent)' }}
               onMouseEnter={e => { e.currentTarget.style.background = '#f5f5f5' }}
               onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
               onClick={() => {
@@ -373,7 +404,7 @@ export default function App() {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
         {/* ── Top bar ──────────────────────────────────────────────────────*/}
-        <div style={{ height: 44, background: '#fff', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', flexShrink: 0 }}>
+        <div style={{ height: 44, background: 'var(--topbar-bg)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', flexShrink: 0 }}>
           <button style={iconBtn} onClick={() => setSidebarOpen(v => !v)}>☰</button>
 
           {/* Breadcrumb */}
@@ -384,7 +415,7 @@ export default function App() {
                 <span key={id} style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
                   {i > 0 && <span style={{ color: '#ddd' }}>/</span>}
                   <span
-                    style={{ cursor: isLast ? 'default' : 'pointer', color: isLast ? '#111' : '#378ADD', fontWeight: isLast ? 600 : 400 }}
+                    style={{ cursor: isLast ? 'default' : 'pointer', color: isLast ? 'var(--text)' : 'var(--accent)', fontWeight: isLast ? 600 : 400 }}
                     onClick={() => !isLast && navigateTo(i)}
                   >{db[id]?.name || id}</span>
                 </span>
@@ -397,34 +428,52 @@ export default function App() {
           {/* View tabs */}
           <div style={{ display: 'flex', background: '#f3f4f6', borderRadius: 8, padding: 2, gap: 1 }}>
             {[['canvas', 'Canvas'], ['list', 'Elenco']].map(([v, l]) => (
-              <button key={v} onClick={() => setView(v)} style={{ fontSize: 12, padding: '3px 12px', borderRadius: 6, border: 'none', cursor: 'pointer', background: view === v ? '#fff' : 'transparent', color: view === v ? '#111' : '#888', fontWeight: view === v ? 600 : 400, boxShadow: view === v ? '0 1px 2px rgba(0,0,0,0.08)' : 'none' }}>{l}</button>
+              <button key={v} onClick={() => setView(v)} style={{ fontSize: 12, padding: '3px 12px', borderRadius: 6, border: 'none', cursor: 'pointer', background: view === v ? 'var(--btn-bg)' : 'transparent', color: view === v ? 'var(--btn-text)' : 'var(--text-muted)', fontWeight: view === v ? 600 : 400, boxShadow: view === v ? '0 1px 2px rgba(0,0,0,0.08)' : 'none' }}>{l}</button>
             ))}
           </div>
 
           {/* Canvas tools */}
-          {view === 'canvas' && (
-            <>
-              <div style={{ display: 'flex', gap: 2 }}>
-                <button
-                  style={{ ...smallBtn, background: drawingGroup ? '#EBF4FF' : '#fff', color: drawingGroup ? '#378ADD' : '#555', borderColor: drawingGroup ? '#378ADD' : '#e5e7eb' }}
-                  onClick={() => { setDrawingGroup(v => !v); setTextMode(false) }}
-                  title="Disegna gruppo"
-                >□ Gruppo</button>
-                <button
-                  style={{ ...smallBtn, background: textMode ? '#EBF4FF' : '#fff', color: textMode ? '#378ADD' : '#555', borderColor: textMode ? '#378ADD' : '#e5e7eb' }}
-                  onClick={() => { setTextMode(v => !v); setDrawingGroup(false) }}
-                  title="Aggiungi testo"
-                >T Testo</button>
-              </div>
-              <div style={{ display: 'flex', gap: 2 }}>
-                <button style={smallBtn} onClick={() => zoomBy(1.2)}>+</button>
-                <button style={smallBtn} onClick={() => zoomBy(0.8)}>−</button>
-                <button style={smallBtn} onClick={() => { setScale(1); setOffset({ x: 0, y: 0 }) }}>1:1</button>
-              </div>
-            </>
-          )}
+          <>
+            <div style={{ display: 'flex', gap: 2 }}>
+              <button
+                disabled={view !== 'canvas'}
+                style={{ ...smallBtn, background: activeTool === 'group' ? 'var(--accent)' : 'var(--btn-bg)', color: activeTool === 'group' ? '#fff' : 'var(--btn-text)', borderColor: activeTool === 'group' ? 'var(--accent)' : 'var(--btn-border)', ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }}
+                onClick={view === 'canvas' ? () => setActiveTool(t => t === 'group' ? 'note' : 'group') : undefined}
+                title="Disegna gruppo"
+              >□ Gruppo</button>
+              <button
+                disabled={view !== 'canvas'}
+                style={{ ...smallBtn, background: activeTool === 'text' ? 'var(--accent)' : 'var(--btn-bg)', color: activeTool === 'text' ? '#fff' : 'var(--btn-text)', borderColor: activeTool === 'text' ? 'var(--accent)' : 'var(--btn-border)', ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }}
+                onClick={view === 'canvas' ? () => setActiveTool(t => t === 'text' ? 'note' : 'text') : undefined}
+                title="Aggiungi testo"
+              >T Testo</button>
+              <button
+                disabled={view !== 'canvas'}
+                style={{ ...smallBtn, ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }}
+                onClick={view === 'canvas' ? () => setShowGrid(v => !v) : undefined}
+                title="Mostra/nascondi griglia"
+              >{showGrid ? '⊞ Grid' : '⊟ Grid'}</button>
+              <button
+                disabled={view !== 'canvas'}
+                style={{ ...smallBtn, background: autoCreate ? 'var(--accent)' : 'var(--btn-bg)', color: autoCreate ? '#fff' : 'var(--btn-text)', borderColor: autoCreate ? 'var(--accent)' : 'var(--btn-border)', ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }}
+                onClick={view === 'canvas' ? () => setAutoCreate(v => !v) : undefined}
+                title="Crea elemento al termine della freccia"
+              >⚡ Quick</button>
+              <button
+                disabled={view !== 'canvas'}
+                style={{ ...smallBtn, background: selectMode ? 'var(--accent)' : 'var(--btn-bg)', color: selectMode ? '#fff' : 'var(--btn-text)', borderColor: selectMode ? 'var(--accent)' : 'var(--btn-border)', ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }}
+                onClick={view === 'canvas' ? () => { setSelectMode(v => !v); setActiveTool('note'); setAutoCreate(false) } : undefined}
+                title="Selezione multipla"
+              >⬚ Select</button>
+            </div>
+            <div style={{ display: 'flex', gap: 2 }}>
+              <button disabled={view !== 'canvas'} style={{ ...smallBtn, ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }} onClick={view === 'canvas' ? () => zoomBy(1.2) : undefined}>+</button>
+              <button disabled={view !== 'canvas'} style={{ ...smallBtn, ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }} onClick={view === 'canvas' ? () => zoomBy(0.8) : undefined}>−</button>
+              <button disabled={view !== 'canvas'} style={{ ...smallBtn, ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }} onClick={view === 'canvas' ? () => { setScale(1); setOffset({ x: 0, y: 0 }) } : undefined}>1:1</button>
+            </div>
+          </>
 
-          <button style={smallBtn} onClick={exportMd}>↓ MD</button>
+          <button disabled={view !== 'canvas'} style={{ ...smallBtn, ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }} onClick={view === 'canvas' ? exportMd : undefined}>↓ MD</button>
         </div>
 
         {/* ── Content ─────────────────────────────────────────────���────────── */}
@@ -433,7 +482,7 @@ export default function App() {
           {view === 'canvas' ? (
             <div
               ref={boardRef}
-              style={{ flex: 1, position: 'relative', overflow: 'hidden', background: '#f0f0f0', cursor: boardCursor, userSelect: 'none' }}
+              style={{ flex: 1, position: 'relative', overflow: 'hidden', cursor: boardCursor, userSelect: 'none', backgroundColor: 'var(--bg)', backgroundImage: showGrid ? 'radial-gradient(circle, var(--grid-dot) 1px, transparent 1px)' : 'none', backgroundSize: `${20 * scale}px ${20 * scale}px`, backgroundPosition: `${offset.x % (20 * scale)}px ${offset.y % (20 * scale)}px` }}
               onMouseDown={e => { setSelectedConn(null); onBoardMouseDown(e) }}
               onDoubleClick={onBoardDblClick}
             >
@@ -533,6 +582,24 @@ export default function App() {
                 )}
               </svg>
 
+              {/* Selection lasso rect */}
+              {selectionRect && (() => {
+                const [sx, sy] = w2s(selectionRect.x, selectionRect.y)
+                return (
+                  <div style={{
+                    position: 'absolute',
+                    left: sx, top: sy,
+                    width: selectionRect.w * scale,
+                    height: selectionRect.h * scale,
+                    border: '2px dashed #378ADD',
+                    background: 'rgba(55,138,221,0.08)',
+                    borderRadius: 4,
+                    pointerEvents: 'none',
+                    zIndex: 9999,
+                  }} />
+                )
+              })()}
+
               {/* World – groups, labels, cards, transformed for pan/zoom */}
               <div style={{ position: 'absolute', top: 0, left: 0, transformOrigin: '0 0', transform: `translate(${offset.x}px,${offset.y}px) scale(${scale})` }}>
 
@@ -574,7 +641,7 @@ export default function App() {
                   <CanvasLabel
                     key={label.id}
                     label={label}
-                    selected={selectedLabel === label.id}
+                    selected={selectedLabel === label.id || multiSelected.includes(label.id)}
                     editing={editingLabelId === label.id}
                     onMouseDown={e => onLabelMouseDown(e, label)}
                     onStartEdit={() => setEditingLabelId(label.id)}
@@ -603,7 +670,7 @@ export default function App() {
                       <CanvasLabel
                         key={card.id}
                         label={labelObj}
-                        selected={selectedLabel === card.id}
+                        selected={selectedLabel === card.id || multiSelected.includes(card.id)}
                         editing={editingLabelId === card.id}
                         onMouseDown={e => onLabelMouseDown(e, labelObj, true)}
                         onStartEdit={() => setEditingLabelId(card.id)}
@@ -625,7 +692,7 @@ export default function App() {
                     <PostIt
                       key={card.id}
                       card={card}
-                      selected={selected === card.id}
+                      selected={selected === card.id || multiSelected.includes(card.id)}
                       onMouseDown={e => onCardMouseDown(e, card)}
                       onDblClick={e => { e.stopPropagation(); if (card.isFolder) enterCanvas(card.id, card.title); else openNote(card) }}
                       onRename={title => updateCardFn(card.id, { title })}
@@ -652,13 +719,13 @@ export default function App() {
 
           ) : (
             /* ── List view ───────────────────────────────────────────────── */
-            <div style={{ flex: 1, overflowY: 'auto', padding: 24, background: '#f0f0f0' }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: 24, background: 'var(--bg)' }}>
               <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
                 {[['az', 'A→Z'], ['za', 'Z→A'], ['date', 'Creazione']].map(([v, l]) => (
                   <button key={v} onClick={() => setListSort(v)} style={{ ...smallBtn, fontWeight: listSort === v ? 700 : 400, background: listSort === v ? '#EBF4FF' : '#fff', color: listSort === v ? '#378ADD' : '#555' }}>{l}</button>
                 ))}
               </div>
-              {listItems.length === 0 && <p style={{ color: '#bbb', fontSize: 13 }}>Nessun elemento in questo canvas.</p>}
+              {listItems.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Nessun elemento in questo canvas.</p>}
               {listItems.map(item => {
                 const badge = item.type === 'folder' ? '📁 Cartella' : item.type === 'label' ? 'T Testo' : '📝 Nota'
                 const dateStr = item.createdAt
@@ -675,9 +742,9 @@ export default function App() {
                     style={{ background: '#fff', borderRadius: 6, padding: '10px 14px', marginBottom: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}
                     onClick={handleClick}
                   >
-                    <span style={{ fontSize: 11, color: '#888', minWidth: 70, flexShrink: 0 }}>{badge}</span>
-                    <span style={{ fontSize: 14, fontWeight: 500, color: '#222', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</span>
-                    <span style={{ fontSize: 11, color: '#bbb', flexShrink: 0 }}>{dateStr}</span>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)', minWidth: 70, flexShrink: 0 }}>{badge}</span>
+                    <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</span>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{dateStr}</span>
                   </div>
                 )
               })}
@@ -697,6 +764,13 @@ export default function App() {
           )}
         </div>
       </div>
+
+      {/* Theme toggle */}
+      <button
+        onClick={() => setTheme(t => t === 'light' ? 'dark' : t === 'dark' ? 'high-contrast' : 'light')}
+        style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 9999, background: 'var(--bg-panel)', border: '1px solid var(--border)', borderRadius: 20, padding: '6px 12px', fontSize: 13, boxShadow: '0 2px 8px rgba(0,0,0,0.15)', cursor: 'pointer', color: 'var(--text)' }}
+      >{theme === 'light' ? '☀️' : theme === 'dark' ? '🌙' : '💾'}</button>
+
     </div>
   )
 }
@@ -707,13 +781,13 @@ function NotePanel({ mode, noteForm, onChangeForm, onSave, onClose, onToggleMode
   const [titleFocused, setTitleFocused] = useState(false)
 
   const panelStyle = isFull
-    ? { flex: 1, display: 'flex', flexDirection: 'column', background: '#fff', overflow: 'hidden' }
-    : { width: 380, flexShrink: 0, display: 'flex', flexDirection: 'column', background: '#fff', borderLeft: '1px solid #e5e7eb', overflow: 'hidden' }
+    ? { flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-panel)', overflow: 'hidden' }
+    : { width: 380, flexShrink: 0, display: 'flex', flexDirection: 'column', background: 'var(--bg-panel)', borderLeft: '1px solid var(--border)', overflow: 'hidden' }
 
   return (
     <div style={panelStyle}>
-      <div style={{ height: 44, display: 'flex', alignItems: 'center', padding: '0 16px', gap: 8, borderBottom: '1px solid #f0f0f0', flexShrink: 0 }}>
-        <span style={{ fontSize: 10, fontWeight: 700, color: '#bbb', letterSpacing: 1, textTransform: 'uppercase' }}>Note</span>
+      <div style={{ height: 44, display: 'flex', alignItems: 'center', padding: '0 16px', gap: 8, borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+        <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: 1, textTransform: 'uppercase' }}>Note</span>
         <div style={{ flex: 1 }} />
         <button style={iconBtn} title={isFull ? 'Vista affiancata' : 'Vista intera'} onClick={onToggleMode}>{isFull ? '⤡' : '⤢'}</button>
         <button style={iconBtn} title="Chiudi" onClick={onClose}>×</button>
@@ -726,7 +800,7 @@ function NotePanel({ mode, noteForm, onChangeForm, onSave, onClose, onToggleMode
             placeholder="Titolo"
             onFocus={() => setTitleFocused(true)}
             onBlur={() => setTitleFocused(false)}
-            style={{ width: '100%', border: 'none', outline: 'none', borderBottom: `2px solid ${titleFocused ? '#378ADD' : '#f0f0f0'}`, padding: '12px 20px', fontSize: 16, fontWeight: 600, color: '#111', fontFamily: 'inherit', background: 'transparent' }}
+            style={{ width: '100%', border: 'none', outline: 'none', borderBottom: `2px solid ${titleFocused ? 'var(--accent)' : 'var(--border)'}`, padding: '12px 20px', fontSize: 16, fontWeight: 600, color: 'var(--text)', fontFamily: 'inherit', background: 'transparent' }}
           />
           <BlockEditor value={noteForm.body} onChange={body => onChangeForm(f => ({ ...f, body }))} />
         </div>
@@ -737,5 +811,5 @@ function NotePanel({ mode, noteForm, onChangeForm, onSave, onClose, onToggleMode
 }
 
 // ─── shared button styles ─────────────────────────────────────────────────────
-const iconBtn = { border: 'none', background: 'none', cursor: 'pointer', fontSize: 16, color: '#888', padding: '2px 4px', lineHeight: 1 }
-const smallBtn = { border: '1px solid #e5e7eb', borderRadius: 4, background: '#fff', cursor: 'pointer', fontSize: 12, padding: '3px 8px', color: '#555' }
+const iconBtn = { border: 'none', background: 'none', cursor: 'pointer', fontSize: 16, color: 'var(--text-muted)', padding: '2px 4px', lineHeight: 1 }
+const smallBtn = { border: '1px solid var(--btn-border)', borderRadius: 4, background: 'var(--btn-bg)', cursor: 'pointer', fontSize: 12, padding: '3px 8px', color: 'var(--btn-text)' }
