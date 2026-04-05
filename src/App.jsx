@@ -3,7 +3,17 @@ import BlockEditor from './components/BlockEditor'
 import PostIt from './components/PostIt'
 import { Group, CanvasLabel } from './components/GroupBox'
 import { useCanvas } from './hooks/useCanvas'
-import { STORAGE_KEY, uid, loadDb, buildPath, anchorPoint } from './utils'
+import { STORAGE_KEY, CARD_W, CARD_H_HALF, uid, loadDb, buildPath } from './utils'
+
+const BOARDS_KEY = 'olaboard_boards'
+
+function loadBoards() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(BOARDS_KEY))
+    if (Array.isArray(raw) && raw.length > 0) return raw
+  } catch {}
+  return [{ id: 'root', name: 'La mia lavagna' }]
+}
 
 // ─── FolderTree ───────────────────────────────────────────────────────────────
 function FolderTree({ db, currentId, onNavigate, id, depth }) {
@@ -39,6 +49,8 @@ function FolderTree({ db, currentId, onNavigate, id, depth }) {
 // ─── App ─────────────────────────────────────────────────────────────────────
 export default function App() {
   const [db, setDb] = useState(loadDb)
+  const [boards, setBoards] = useState(loadBoards)
+  const [renamingBoardId, setRenamingBoardId] = useState(null)
   const [stack, setStack] = useState(['root'])
   const [view, setView] = useState('canvas')
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -53,6 +65,7 @@ export default function App() {
   const currentIdRef = useRef('root')
 
   useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(db)) }, [db])
+  useEffect(() => { localStorage.setItem(BOARDS_KEY, JSON.stringify(boards)) }, [boards])
 
   const currentId = stack[stack.length - 1]
   useEffect(() => { currentIdRef.current = currentId }, [currentId])
@@ -87,12 +100,11 @@ export default function App() {
   const {
     offset, setOffset,
     scale, setScale,
-    scaleRef,
     connectLine,
     drawingGroup, setDrawingGroup,
     textMode, setTextMode,
     groupDrawPreview,
-    selectedLabel, setSelectedLabel,
+    selectedLabel,
     editingLabelId, setEditingLabelId,
     selected, setSelected,
     editingCardId, setEditingCardId,
@@ -103,7 +115,6 @@ export default function App() {
     onCardMouseDown, onConnectDotMouseDown,
     onGroupTitleBarMouseDown, onGroupResizeHandleMouseDown,
     onLabelMouseDown, zoomBy,
-    createLabel, updateLabel,
   } = useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnectionFn, setActiveNoteId, view })
 
   // ── navigation ───────────────────────────────────────────────────────────
@@ -156,6 +167,43 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [selectedConn])
 
+  // ── board delete (keyboard) ───────────────────────────────────────────────
+  useEffect(() => {
+    function onKey(e) {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selected === null && boards.length > 1) {
+        const boardId = stack[0]
+        if (!window.confirm('Eliminare questa lavagna e tutto il suo contenuto?')) return
+        // collect all canvas IDs rooted at boardId
+        function collectIds(db, id) {
+          const canvas = db[id]
+          if (!canvas) return [id]
+          const ids = [id]
+          for (const c of canvas.cards) {
+            if (c.isFolder && !c.isLabel) ids.push(...collectIds(db, c.id))
+          }
+          return ids
+        }
+        setBoards(prev => {
+          const next = prev.filter(b => b.id !== boardId)
+          const firstId = next[0].id
+          setDb(prev2 => {
+            const idsToRemove = collectIds(prev2, boardId)
+            const next2 = { ...prev2 }
+            for (const id of idsToRemove) delete next2[id]
+            return next2
+          })
+          setStack([firstId])
+          setSelected(null); setActiveNoteId(null)
+          setOffset({ x: 0, y: 0 }); setScale(1)
+          return next
+        })
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [selected, boards, stack])
+
   // ── connection label ──────────────────────────────────────────────────────
   function saveConnLabel(connId, label) {
     setDb(prev => {
@@ -201,9 +249,25 @@ export default function App() {
   }
 
   // ── list view ─────────────────────────────────────────────────────────────
-  const sortedCards = [...cards.filter(c => !c.isFolder && !c.isLabel)].sort((a, b) => {
-    if (listSort === 'az') return (a.title || '').localeCompare(b.title || '')
-    if (listSort === 'za') return (b.title || '').localeCompare(a.title || '')
+  const listItems = [
+    ...cards.map(c => ({
+      id: c.id,
+      title: c.title || 'Senza titolo',
+      type: c.isFolder ? 'folder' : c.isLabel ? 'label' : 'note',
+      createdAt: c.createdAt || null,
+      _card: c,
+    })),
+    ...labels.map(l => ({
+      id: l.id,
+      title: l.text || 'Senza titolo',
+      type: 'label',
+      createdAt: l.createdAt || null,
+      _label: l,
+    })),
+  ].sort((a, b) => {
+    if (listSort === 'az') return a.title.localeCompare(b.title)
+    if (listSort === 'za') return b.title.localeCompare(a.title)
+    if (listSort === 'date') return (a.createdAt || 0) - (b.createdAt || 0)
     return 0
   })
 
@@ -213,9 +277,95 @@ export default function App() {
 
       {/* ── Sidebar ──────────────────────────────────────────────────────── */}
       {sidebarOpen && (
-        <div style={{ width: 190, flexShrink: 0, background: '#fff', borderRight: '1px solid #e5e7eb', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ padding: '10px 8px 4px', fontSize: 10, fontWeight: 700, color: '#bbb', letterSpacing: 1, textTransform: 'uppercase' }}>Lavagne</div>
-          <FolderTree db={db} currentId={currentId} onNavigate={handleSidebarNavigate} id="root" />
+        <div style={{ width: 210, flexShrink: 0, background: '#fff', borderRight: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          {/* Top scrollable section */}
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+            <div style={{ padding: '10px 12px 4px', fontSize: 10, fontWeight: 700, color: '#bbb', letterSpacing: 1, textTransform: 'uppercase' }}>Lavagne</div>
+            {boards.map(board => {
+              const isActive = stack[0] === board.id
+              const isRenaming = renamingBoardId === board.id
+              return (
+                <div key={board.id}>
+                  {/* Board row */}
+                  <div
+                    style={{ padding: '6px 12px', fontSize: 13, fontWeight: isActive ? 600 : 400, color: isActive ? '#111' : '#666', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, background: 'transparent' }}
+                    onClick={() => {
+                      if (isRenaming) return
+                      if (!isActive) {
+                        setStack([board.id])
+                        setSelected(null); setActiveNoteId(null)
+                        setOffset({ x: 0, y: 0 }); setScale(1)
+                        setDb(prev => prev[board.id] ? prev : { ...prev, [board.id]: { id: board.id, name: board.name, cards: [], connections: [], groups: [], labels: [] } })
+                      } else {
+                        setRenamingBoardId(board.id)
+                      }
+                    }}
+                    onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = '#f5f5f5' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+                  >
+                    <span style={{ fontSize: 11 }}>{isActive ? '▾' : '▸'}</span>
+                    {isRenaming ? (
+                      <input
+                        autoFocus
+                        defaultValue={board.name}
+                        style={{ border: 'none', outline: 'none', fontSize: 13, fontWeight: 600, color: '#111', background: 'transparent', width: '100%', fontFamily: 'inherit' }}
+                        onBlur={e => {
+                          const name = e.target.value.trim() || board.name
+                          setBoards(prev => prev.map(b => b.id === board.id ? { ...b, name } : b))
+                          setDb(prev => prev[board.id] ? { ...prev, [board.id]: { ...prev[board.id], name } } : prev)
+                          setRenamingBoardId(null)
+                        }}
+                        onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') e.target.blur(); e.stopPropagation() }}
+                        onClick={e => e.stopPropagation()}
+                      />
+                    ) : (
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{board.name}</span>
+                    )}
+                    {!isActive && boards.length > 1 && (
+                      <button
+                        style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#bbb', fontSize: 12, lineHeight: 1, padding: '0 2px', flexShrink: 0 }}
+                        onMouseEnter={e => { e.currentTarget.style.color = '#e53935' }}
+                        onMouseLeave={e => { e.currentTarget.style.color = '#bbb' }}
+                        onMouseDown={e => e.stopPropagation()}
+                        onClick={e => {
+                          e.stopPropagation()
+                          setBoards(prev => prev.filter(b => b.id !== board.id))
+                          setDb(prev => { const next = { ...prev }; delete next[board.id]; return next })
+                        }}
+                      >×</button>
+                    )}
+                  </div>
+                  {/* Folder tree when active */}
+                  {isActive && (
+                    <FolderTree db={db} currentId={currentId} onNavigate={handleSidebarNavigate} id={board.id} depth={1} />
+                  )}
+                </div>
+              )
+            })}
+          </div>
+          {/* Bottom fixed section */}
+          <div style={{ borderTop: '1px solid #e5e7eb', flexShrink: 0 }}>
+            <button
+              style={{ width: '100%', textAlign: 'left', padding: '10px 12px', fontSize: 13, border: 'none', background: 'none', cursor: 'pointer', color: '#378ADD' }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#f5f5f5' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
+              onClick={() => {
+                const id = uid()
+                const name = 'Nuova lavagna'
+                setBoards(prev => [...prev, { id, name }])
+                setDb(prev => ({ ...prev, [id]: { id, name, cards: [], connections: [], groups: [], labels: [] } }))
+                setStack([id]); setSelected(null); setActiveNoteId(null)
+                setOffset({ x: 0, y: 0 }); setScale(1)
+                setRenamingBoardId(id)
+              }}
+            >+ Nuova lavagna</button>
+            <button
+              style={{ width: '100%', textAlign: 'left', padding: '10px 12px', fontSize: 13, border: 'none', background: 'none', cursor: 'pointer', color: '#555' }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#f5f5f5' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
+              onClick={() => alert('Coming soon')}
+            >👤 Account</button>
+          </div>
         </div>
       )}
 
@@ -290,10 +440,10 @@ export default function App() {
               {/* SVG overlay – arrows in screen-space */}
               <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
                 <defs>
-                  <marker id="ah" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+                  <marker id="ah" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto" markerUnits="userSpaceOnUse">
                     <polygon points="0 0, 10 3.5, 0 7" fill="#378ADD" />
                   </marker>
-                  <marker id="ah-sel" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+                  <marker id="ah-sel" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto" markerUnits="userSpaceOnUse">
                     <polygon points="0 0, 10 3.5, 0 7" fill="#e53935" />
                   </marker>
                 </defs>
@@ -307,40 +457,50 @@ export default function App() {
                     if (lbl) return { entity: lbl, isLabel: true }
                     return null
                   }
-                  function labelAnchorPoint(lbl, anchor) {
-                    const LW = 100, LH = 30
-                    switch (anchor) {
-                      case 'top':    return [lbl.x + LW / 2, lbl.y]
-                      case 'bottom': return [lbl.x + LW / 2, lbl.y + LH]
-                      case 'left':   return [lbl.x,          lbl.y + LH / 2]
-                      case 'right':
-                      default:       return [lbl.x + LW,     lbl.y + LH / 2]
-                    }
-                  }
                   const fromRes = resolveEntity(conn.from)
                   const toRes   = resolveEntity(conn.to)
                   if (!fromRes || !toRes) return null
-                  const fa = conn.fromAnchor || 'right'
-                  const ta = conn.toAnchor   || 'left'
-                  const [fpx, fpy] = fromRes.isLabel ? labelAnchorPoint(fromRes.entity, fa) : anchorPoint(fromRes.entity, fa)
-                  const [tpx, tpy] = toRes.isLabel   ? labelAnchorPoint(toRes.entity, ta)   : anchorPoint(toRes.entity, ta)
-                  const [x1, y1] = w2s(fpx, fpy)
-                  const [x2, y2] = w2s(tpx, tpy)
-                  const dist = Math.hypot(x2 - x1, y2 - y1)
-                  const OFF = Math.min(dist * 0.25, 40 * scaleRef.current)
-                  const anchorDir = a => a === 'right' ? [1,0] : a === 'left' ? [-1,0] : a === 'bottom' ? [0,1] : [0,-1]
-                  const [fdx, fdy] = anchorDir(fa)
-                  const [tdx, tdy] = anchorDir(ta)
-                  const sx1 = x1, sy1 = y1, sx2 = x2, sy2 = y2
-                  const _ang = Math.atan2(sy2 - sy1, sx2 - sx1)
-                  const ex = sx2 - Math.cos(_ang) * 12
-                  const ey = sy2 - Math.sin(_ang) * 12
-                  const cp1x = x1 + fdx * OFF, cp1y = y1 + fdy * OFF
-                  const cp2x = ex + tdx * OFF,  cp2y = ey + tdy * OFF
+                  const fe = fromRes.entity, te = toRes.entity
+                  const fCX = fromRes.isLabel ? fe.x + 50 : fe.x + CARD_W / 2
+                  const fCY = fromRes.isLabel ? fe.y + 15 : fe.y + CARD_H_HALF
+                  const tCX = toRes.isLabel   ? te.x + 50 : te.x + CARD_W / 2
+                  const tCY = toRes.isLabel   ? te.y + 15 : te.y + CARD_H_HALF
+                  const wdx = tCX - fCX, wdy = tCY - fCY
+                  const horiz = Math.abs(wdx) > Math.abs(wdy)
+                  function exitPoint(entity, isLbl, goingRight, goingDown, isHoriz, isSource) {
+                    const w = isLbl ? 112 : CARD_W
+                    const h = isLbl ? 40 : CARD_H_HALF * 2
+                    const P = isSource ? 0 : (isLbl ? 20 : 36)
+                    const cx = entity.x + w / 2
+                    const cy = entity.y + h / 2
+                    if (isHoriz) {
+                      if (isSource) return goingRight ? [entity.x + w + P, cy] : [entity.x - P, cy]
+                      else          return goingRight ? [entity.x - P, cy]     : [entity.x + w + P, cy]
+                    } else {
+                      if (isSource) return goingDown ? [cx, entity.y + h + P] : [cx, entity.y - P]
+                      else          return goingDown ? [cx, entity.y - P]     : [cx, entity.y + h + P]
+                    }
+                  }
+                  const [fpx, fpy] = exitPoint(fe, fromRes.isLabel, wdx > 0, wdy > 0, horiz, true)
+                  const [tpx, tpy] = exitPoint(te, toRes.isLabel,   wdx > 0, wdy > 0, horiz, false)
+                  const [sx1, sy1] = w2s(fpx, fpy)
+                  const [sx2, sy2] = w2s(tpx, tpy)
+                  const dist = Math.sqrt((sx2 - sx1) ** 2 + (sy2 - sy1) ** 2)
+                  const off = dist / 3
+                  let cp1x, cp1y, cp2x, cp2y
+                  if (horiz) {
+                    const dir = sx2 > sx1 ? 1 : -1
+                    cp1x = sx1 + dir * off; cp1y = sy1
+                    cp2x = sx2 - dir * off; cp2y = sy2
+                  } else {
+                    const dir = sy2 > sy1 ? 1 : -1
+                    cp1x = sx1; cp1y = sy1 + dir * off
+                    cp2x = sx2; cp2y = sy2 - dir * off
+                  }
                   const t = 0.5
-                  const mx = (1-t)**3*x1 + 3*(1-t)**2*t*cp1x + 3*(1-t)*t**2*cp2x + t**3*x2
-                  const my = (1-t)**3*y1 + 3*(1-t)**2*t*cp1y + 3*(1-t)*t**2*cp2y + t**3*y2
-                  const d = `M${x1},${y1} C${cp1x},${cp1y} ${cp2x},${cp2y} ${ex},${ey}`
+                  const mx = (1-t)**3*sx1 + 3*(1-t)**2*t*cp1x + 3*(1-t)*t**2*cp2x + t**3*sx2
+                  const my = (1-t)**3*sy1 + 3*(1-t)**2*t*cp1y + 3*(1-t)*t**2*cp2y + t**3*sy2
+                  const d = `M${sx1},${sy1} C${cp1x},${cp1y} ${cp2x},${cp2y} ${sx2},${sy2}`
                   const stroke = isSel ? '#e53935' : '#378ADD'
                   const markerEnd = isSel ? 'url(#ah-sel)' : 'url(#ah)'
                   return (
@@ -498,13 +658,29 @@ export default function App() {
                   <button key={v} onClick={() => setListSort(v)} style={{ ...smallBtn, fontWeight: listSort === v ? 700 : 400, background: listSort === v ? '#EBF4FF' : '#fff', color: listSort === v ? '#378ADD' : '#555' }}>{l}</button>
                 ))}
               </div>
-              {sortedCards.length === 0 && <p style={{ color: '#bbb', fontSize: 13 }}>Nessuna scheda in questo canvas.</p>}
-              {sortedCards.map(card => (
-                <div key={card.id} style={{ background: '#fff', borderRadius: 6, padding: '10px 14px', marginBottom: 8, cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }} onClick={() => openNote(card)}>
-                  <div style={{ fontWeight: 500, fontSize: 14, color: '#222' }}>{card.title || 'Senza titolo'}</div>
-                  {card.body && <div style={{ fontSize: 12, color: '#999', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{card.body}</div>}
-                </div>
-              ))}
+              {listItems.length === 0 && <p style={{ color: '#bbb', fontSize: 13 }}>Nessun elemento in questo canvas.</p>}
+              {listItems.map(item => {
+                const badge = item.type === 'folder' ? '📁 Cartella' : item.type === 'label' ? 'T Testo' : '📝 Nota'
+                const dateStr = item.createdAt
+                  ? new Date(item.createdAt).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                  : '—'
+                function handleClick() {
+                  if (item.type === 'folder') enterCanvas(item._card.id, item._card.title)
+                  else if (item.type === 'note') openNote(item._card)
+                  else setSelected(item.id)
+                }
+                return (
+                  <div
+                    key={item.id}
+                    style={{ background: '#fff', borderRadius: 6, padding: '10px 14px', marginBottom: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}
+                    onClick={handleClick}
+                  >
+                    <span style={{ fontSize: 11, color: '#888', minWidth: 70, flexShrink: 0 }}>{badge}</span>
+                    <span style={{ fontSize: 14, fontWeight: 500, color: '#222', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</span>
+                    <span style={{ fontSize: 11, color: '#bbb', flexShrink: 0 }}>{dateStr}</span>
+                  </div>
+                )
+              })}
             </div>
           )}
 

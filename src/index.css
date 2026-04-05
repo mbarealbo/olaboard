@@ -62,6 +62,7 @@ body { font-family: system-ui, sans-serif; background: #f0f0f0; height: 100vh; o
 .connect-dot-left   { left: -7px; top: 50%; transform: translateY(-50%); }
 .connect-dot-right  { right: -7px; top: 50%; transform: translateY(-50%); }
 .postit:hover .connect-dot { display: block; }
+.canvas-label:hover .connect-dot { display: block; }
 .connect-dot.anchor-hover { display: block; background: #1a5fa8; transform: scale(1.35); }
 
 /* ── Block editor ───────────────────────────────────────────────────────────── */

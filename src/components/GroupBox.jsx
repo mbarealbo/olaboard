@@ -78,9 +78,10 @@ export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit
   return (
     <div
       data-card-id={label.id}
+      className="canvas-label"
       style={{
         position: 'absolute', left: label.x, top: label.y,
-        padding: '2px 4px', cursor: editing ? 'text' : 'move', zIndex: 1,
+        padding: '8px 16px', cursor: editing ? 'text' : 'move', zIndex: 1,
         border: selected || hovered ? '1px dashed #ccc' : '1px dashed transparent',
         borderRadius: 2, userSelect: 'none',
       }}

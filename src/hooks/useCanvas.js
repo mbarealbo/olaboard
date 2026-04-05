@@ -254,7 +254,15 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
             const cId = currentIdRef.current
             const canvas = prev[cId]
             if (!canvas) return prev
-            return { ...prev, [cId]: { ...canvas, labels: (canvas.labels||[]).filter(l => l.id !== selectedLabel) } }
+            return {
+              ...prev,
+              [cId]: {
+                ...canvas,
+                labels: (canvas.labels||[]).filter(l => l.id !== selectedLabel),
+                cards: canvas.cards.filter(c => c.id !== selectedLabel),
+                connections: canvas.connections.filter(c => c.from !== selectedLabel && c.to !== selectedLabel),
+              }
+            }
           })
           setSelectedLabel(null)
         }
