@@ -134,6 +134,11 @@ body { font-family: system-ui, sans-serif; background: var(--bg); height: 100vh;
 .canvas-label:hover .connect-dot { display: block; }
 .connect-dot.anchor-hover { display: block; background: #1a5fa8; transform: scale(1.35); }
 
+[data-theme="high-contrast"] .sidebar-active {
+  background: #7b2fff !important;
+  color: #ffffff !important;
+}
+
 /* ── Block editor ───────────────────────────────────────────────────────────── */
 .block-editor-block:empty::before {
   content: attr(data-placeholder);

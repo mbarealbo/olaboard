@@ -18,7 +18,7 @@ function loadBoards() {
 }
 
 // ─── FolderTree ───────────────────────────────────────────────────────────────
-function FolderTree({ db, currentId, onNavigate, id, depth }) {
+function FolderTree({ db, currentId, onNavigate, id, depth, theme }) {
   depth = depth ?? 0
   const canvas = db[id]
   if (!canvas) return null
@@ -28,6 +28,7 @@ function FolderTree({ db, currentId, onNavigate, id, depth }) {
   return (
     <>
       <div
+        className={isActive ? 'sidebar-active' : undefined}
         style={{
           paddingLeft: depth * 12 + 8, paddingRight: 8,
           paddingTop: 4, paddingBottom: 4,
@@ -55,6 +56,7 @@ function FolderTree({ db, currentId, onNavigate, id, depth }) {
             onNavigate={onNavigate}
             id={f.id}
             depth={depth + 1}
+            theme={theme}
           />
         )
       })}
@@ -508,7 +510,7 @@ export default function App() {
                   </div>
                   {/* Folder tree when active */}
                   {isActive && (
-                    <FolderTree db={db} currentId={currentId} onNavigate={handleSidebarNavigate} id={board.id} depth={1} />
+                    <FolderTree db={db} currentId={currentId} onNavigate={handleSidebarNavigate} id={board.id} depth={1} theme={theme} />
                   )}
                 </div>
               )
@@ -560,17 +562,17 @@ export default function App() {
           </div>
 
           {/* Canvas tools */}
-          <>
+          {(activeColor => <>
             <div style={{ display: 'flex', gap: 2 }}>
               <button
                 disabled={view !== 'canvas'}
-                style={{ ...smallBtn, background: activeTool === 'group' ? 'var(--accent)' : 'var(--btn-bg)', color: activeTool === 'group' ? '#fff' : 'var(--btn-text)', borderColor: activeTool === 'group' ? 'var(--accent)' : 'var(--btn-border)', ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }}
+                style={{ ...smallBtn, background: activeTool === 'group' ? activeColor : 'var(--btn-bg)', color: activeTool === 'group' ? '#fff' : 'var(--btn-text)', borderColor: activeTool === 'group' ? activeColor : 'var(--btn-border)', ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }}
                 onClick={view === 'canvas' ? () => setActiveTool(t => t === 'group' ? 'note' : 'group') : undefined}
                 title="Disegna gruppo"
               >□ Gruppo</button>
               <button
                 disabled={view !== 'canvas'}
-                style={{ ...smallBtn, background: activeTool === 'text' ? 'var(--accent)' : 'var(--btn-bg)', color: activeTool === 'text' ? '#fff' : 'var(--btn-text)', borderColor: activeTool === 'text' ? 'var(--accent)' : 'var(--btn-border)', ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }}
+                style={{ ...smallBtn, background: activeTool === 'text' ? activeColor : 'var(--btn-bg)', color: activeTool === 'text' ? '#fff' : 'var(--btn-text)', borderColor: activeTool === 'text' ? activeColor : 'var(--btn-border)', ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }}
                 onClick={view === 'canvas' ? () => setActiveTool(t => t === 'text' ? 'note' : 'text') : undefined}
                 title="Aggiungi testo"
               >T Testo</button>
@@ -582,13 +584,13 @@ export default function App() {
               >{showGrid ? '⊞ Grid' : '⊟ Grid'}</button>
               <button
                 disabled={view !== 'canvas'}
-                style={{ ...smallBtn, background: autoCreate ? 'var(--accent)' : 'var(--btn-bg)', color: autoCreate ? '#fff' : 'var(--btn-text)', borderColor: autoCreate ? 'var(--accent)' : 'var(--btn-border)', ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }}
+                style={{ ...smallBtn, background: autoCreate ? activeColor : 'var(--btn-bg)', color: autoCreate ? '#fff' : 'var(--btn-text)', borderColor: autoCreate ? activeColor : 'var(--btn-border)', ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }}
                 onClick={view === 'canvas' ? () => setAutoCreate(v => !v) : undefined}
                 title="Crea elemento al termine della freccia"
               ><Zap size={14} /> Quick</button>
               <button
                 disabled={view !== 'canvas'}
-                style={{ ...smallBtn, background: selectMode ? 'var(--accent)' : 'var(--btn-bg)', color: selectMode ? '#fff' : 'var(--btn-text)', borderColor: selectMode ? 'var(--accent)' : 'var(--btn-border)', ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }}
+                style={{ ...smallBtn, background: selectMode ? activeColor : 'var(--btn-bg)', color: selectMode ? '#fff' : 'var(--btn-text)', borderColor: selectMode ? activeColor : 'var(--btn-border)', ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }}
                 onClick={view === 'canvas' ? () => { setSelectMode(v => !v); setActiveTool('note'); setAutoCreate(false) } : undefined}
                 title="Selezione multipla"
               >⬚ Select</button>
@@ -598,7 +600,7 @@ export default function App() {
               <button disabled={view !== 'canvas'} style={{ ...smallBtn, ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }} onClick={view === 'canvas' ? () => zoomBy(0.8) : undefined}>−</button>
               <button disabled={view !== 'canvas'} style={{ ...smallBtn, ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }} onClick={view === 'canvas' ? () => { setScale(1); setOffset({ x: 0, y: 0 }) } : undefined}>1:1</button>
             </div>
-          </>
+          </>)(theme === 'high-contrast' ? '#7b2fff' : 'var(--accent)')}
 
           <button disabled={view !== 'canvas'} style={{ ...smallBtn, ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }} onClick={view === 'canvas' ? exportMd : undefined}>↓ MD</button>
         </div>

@@ -1,6 +1,31 @@
 import { useRef, useState, useEffect } from 'react'
 import { Folder } from 'lucide-react'
 
+const URL_REGEX = /(https?:\/\/[^\s]+|www\.[^\s]+|[a-zA-Z0-9-]+\.(?:com|it|io|net|org|dev|app|co|ai|me|eu)[^\s]*)/g
+const IS_URL = /^(https?:\/\/|www\.|[a-zA-Z0-9-]+\.(?:com|it|io|net|org|dev|app|co|ai|me|eu))/
+
+function parseTextWithLinks(text) {
+  if (!text) return text
+  const parts = text.split(URL_REGEX)
+  return parts.map((part, i) => {
+    if (!part || !IS_URL.test(part)) return part
+    const href = part.startsWith('http') ? part : `https://${part}`
+    return (
+      <a
+        key={i}
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{ color: 'var(--accent)', textDecoration: 'underline', fontWeight: 500, cursor: 'pointer' }}
+        onMouseEnter={e => { e.currentTarget.style.opacity = '0.8' }}
+        onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
+        onMouseDown={e => e.stopPropagation()}
+        onClick={e => e.stopPropagation()}
+      >{part}</a>
+    )
+  })
+}
+
 const RESIZE_HANDLES = [
   { id: 'nw', style: { top: -4, left:  -4, cursor: 'nw-resize' } },
   { id: 'n',  style: { top: -4, left: 'calc(50% - 4px)', cursor: 'n-resize' } },
@@ -60,11 +85,8 @@ export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit
   const [hovered, setHovered] = useState(false)
 
   useEffect(() => {
-    if (elRef.current) elRef.current.textContent = label.text
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
     if (editing && elRef.current) {
+      elRef.current.textContent = label.text
       elRef.current.focus()
       try {
         const range = document.createRange()
@@ -74,7 +96,7 @@ export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit
         sel.addRange(range)
       } catch (_) {}
     }
-  }, [editing])
+  }, [editing]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div
@@ -91,29 +113,29 @@ export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <div
-        ref={elRef}
-        contentEditable={editing}
-        suppressContentEditableWarning
-        style={{ fontSize: label.fontSize, color: '#555', outline: 'none', minWidth: 80, pointerEvents: editing ? 'auto' : 'none', cursor: editing ? 'text' : 'move', whiteSpace: 'pre-wrap' }}
-        onMouseDown={e => { if (editing) e.stopPropagation() }}
-        onBlur={e => {
-          const text = e.target.textContent.trim()
-          if (!text) {
-            onEndEdit()
-            onDelete()
-          } else {
-            onTextChange(text)
-            onEndEdit()
-          }
-        }}
-        onKeyDown={e => {
-          if (!editing) return
-          e.stopPropagation()
-          if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); elRef.current.blur() }
-          if (e.key === 'Escape') elRef.current.blur()
-        }}
-      />
+      {editing ? (
+        <div
+          ref={elRef}
+          contentEditable
+          suppressContentEditableWarning
+          style={{ fontSize: label.fontSize, color: '#555', outline: 'none', minWidth: 80, cursor: 'text', whiteSpace: 'pre-wrap' }}
+          onMouseDown={e => e.stopPropagation()}
+          onBlur={e => {
+            const text = e.target.textContent.trim()
+            if (!text) { onEndEdit(); onDelete() }
+            else { onTextChange(text); onEndEdit() }
+          }}
+          onKeyDown={e => {
+            e.stopPropagation()
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); elRef.current.blur() }
+            if (e.key === 'Escape') elRef.current.blur()
+          }}
+        />
+      ) : (
+        <p style={{ fontSize: label.fontSize, color: '#555', margin: 0, minWidth: 80, whiteSpace: 'pre-wrap', cursor: 'move' }}>
+          {parseTextWithLinks(label.text)}
+        </p>
+      )}
       {onConnectDot && (
         <>
           <div className="connect-dot connect-dot-top"    onMouseDown={e => { e.stopPropagation(); e.preventDefault(); onConnectDot(e, 'top') }} />

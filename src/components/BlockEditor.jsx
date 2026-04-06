@@ -23,7 +23,9 @@ export function parseMarkdown(md) {
       blocks.push({ id: uid(), type: 'code', content: codeLines.join('\n') })
       i++; continue
     }
-    if (line.startsWith('### '))     blocks.push({ id: uid(), type: 'h3',    content: line.slice(4) })
+    const imgMatch = line.match(/^!\[([^\]]*)\]\((.+)\)$/)
+    if (imgMatch)                    blocks.push({ id: uid(), type: 'image', url: imgMatch[2], caption: imgMatch[1] })
+    else if (line.startsWith('### '))blocks.push({ id: uid(), type: 'h3',    content: line.slice(4) })
     else if (line.startsWith('## ')) blocks.push({ id: uid(), type: 'h2',    content: line.slice(3) })
     else if (line.startsWith('# '))  blocks.push({ id: uid(), type: 'h1',    content: line.slice(2) })
     else if (line.startsWith('- '))  blocks.push({ id: uid(), type: 'ul',    content: line.slice(2) })
@@ -39,6 +41,9 @@ export function parseMarkdown(md) {
 function serializeBlocks(blocks, domRefs) {
   return blocks
     .map(block => {
+      if (block.type === 'image') {
+        return block.url ? `![${block.caption || ''}](${block.url})` : null
+      }
       const el = domRefs.current[block.id]
       let content = el ? (el.innerText || '') : block.content
       if (content.endsWith('\n')) content = content.slice(0, -1)
@@ -69,6 +74,7 @@ const BLOCK_TYPES = [
   { type: 'ol',    icon: '1.',  label: 'Lista numerata', keywords: ['ol', 'numbered', 'numero', 'numerata'] },
   { type: 'quote', icon: '"',   label: 'Citazione',      keywords: ['quote', 'citazione', 'blockquote'] },
   { type: 'code',  icon: '</>',  label: 'Codice',        keywords: ['code', 'codice', 'mono'] },
+  { type: 'image', icon: '🖼',  label: 'Immagine',       keywords: ['image', 'immagine', 'img', 'foto', 'photo'] },
 ]
 
 // Prefixes that trigger block-type conversion on Space (checked in order — longest first)
@@ -110,9 +116,99 @@ const PLACEHOLDERS = {
   quote: 'Citazione…', code: 'Codice…',
 }
 
+const URL_REGEX = /(https?:\/\/[^\s]+|www\.[^\s]+|[a-zA-Z0-9-]+\.(?:com|it|io|net|org|dev|app|co|ai|me|eu)[^\s]*)/g
+const IS_URL = /^(https?:\/\/|www\.|[a-zA-Z0-9-]+\.(?:com|it|io|net|org|dev|app|co|ai|me|eu))/
+
+function parseTextWithLinks(text) {
+  if (!text) return text
+  const parts = text.split(URL_REGEX)
+  return parts.map((part, i) => {
+    if (!part || !IS_URL.test(part)) return part
+    const href = part.startsWith('http') ? part : `https://${part}`
+    return (
+      <a
+        key={i}
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{ color: 'var(--accent)', textDecoration: 'underline', fontWeight: 500, cursor: 'pointer' }}
+        onMouseEnter={e => { e.currentTarget.style.opacity = '0.8' }}
+        onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
+        onClick={e => e.stopPropagation()}
+      >{part}</a>
+    )
+  })
+}
+
+// ── ImageBlock ────────────────────────────────────────────────────────────────
+function ImageBlock({ block, onUpdate }) {
+  const [editing, setEditing] = useState(!block.url)
+  const [urlInput, setUrlInput] = useState(block.url || '')
+  const [hovered, setHovered] = useState(false)
+
+  function commitUrl() {
+    const trimmed = urlInput.trim()
+    if (trimmed) {
+      onUpdate(block.id, { url: trimmed })
+      setEditing(false)
+    }
+  }
+
+  // URL input row — shown when no url yet or clicking image to re-edit
+  if (editing || !block.url) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 0', minHeight: '1.6em' }}>
+        <span style={{ fontSize: 14, userSelect: 'none', flexShrink: 0 }}>🖼</span>
+        <input
+          autoFocus
+          style={{ border: 'none', outline: 'none', background: 'transparent', fontSize: 14, color: 'var(--text-muted)', width: '100%', fontFamily: 'inherit' }}
+          placeholder="Incolla URL immagine..."
+          value={urlInput}
+          onChange={e => setUrlInput(e.target.value)}
+          onKeyDown={e => {
+            e.stopPropagation()
+            if (e.key === 'Enter') commitUrl()
+            if (e.key === 'Escape') { if (block.url) { setUrlInput(block.url); setEditing(false) } }
+          }}
+          onBlur={commitUrl}
+        />
+      </div>
+    )
+  }
+
+  return (
+    <div
+      style={{ position: 'relative', margin: '4px 0' }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <img
+        src={block.url}
+        alt={block.caption || ''}
+        style={{ maxWidth: '100%', borderRadius: 6, display: 'block', cursor: 'pointer', marginTop: 4 }}
+        onClick={() => { setUrlInput(block.url); setEditing(true) }}
+      />
+      <input
+        style={{ fontSize: 12, color: 'var(--text-muted)', border: 'none', outline: 'none', background: 'transparent', width: '100%', padding: '4px 0', fontFamily: 'inherit' }}
+        placeholder="Didascalia..."
+        value={block.caption || ''}
+        onChange={e => onUpdate(block.id, { caption: e.target.value })}
+        onKeyDown={e => e.stopPropagation()}
+      />
+      {hovered && (
+        <button
+          style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(0,0,0,0.5)', color: '#fff', border: 'none', borderRadius: '50%', width: 22, height: 22, fontSize: 16, lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={() => { onUpdate(block.id, { url: '', caption: '' }); setUrlInput(''); setEditing(true) }}
+        >×</button>
+      )}
+    </div>
+  )
+}
+
 // ── BlockItem ─────────────────────────────────────────────────────────────────
-function BlockItem({ block, olIndex, onKeyDown, onInput, onBlur, registerRef }) {
+function BlockItem({ block, olIndex, onKeyDown, onInput, onBlur, registerRef, onUpdate }) {
   const elRef = useRef(null)
+  const [focused, setFocused] = useState(false)
 
   useEffect(() => {
     const el = elRef.current
@@ -140,11 +236,39 @@ function BlockItem({ block, olIndex, onKeyDown, onInput, onBlur, registerRef }) 
       data-placeholder={PLACEHOLDERS[block.type] || PLACEHOLDERS.p}
       style={getBlockStyle(block.type)}
       className="block-editor-block"
-      onBlur={() => onBlur(block)}
+      onFocus={() => setFocused(true)}
+      onBlur={() => { setFocused(false); onBlur(block) }}
       onKeyDown={e => onKeyDown(e, block)}
       onInput={e => onInput(e, block)}
     />
   )
+
+  if (block.type === 'image') {
+    return <ImageBlock block={block} onUpdate={onUpdate} />
+  }
+
+  // 'p' blocks: when not focused, show read-only view with clickable links.
+  // Keep contentEditable always mounted (opacity:0) so innerText/refs remain valid.
+  if (block.type === 'p') {
+    return (
+      <div style={{ position: 'relative', minHeight: '1.6em' }}>
+        <div style={{ opacity: focused ? 1 : 0, pointerEvents: focused ? 'auto' : 'none', position: focused ? 'relative' : 'absolute', top: 0, left: 0, right: 0 }}>
+          {editableEl}
+        </div>
+        {!focused && (
+          <p
+            style={{ ...getBlockStyle('p'), margin: 0, cursor: 'text', position: 'relative' }}
+            onClick={() => elRef.current?.focus()}
+          >
+            {block.content
+              ? parseTextWithLinks(block.content)
+              : <span style={{ color: '#bbb', pointerEvents: 'none' }}>{PLACEHOLDERS.p}</span>
+            }
+          </p>
+        )}
+      </div>
+    )
+  }
 
   // ul/ol: wrap in flex row so the bullet/number is a real DOM element,
   // always visible (even on empty blocks) — avoids ::before CSS conflict with placeholder.
@@ -242,14 +366,24 @@ export default function BlockEditor({ value, onChange }) {
     return blocksRef.current.findIndex(b => b.id === id)
   }
 
+  // ── update image block fields ─────────────────────────────────────────────
+  function updateBlock(id, patch) {
+    const updated = blocksRef.current.map(b => b.id === id ? { ...b, ...patch } : b)
+    emit(updated)
+    setBlocks(updated)
+  }
+
   // ── apply block type conversion (shortcut or slash command) ───────────────
   function convertBlock(blockId, type) {
     const el = domRefs.current[blockId]
     if (el) el.innerHTML = ''
-    const updated = blocksRef.current.map(b => b.id === blockId ? { ...b, type, content: '' } : b)
+    const updated = blocksRef.current.map(b => b.id === blockId
+      ? type === 'image' ? { id: b.id, type: 'image', url: '', caption: '' } : { ...b, type, content: '' }
+      : b
+    )
     emit(updated)
     setBlocks(updated)
-    pendingFocus.current = { id: blockId, atEnd: false }
+    if (type !== 'image') pendingFocus.current = { id: blockId, atEnd: false }
     setSlashMenu(null)
   }
 
@@ -410,6 +544,7 @@ export default function BlockEditor({ value, onChange }) {
           onInput={handleInput}
           onBlur={handleBlur}
           registerRef={registerRef}
+          onUpdate={updateBlock}
         />
       ))}
 
