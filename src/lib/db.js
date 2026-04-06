@@ -1,108 +1,196 @@
-// Auto-switches between Supabase (production) and localStorage (demo).
-// When VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are properly set,
-// all functions below use Supabase. Otherwise they use the in-memory store.
+import { supabase } from './supabase'
 
-import { isSupabaseConfigured } from './config'
-import * as mem from './memoryDb'
+// ── BOARDS ────────────────────────────────────────────────────────────────────
 
-// Lazy-loaded Supabase functions to avoid crashing when env vars are missing
-async function supa() {
-  const { supabase } = await import('./supabase')
-  return supabase
-}
-
-// Canvases
-export async function fetchCanvases(userId) {
-  if (!isSupabaseConfigured) return mem.fetchCanvases(userId)
-  const db = await supa()
-  const { data, error } = await db.from('canvases').select('*').eq('user_id', userId).order('name')
+export async function fetchBoards(userId) {
+  const { data, error } = await supabase
+    .from('boards')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at')
   if (error) throw error
   return data
 }
 
-export async function createCanvas({ name, parent_id, user_id }) {
-  if (!isSupabaseConfigured) return mem.createCanvas({ name, parent_id, user_id })
-  const db = await supa()
-  const { data, error } = await db.from('canvases').insert({ name, parent_id, user_id }).select().single()
+export async function createBoard({ name, userId }) {
+  const { data, error } = await supabase
+    .from('boards')
+    .insert({ name, user_id: userId })
+    .select().single()
+  if (error) throw error
+  return data
+}
+
+export async function updateBoard(id, updates) {
+  const { data, error } = await supabase
+    .from('boards')
+    .update(updates)
+    .eq('id', id)
+    .select().single()
+  if (error) throw error
+  return data
+}
+
+export async function deleteBoard(id) {
+  const { error } = await supabase
+    .from('boards')
+    .delete()
+    .eq('id', id)
+  if (error) throw error
+}
+
+// ── CANVASES ──────────────────────────────────────────────────────────────────
+
+export async function fetchCanvas(id) {
+  const { data, error } = await supabase
+    .from('canvases')
+    .select('*')
+    .eq('id', id)
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function createCanvas({ id, boardId, parentId, name, userId }) {
+  const row = { board_id: boardId, parent_id: parentId || null, name, user_id: userId, groups: [], labels: [] }
+  if (id) row.id = id
+  const { data, error } = await supabase
+    .from('canvases')
+    .insert(row)
+    .select().single()
   if (error) throw error
   return data
 }
 
 export async function updateCanvas(id, updates) {
-  if (!isSupabaseConfigured) return mem.updateCanvas(id, updates)
-  const db = await supa()
-  const { data, error } = await db.from('canvases').update(updates).eq('id', id).select().single()
+  const { data, error } = await supabase
+    .from('canvases')
+    .update(updates)
+    .eq('id', id)
+    .select().single()
   if (error) throw error
   return data
 }
 
-export async function deleteCanvas(id) {
-  if (!isSupabaseConfigured) return mem.deleteCanvas(id)
-  const db = await supa()
-  const { error } = await db.from('canvases').delete().eq('id', id)
-  if (error) throw error
-}
+// ── CARDS ─────────────────────────────────────────────────────────────────────
 
-// Cards
 export async function fetchCards(canvasId) {
-  if (!isSupabaseConfigured) return mem.fetchCards(canvasId)
-  const db = await supa()
-  const { data, error } = await db.from('cards').select('*').eq('canvas_id', canvasId).order('created_at')
+  const { data, error } = await supabase
+    .from('cards')
+    .select('*')
+    .eq('canvas_id', canvasId)
+    .order('created_at')
   if (error) throw error
   return data
 }
 
-export async function createCard({ canvas_id, title, body, x, y, is_folder, node_type }) {
-  if (!isSupabaseConfigured) return mem.createCard({ canvas_id, title, body, x, y, is_folder, node_type })
-  const db = await supa()
-  const { data, error } = await db.from('cards').insert({ canvas_id, title, body: body || '', x, y, is_folder: is_folder || false, node_type: node_type || 'postit' }).select().single()
+export async function createCard({ canvasId, title, body, x, y, isFolder, isLabel, color }) {
+  const { data, error } = await supabase
+    .from('cards')
+    .insert({ canvas_id: canvasId, title, body: body || '', x, y, is_folder: isFolder || false, is_label: isLabel || false, color: color || 'yellow' })
+    .select().single()
   if (error) throw error
   return data
 }
 
 export async function updateCard(id, updates) {
-  if (!isSupabaseConfigured) return mem.updateCard(id, updates)
-  const db = await supa()
-  const { data, error } = await db.from('cards').update(updates).eq('id', id).select().single()
+  const { data, error } = await supabase
+    .from('cards')
+    .update(updates)
+    .eq('id', id)
+    .select().single()
   if (error) throw error
   return data
 }
 
 export async function deleteCard(id) {
-  if (!isSupabaseConfigured) return mem.deleteCard(id)
-  const db = await supa()
-  const { error } = await db.from('cards').delete().eq('id', id)
+  const { error } = await supabase
+    .from('cards')
+    .delete()
+    .eq('id', id)
   if (error) throw error
 }
 
-// Connections
+// ── CONNECTIONS ───────────────────────────────────────────────────────────────
+
 export async function fetchConnections(canvasId) {
-  if (!isSupabaseConfigured) return mem.fetchConnections(canvasId)
-  const db = await supa()
-  const { data, error } = await db.from('connections').select('*').eq('canvas_id', canvasId)
+  const { data, error } = await supabase
+    .from('connections')
+    .select('*')
+    .eq('canvas_id', canvasId)
   if (error) throw error
   return data
 }
 
-export async function createConnection({ canvas_id, from_card_id, to_card_id, label }) {
-  if (!isSupabaseConfigured) return mem.createConnection({ canvas_id, from_card_id, to_card_id, label })
-  const db = await supa()
-  const { data, error } = await db.from('connections').insert({ canvas_id, from_card_id, to_card_id, label: label || '' }).select().single()
+export async function createConnection({ canvasId, fromCardId, toCardId, label, fromAnchor, toAnchor }) {
+  const { data, error } = await supabase
+    .from('connections')
+    .insert({ canvas_id: canvasId, from_card_id: fromCardId, to_card_id: toCardId, label: label || '', from_anchor: fromAnchor || 'right', to_anchor: toAnchor || 'left' })
+    .select().single()
   if (error) throw error
   return data
 }
 
 export async function updateConnection(id, updates) {
-  if (!isSupabaseConfigured) return mem.updateConnection(id, updates)
-  const db = await supa()
-  const { data, error } = await db.from('connections').update(updates).eq('id', id).select().single()
+  const { data, error } = await supabase
+    .from('connections')
+    .update(updates)
+    .eq('id', id)
+    .select().single()
   if (error) throw error
   return data
 }
 
 export async function deleteConnection(id) {
-  if (!isSupabaseConfigured) return mem.deleteConnection(id)
-  const db = await supa()
-  const { error } = await db.from('connections').delete().eq('id', id)
+  const { error } = await supabase
+    .from('connections')
+    .delete()
+    .eq('id', id)
+  if (error) throw error
+}
+
+// ── BULK SYNC ─────────────────────────────────────────────────────────────────
+
+export async function upsertCards(cards, canvasId) {
+  if (!cards.length) return
+  const rows = cards.map(c => ({
+    id: c.id,
+    canvas_id: canvasId,
+    title: c.title || '',
+    body: c.body || '',
+    x: c.x,
+    y: c.y,
+    is_folder: c.isFolder || false,
+    is_label: c.isLabel || false,
+    color: c.color || 'yellow',
+  }))
+  const { error } = await supabase.from('cards').upsert(rows, { onConflict: 'id' })
+  if (error) throw error
+}
+
+export async function deleteCardsByIds(ids) {
+  if (!ids.length) return
+  const { error } = await supabase.from('cards').delete().in('id', ids)
+  if (error) throw error
+}
+
+export async function upsertConnections(connections, canvasId) {
+  if (!connections.length) return
+  const rows = connections.map(c => ({
+    id: c.id,
+    canvas_id: canvasId,
+    from_card_id: c.from,
+    to_card_id: c.to,
+    label: c.label || '',
+    from_anchor: c.fromAnchor || 'right',
+    to_anchor: c.toAnchor || 'left',
+  }))
+  const { error } = await supabase.from('connections').upsert(rows, { onConflict: 'id' })
+  if (error) throw error
+}
+
+export async function deleteConnectionsByIds(ids) {
+  if (!ids.length) return
+  const { error } = await supabase.from('connections').delete().in('id', ids)
   if (error) throw error
 }

@@ -1,21 +1,29 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Trash2, Moon, Sun, Monitor, Zap, User, Folder } from 'lucide-react'
+import { Trash2, Moon, Sun, Monitor, Zap, Folder, LogOut } from 'lucide-react'
 import BlockEditor from './components/BlockEditor'
 import PostIt from './components/PostIt'
 import { Group, CanvasLabel } from './components/GroupBox'
 import { useCanvas } from './hooks/useCanvas'
-import { STORAGE_KEY, CARD_W, CARD_H_HALF, uid, loadDb } from './utils'
+import { CARD_W, CARD_H_HALF, uid } from './utils'
+import { supabase } from './lib/supabase'
+import AuthPage from './components/AuthPage'
+import {
+  fetchBoards as fetchBoardsDB,
+  createBoard as createBoardDB,
+  updateBoard as updateBoardDB,
+  deleteBoard as deleteBoardDB,
+  fetchCanvas as fetchCanvasDB,
+  createCanvas as createCanvasDB,
+  updateCanvas as updateCanvasDB,
+  fetchCards as fetchCardsDB,
+  fetchConnections as fetchConnectionsDB,
+  upsertCards,
+  deleteCardsByIds,
+  upsertConnections,
+  deleteConnectionsByIds,
+} from './lib/db'
 
-const BOARDS_KEY = 'olaboard_boards'
 const STACK_KEY = 'olaboard_stack'
-
-function loadBoards() {
-  try {
-    const raw = JSON.parse(localStorage.getItem(BOARDS_KEY))
-    if (Array.isArray(raw) && raw.length > 0) return raw
-  } catch {}
-  return [{ id: 'root', name: 'La mia lavagna' }]
-}
 
 // ─── FolderTree ───────────────────────────────────────────────────────────────
 function FolderTree({ db, currentId, onNavigate, id, depth, theme }) {
@@ -64,24 +72,57 @@ function FolderTree({ db, currentId, onNavigate, id, depth, theme }) {
   )
 }
 
+// ─── LoadingOverlay ───────────────────────────────────────────────────────────
+function LoadingOverlay({ loading }) {
+  const [hidden, setHidden] = useState(false)
+
+  return (
+    <div
+      onTransitionEnd={() => { if (!loading) setHidden(true) }}
+      style={{
+        display: hidden ? 'none' : 'flex',
+        position: 'fixed', inset: 0, zIndex: 9999,
+        alignItems: 'center', justifyContent: 'center',
+        background: 'var(--bg, #ffffff)',
+        color: 'var(--text, #1a1a1a)',
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: 24, fontWeight: 700,
+        letterSpacing: '-0.5px',
+        opacity: loading ? 1 : 0,
+        transition: 'opacity 0.3s ease',
+        pointerEvents: loading ? 'auto' : 'none',
+      }}
+    >
+      Olaboard
+    </div>
+  )
+}
+
 // ─── App ─────────────────────────────────────────────────────────────────────
 export default function App() {
-  const [db, setDb] = useState(loadDb)
-  const [boards, setBoards] = useState(loadBoards)
+  const [session, setSession] = useState(undefined) // undefined = loading, null = not logged in
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setSession(data.session ?? null))
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session ?? null)
+    })
+    return () => subscription.unsubscribe()
+  }, [])
+
+  if (session === undefined) return null // loading
+  if (session === null) return <AuthPage />
+
+  return <AppInner userId={session.user.id} />
+}
+
+function AppInner({ userId }) {
+  const [db, setDb] = useState({})
+  const [boards, setBoards] = useState([])
+  const [loading, setLoading] = useState(true)
   const [renamingBoardId, setRenamingBoardId] = useState(null)
-  const [stack, setStack] = useState(() => {
-    try {
-      const savedStack = JSON.parse(localStorage.getItem(STACK_KEY))
-      const savedBoards = JSON.parse(localStorage.getItem(BOARDS_KEY)) || []
-      if (Array.isArray(savedStack) && savedStack.length > 0) {
-        const boardExists = savedBoards.some(b => b.id === savedStack[0]) ||
-                           savedStack[0] === 'root'
-        if (boardExists) return savedStack
-      }
-      const firstBoard = savedBoards[0]
-      return firstBoard ? [firstBoard.id] : ['root']
-    } catch { return ['root'] }
-  })
+  const [stack, setStack] = useState(['__loading__'])
+  const [displayName, setDisplayName] = useState('')
   const [view, setView] = useState('canvas')
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [activeNoteId, setActiveNoteId] = useState(null)
@@ -99,17 +140,133 @@ export default function App() {
   const [editingConnId, setEditingConnId] = useState(null)
   const [editingConnValue, setEditingConnValue] = useState('')
 
-  const currentIdRef = useRef('root')
+  const currentIdRef = useRef('__loading__')
   const dbRef = useRef(db)
   useEffect(() => { dbRef.current = db }, [db])
   const boardsRef = useRef(boards)
   useEffect(() => { boardsRef.current = boards }, [boards])
 
-  useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(db)) }, [db])
-  useEffect(() => { localStorage.setItem(BOARDS_KEY, JSON.stringify(boards)) }, [boards])
-  useEffect(() => { console.log('stack changed:', stack); localStorage.setItem(STACK_KEY, JSON.stringify(stack)) }, [stack])
+  // Stack persisted as UI preference only
+  useEffect(() => { localStorage.setItem(STACK_KEY, JSON.stringify(stack)) }, [stack])
 
+  // ── map Supabase rows → app shape ─────────────────────────────────────────
+  function mapCard(row) {
+    return { id: row.id, title: row.title || '', body: row.body || '', x: row.x, y: row.y, isFolder: row.is_folder || false, isLabel: row.is_label || false, color: row.color || 'yellow', createdAt: row.created_at }
+  }
+  function mapConn(row) {
+    return { id: row.id, from: row.from_card_id, to: row.to_card_id, label: row.label || '', fromAnchor: row.from_anchor || 'right', toAnchor: row.to_anchor || 'left' }
+  }
+
+  // ── load canvas data from Supabase into db state ──────────────────────────
+  const loadCanvasData = useCallback(async (canvasId, boardId, folderName) => {
+    try {
+      let canvasData = await fetchCanvasDB(canvasId).catch(() => null)
+      if (!canvasData) {
+        // Canvas row doesn't exist yet — create it
+        const bid = boardId || canvasId // for root boards, canvasId === boardId
+        const canvasName = folderName || boardsRef.current.find(b => b.id === canvasId)?.name || canvasId
+        canvasData = await createCanvasDB({ id: canvasId, boardId: bid, name: canvasName, userId }).catch(() => null)
+      }
+      const [cardsData, connectionsData] = await Promise.all([
+        fetchCardsDB(canvasId).catch(() => []),
+        fetchConnectionsDB(canvasId).catch(() => []),
+      ])
+      const confirmedName = canvasData?.name || folderName || canvasId
+      setDb(prev => ({
+        ...prev,
+        [canvasId]: {
+          id: canvasId,
+          name: confirmedName,
+          cards: (cardsData || []).map(mapCard),
+          connections: (connectionsData || []).map(mapConn),
+          groups: canvasData?.groups || [],
+          labels: canvasData?.labels || [],
+        }
+      }))
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(confirmedName)
+      if (canvasId === currentIdRef.current && !isUUID) setDisplayName(confirmedName)
+    } catch (err) {
+      console.error('loadCanvasData error:', err)
+    }
+  }, [userId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── initial load: boards + first canvas ───────────────────────────────────
+  useEffect(() => {
+    ;(async () => {
+      try {
+        let boardsData = await fetchBoardsDB(userId)
+        if (!boardsData.length) {
+          const board = await createBoardDB({ name: 'La mia lavagna', userId })
+          await createCanvasDB({ id: board.id, boardId: board.id, name: board.name, userId })
+          boardsData = [board]
+        }
+        const mapped = boardsData.map(b => ({ id: b.id, name: b.name }))
+        setBoards(mapped)
+
+        const savedStack = (() => {
+          try {
+            const s = JSON.parse(localStorage.getItem(STACK_KEY))
+            if (Array.isArray(s) && s.length > 0 && mapped.some(b => b.id === s[0])) return s
+          } catch {}
+          return [boardsData[0].id]
+        })()
+
+        setStack(savedStack)
+        const firstCanvasId = savedStack[savedStack.length - 1]
+        const firstBoardId = savedStack[0]
+        const initName = mapped.find(b => b.id === firstCanvasId)?.name || mapped.find(b => b.id === firstBoardId)?.name || ''
+        setDisplayName(initName)
+        await loadCanvasData(firstCanvasId, firstBoardId, initName)
+      } catch (err) {
+        console.error('init error:', err)
+      } finally {
+        setLoading(false)
+      }
+    })()
+  }, [userId, loadCanvasData])
+
+  // ── load canvas data when navigating to an unloaded canvas ────────────────
+  const loadedRef = useRef(new Set())
   const currentId = stack[stack.length - 1]
+  useEffect(() => {
+    if (loading || !currentId || currentId === '__loading__') return
+    if (loadedRef.current.has(currentId)) return
+    loadedRef.current.add(currentId)
+    const folderName = dbRef.current[currentId]?.name
+    loadCanvasData(currentId, stack[0], folderName)
+  }, [currentId, loading, loadCanvasData]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── debounced Supabase sync ───────────────────────────────────────────────
+  const syncedRef = useRef({}) // canvasId → { cardIds, connectionIds }
+  const syncTimerRef = useRef(null)
+
+  const syncCanvas = useCallback(async (canvasId, canvas) => {
+    try {
+      const prev = syncedRef.current[canvasId] || { cardIds: new Set(), connectionIds: new Set() }
+      const curCardIds = new Set(canvas.cards.map(c => c.id))
+      const curConnIds = new Set(canvas.connections.map(c => c.id))
+
+      await Promise.all([
+        upsertCards(canvas.cards, canvasId),
+        deleteCardsByIds([...prev.cardIds].filter(id => !curCardIds.has(id))),
+        upsertConnections(canvas.connections, canvasId),
+        deleteConnectionsByIds([...prev.connectionIds].filter(id => !curConnIds.has(id))),
+        updateCanvasDB(canvasId, { groups: canvas.groups || [], labels: canvas.labels || [] }),
+      ])
+      syncedRef.current[canvasId] = { cardIds: curCardIds, connectionIds: curConnIds }
+    } catch (err) {
+      console.error('sync error:', err)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (loading || !currentId || currentId === '__loading__') return
+    const canvas = dbRef.current[currentId]
+    if (!canvas) return
+    clearTimeout(syncTimerRef.current)
+    syncTimerRef.current = setTimeout(() => syncCanvas(currentId, canvas), 500)
+  }) // runs after every render — intentional, checks db[currentId]
+
   useEffect(() => { currentIdRef.current = currentId }, [currentId])
 
   const currentCanvas = db[currentId] || { cards: [], connections: [], groups: [], labels: [] }
@@ -124,9 +281,18 @@ export default function App() {
       const cId = currentIdRef.current
       const canvas = prev[cId]
       if (!canvas) return prev
-      return { ...prev, [cId]: { ...canvas, cards: canvas.cards.map(c => c.id === cardId ? { ...c, ...updates } : c) } }
+      const next = { ...prev, [cId]: { ...canvas, cards: canvas.cards.map(c => c.id === cardId ? { ...c, ...updates } : c) } }
+      // If renaming a folder card, also update the canvas entry name
+      if (updates.title && prev[cardId]) {
+        next[cardId] = { ...prev[cardId], name: updates.title }
+      }
+      return next
     })
-  }, [])
+    // If renaming a folder card that is a board root, update boards state
+    if (updates.title) {
+      setBoards(prev => prev.map(b => b.id === cardId ? { ...b, name: updates.title } : b))
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const addConnectionFn = useCallback((from, to, fromAnchor, toAnchor) => {
     if (from === to) return
@@ -190,14 +356,22 @@ export default function App() {
   }
 
   function enterCanvas(id, name) {
-    setDb(prev => prev[id] ? prev : { ...prev, [id]: { id, name: name || 'Cartella', cards: [], connections: [], groups: [], labels: [] } })
+    const resolvedName = name || boardsRef.current.find(b => b.id === id)?.name || id
+    setDisplayName(resolvedName)
+    setDb(prev => prev[id] ? prev : { ...prev, [id]: { id, name: resolvedName, cards: [], connections: [], groups: [], labels: [] } })
     setStack(prev => [...prev, id])
     setSelected(null); setActiveNoteId(null)
+    if (!loadedRef.current.has(id)) {
+      loadedRef.current.add(id)
+      loadCanvasData(id, stack[0], resolvedName)
+    }
     setTimeout(() => centerCanvas(id), 50)
   }
 
   function navigateTo(idx) {
     const targetId = stack[idx]
+    const targetName = dbRef.current[targetId]?.name || boardsRef.current.find(b => b.id === targetId)?.name || ''
+    setDisplayName(targetName)
     setStack(prev => prev.slice(0, idx + 1))
     setSelected(null); setActiveNoteId(null)
     setTimeout(() => centerCanvas(targetId), 50)
@@ -256,12 +430,16 @@ export default function App() {
         ...prev,
         [targetId]: {
           id: targetId,
-          name: fc?.title || 'Cartella',
+          name: fc?.name || fc?.title || targetId,
           cards: [], connections: [], groups: [], labels: []
         }
       }
     })
 
+    const targetName = dbRef.current[targetId]?.name
+      || boardsRef.current.find(b => b.id === targetId)?.name
+      || (() => { for (const b of boardsRef.current) { function fc(id) { const cv = dbRef.current[id]; if (!cv) return null; const f = cv.cards.find(c => c.id === targetId); if (f) return f.title; for (const c of cv.cards) if (c.isFolder) { const r = fc(c.id); if (r) return r } return null } const r = fc(b.id); if (r) return r } return '' })()
+    setDisplayName(targetName || '')
     setStack(path)
     setSelected(null)
     setActiveNoteId(null)
@@ -447,6 +625,9 @@ export default function App() {
   return (
     <div data-theme={theme} style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: 'system-ui, sans-serif' }}>
 
+      {/* Loading overlay */}
+      <LoadingOverlay loading={loading} />
+
       {/* ── Sidebar ──────────────────────────────────────────────────────── */}
       {sidebarOpen && (
         <div style={{ width: 210, flexShrink: 0, background: 'var(--sidebar-bg)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -464,6 +645,7 @@ export default function App() {
                     onClick={() => {
                       if (isRenaming) return
                       if (!isActive) {
+                        setDisplayName(board.name)
                         setStack([board.id])
                         setSelected(null); setActiveNoteId(null)
                         setOffset({ x: 0, y: 0 }); setScale(1)
@@ -485,6 +667,7 @@ export default function App() {
                           const name = e.target.value.trim() || board.name
                           setBoards(prev => prev.map(b => b.id === board.id ? { ...b, name } : b))
                           setDb(prev => prev[board.id] ? { ...prev, [board.id]: { ...prev[board.id], name } } : prev)
+                          updateBoardDB(board.id, { name }).catch(console.error)
                           setRenamingBoardId(null)
                         }}
                         onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') e.target.blur(); e.stopPropagation() }}
@@ -504,6 +687,7 @@ export default function App() {
                           if (!window.confirm('Eliminare questa lavagna e tutto il suo contenuto?')) return
                           setBoards(prev => prev.filter(b => b.id !== board.id))
                           setDb(prev => { const next = { ...prev }; delete next[board.id]; return next })
+                          deleteBoardDB(board.id).catch(console.error)
                         }}
                       ><Trash2 size={14} /></button>
                     )}
@@ -527,17 +711,18 @@ export default function App() {
                 const name = 'Nuova lavagna'
                 setBoards(prev => [...prev, { id, name }])
                 setDb(prev => ({ ...prev, [id]: { id, name, cards: [], connections: [], groups: [], labels: [] } }))
+                setDisplayName(name)
                 setStack([id]); localStorage.setItem(STACK_KEY, JSON.stringify([id])); setSelected(null); setActiveNoteId(null)
                 setOffset({ x: 0, y: 0 }); setScale(1)
                 setRenamingBoardId(id)
               }}
             >+ Nuova lavagna</button>
             <button
-              style={{ width: '100%', textAlign: 'left', padding: '10px 12px', fontSize: 13, border: 'none', background: 'none', cursor: 'pointer', color: '#555' }}
+              style={{ width: '100%', textAlign: 'left', padding: '10px 12px', fontSize: 13, border: 'none', background: 'none', cursor: 'pointer', color: '#555', display: 'flex', alignItems: 'center', gap: 6 }}
               onMouseEnter={e => { e.currentTarget.style.background = '#f5f5f5' }}
               onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
-              onClick={() => alert('Coming soon')}
-            ><User size={14} /> Account</button>
+              onClick={() => supabase.auth.signOut()}
+            ><LogOut size={14} /> Esci</button>
           </div>
         </div>
       )}
@@ -550,7 +735,7 @@ export default function App() {
           <button style={iconBtn} onClick={() => setSidebarOpen(v => !v)}>☰</button>
 
           {/* Current canvas name */}
-          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{db[currentId]?.name || currentId}</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{displayName || db[currentId]?.name || ''}</span>
 
           <div style={{ flex: 1 }} />
 

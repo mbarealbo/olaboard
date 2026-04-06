@@ -2,94 +2,127 @@
 
 ## Stack
 - React + Vite (no TypeScript)
-- CSS puro + alcune Tailwind utility classes
-- localStorage per persistenza (chiave: olaboard_data)
+- CSS puro
+- Supabase per auth (magic link) e persistenza cloud
 - No React Flow, no librerie canvas esterne
 
 ## Struttura file
-- `src/App.jsx` – FolderTree, NotePanel, App render + stato top-level, rendering SVG frecce
+- `src/App.jsx` – App (auth gate), AppInner (stato top-level), FolderTree, LoadingOverlay, NotePanel, render SVG frecce
 - `src/hooks/useCanvas.js` – tutto lo stato canvas: offset, scale, dragging, connecting, keyboard, exitPoint
-- `src/components/PostIt.jsx` – componente PostIt con 4 connect dots cardinali
-- `src/components/GroupBox.jsx` – Group (box ridimensionabile) e CanvasLabel (testo libero)
-- `src/components/BlockEditor.jsx` – editor blocchi stile Notion con slash commands
-- `src/utils.js` – costanti CARD_W=130, CARD_H_HALF=37, uid(), loadDb(), buildPath()
+- `src/components/PostIt.jsx` – componente PostIt con 4 connect dots cardinali, Lucide icons
+- `src/components/GroupBox.jsx` – Group (box ridimensionabile) e CanvasLabel (testo libero, link cliccabili)
+- `src/components/BlockEditor.jsx` – editor blocchi stile Notion con slash commands, blocchi immagine, link cliccabili nei blocchi `p`
+- `src/components/AuthPage.jsx` – magic link login page
+- `src/lib/supabase.js` – createClient export
+- `src/lib/db.js` – tutte le funzioni CRUD Supabase (boards, canvases, cards, connections, bulk upsert/delete)
+- `src/utils.js` – costanti CARD_W=130, CARD_H_HALF=37, uid() (crypto.randomUUID), buildPath()
 
-## Struttura dati localStorage
+## Auth
+- `App` component: `session` state (undefined=loading, null=not logged in, object=logged in)
+- `supabase.auth.getSession()` + `onAuthStateChange` per mantenere sessione aggiornata
+- `session === undefined` → null (spinner rimosso, ora usa LoadingOverlay)
+- `session === null` → `<AuthPage />` (magic link via signInWithOtp)
+- `session` presente → `<AppInner userId={session.user.id} />`
 
+## Struttura dati (Supabase)
+
+### Tabelle
+- `boards` – id, user_id, name, created_at
+- `canvases` – id, board_id, parent_id, user_id, name, groups (jsonb), labels (jsonb)
+- `cards` – id, canvas_id, title, body, x, y, is_folder, is_label, color, created_at
+- `connections` – id, canvas_id, from_card_id, to_card_id, label, from_anchor, to_anchor
+
+### Shape app (dopo mapCard/mapConn)
 ```js
-{
-  boards: [{ id, name }],
-  root: { id, name, cards: [], connections: [], groups: [], labels: [] },
-  [canvasId]: { id, name, cards: [], connections: [], groups: [], labels: [] }
-}
-```
+// Card
+{ id, title, body, x, y, color, isFolder, isLabel, createdAt }
 
-### Card
-```js
-{ id, x, y, title, body, color, isFolder, isLabel, createdAt }
-```
+// Connection
+{ id, from, to, label, fromAnchor, toAnchor }
 
-### Connection
-```js
-{ id, from, to, label }
-```
-
-### Group
-```js
+// Group
 { id, title, x, y, width, height, cardIds: [] }
-```
 
-### Label standalone
-```js
+// Label standalone
 { id, x, y, text, fontSize }
 ```
 
-## Feature implementate
-- Lavagna infinita: pan (drag sfondo), zoom (scroll + bottoni +/−/1:1)
-- Post-it gialli (#FAC775): doppio click sulla lavagna crea, doppio click su titolo rinomina inline, entra in rename mode automaticamente alla creazione
-- Cartelle arancioni (#EF9F27): doppio click entra nel canvas figlio
-- Testo libero (isLabel:true): card senza sfondo, solo testo, convertibile in post-it o cartella
-- Gruppi: box ridimensionabili con 8 handle, titolo editabile, trascinare il gruppo muove tutte le card dentro
-- Frecce bezier: exitPoint geometrico con padding target 18px, control points adattivi per orizzontale/verticale
-- 4 connect dots per card (top/right/bottom/left), visibili su hover
-- Etichette frecce: input inline su click del cerchio centrale, cancellabile svuotando il campo
-- Pannello note: side mode (380px) e full mode (larghezza totale, max-width 800px centrato)
-- BlockEditor stile Notion: blocchi p/h1/h2/h3/ul/ol/quote/code, slash commands, shortcut markdown (# spazio → h1, - spazio → ul, ecc.), bullet rossi stile Bear
-  - Fix: emit() non più chiamata dentro setBlocks() updater (evita React warning "update during render")
-- Preview body sui post-it (max 3 righe)
-- Vista Elenco: tutti gli elementi (note, cartelle, testi liberi, label) con badge tipo e data creazione
-- Sidebar: multiple lavagne, espandi/collassa, rinomina inline, cancella con 🗑, Delete/Backspace con confirm, + Nuova lavagna, 👤 Account placeholder
-- Breadcrumb overlay bottom-left del canvas (visibile solo quando annidati, stack.length > 1)
-- Export markdown del canvas corrente (↓ MD)
-- Delete/Backspace elimina elemento selezionato (card, label, group)
-- FolderTree in sidebar aggiornato in real-time alla creazione cartelle
-  - isActive evidenzia anche i nodi parent del canvas corrente
-  - Fallback per cartelle non ancora visitate (nessun db entry)
-- Griglia puntini toggle (⊞ Grid): background-image radial-gradient, segue pan/zoom
-- activeTool modale ('note'|'text'|'group'): doppio click sulla lavagna crea il tipo attivo; i bottoni toolbar si evidenziano in blu quando attivi
-- ⚡ Quick (autoCreate): se attivo, trascinare una freccia sul canvas crea automaticamente una nuova card collegata
-- ⬚ Select (lasso multi-selezione): drag sulla lavagna seleziona tutte le card/label/group nell'area; Delete rimuove tutti gli elementi selezionati
-- Zoom scroll: wheel handler legge scale e offset dai ref (scaleRef, offsetRef) in modo sincrono, aggiorna i ref immediatamente dopo setState per evitare stale closure su scroll rapido
-- Group drag: cardOrigins calcolato dinamicamente in base ai bounds del gruppo (non più da cardIds); cardIds risincronizzato al mouseup
-- Multi-drag: se si trascina una card dentro una selezione multipla, tutte le card selezionate si muovono insieme (type:'multi' in dragging.current)
-- Tema: toggle ☀️/🌙/💾 in basso a destra, CSS variables (--bg, --bg-panel, --border, --text, --text-muted, --accent, --btn-bg, --btn-text, --btn-border, --postit-bg, --folder-bg, --grid-dot, --sidebar-bg, --topbar-bg), tre temi: light/dark/high-contrast
-- Toolbar in list view: tutti i bottoni canvas rimangono visibili ma disabled + opacity 0.4 + cursor not-allowed
-- Colori post-it personalizzati: 8 colori (yellow/orange/green/blue/pink/purple/white/red), selezionabili nel pannello note
-  - COLOR_MAP per temi light/dark, HC_COLOR_MAP per high-contrast (colori stile Commodore 64)
-  - getTextColor(bgHex): luminance-based, sceglie testo scuro o chiaro automaticamente
-  - Color picker nascosto in HC (usa HC_COLOR_MAP direttamente); nel pannello note mostra i colori del tema attivo
-- Stack navigazione persistito in localStorage (STACK_KEY='olaboard_stack')
-  - Inizializzazione con validazione: verifica che stack[0] sia una board esistente
-  - centerCanvas: auto-fit viewport quando si naviga in un canvas
-- handleSidebarNavigate: usa dbRef.current + boardsRef.current per evitare stale closure
-  - findPath ricorsivo senza guard su db entry (cartelle non visitate supportate)
-  - Se path.length===1 e non è una board root, cerca il board contenitore e prepende l'id
+## Stato in AppInner
+- `db` – `{ [canvasId]: { id, name, cards, connections, groups, labels } }`
+- `boards` – `[{ id, name }]`
+- `stack` – array di canvasId (root board in [0], canvas corrente in [last])
+- `displayName` – nome human-readable del canvas corrente, settato eagerly prima della navigazione per evitare flash UUID
+- `loading` – true durante init, mostra `<LoadingOverlay>`
+- Stack persistito in `localStorage` (STACK_KEY), validato al boot (controlla che stack[0] sia una board esistente)
 
-## Refs in App.jsx
+## Refs in AppInner
 - `dbRef` – sempre aggiornato a db corrente
 - `boardsRef` – sempre aggiornato a boards corrente
 - `currentIdRef` – id del canvas corrente
-- Passati a useCanvas: `activeAutoCreateRef`, `activeToolRef`, `multiSelectedRef`
+- `loadedRef` (Set) – canvas già caricati, evita double-fetch
+- `syncedRef` – `{ [canvasId]: { cardIds: Set, connectionIds: Set } }`, per diff-delete al sync
+- `syncTimerRef` – debounce timer per Supabase sync (500ms)
+
+## Flusso dati
+
+### Boot (init useEffect)
+1. `fetchBoardsDB(userId)` – se vuoto, crea board + canvas di default
+2. Ripristina stack da localStorage (validato)
+3. `setDisplayName` con nome board/canvas iniziale
+4. `loadCanvasData(firstCanvasId, firstBoardId, initName)`
+5. `setLoading(false)`
+
+### loadCanvasData(canvasId, boardId, folderName)
+1. `fetchCanvasDB(canvasId)` – se null (PGRST116), crea canvas con `createCanvasDB`
+2. Fetch cards + connections in parallelo
+3. `setDb` aggiorna entry del canvas
+4. `confirmedName = canvasData?.name || folderName || canvasId`
+5. Se `confirmedName` non è UUID e `canvasId === currentIdRef.current`, aggiorna `displayName`
+
+### Sync debounced (ogni render, 500ms)
+- `upsertCards` + `deleteCardsByIds` (diff vs syncedRef)
+- `upsertConnections` + `deleteConnectionsByIds` (diff vs syncedRef)
+- `updateCanvasDB` per groups/labels
+
+### Navigazione
+- `enterCanvas(id, name)` – setta `displayName` eagerly, aggiorna db stub, aggiunge a stack, chiama `loadCanvasData`
+- `navigateTo(idx)` – setta `displayName` eagerly, tronca stack all'indice
+- `handleSidebarNavigate(targetId)` – setta `displayName` eagerly, calcola path ricorsivo, setta stack
+- Board click in sidebar – setta `displayName` eagerly, setta stack a `[board.id]`
+
+## Feature implementate
+- Lavagna infinita: pan (drag sfondo), zoom (scroll + bottoni +/−/1:1)
+- Post-it: doppio click sulla lavagna crea, doppio click su titolo rinomina inline
+  - 8 colori: yellow/orange/green/blue/pink/purple/white/red
+  - COLOR_MAP (light/dark), HC_COLOR_MAP (high-contrast, stile Commodore 64)
+  - getTextColor(bgHex): luminance-based testo scuro/chiaro automatico
+- Cartelle: doppio click entra nel canvas figlio
+- Testo libero (isLabel:true): card senza sfondo, convertibile in post-it o cartella
+- Gruppi: box ridimensionabili 8 handle, titolo editabile, drag muove card interne
+- Frecce bezier con exitPoint geometrico, control points adattivi
+- 4 connect dots per card (top/right/bottom/left), visibili su hover
+- Etichette frecce: input inline, cancellabile svuotando
+- Pannello note: side (380px) e full mode
+- BlockEditor stile Notion: p/h1/h2/h3/ul/ol/quote/code + blocchi immagine (URL inline)
+  - Link cliccabili nei blocchi `p` (regex URL, stile var(--accent))
+  - Slash commands, shortcut markdown
+- Preview body sui post-it (max 3 righe)
+- Vista Elenco con sort az/za/date
+- Sidebar: FolderTree multi-board, rinomina inline, cancella, + Nuova lavagna, Esci (logout)
+- Breadcrumb overlay bottom-left (visibile solo quando annidati)
+- Export markdown canvas
+- Delete/Backspace elimina elemento selezionato
+- Griglia puntini toggle
+- activeTool modale ('note'|'text'|'group')
+- ⚡ Quick (autoCreate): drag freccia → crea card collegata
+- ⬚ Select (lasso multi-selezione)
+- Zoom scroll sincrono via ref
+- Temi: light / dark / high-contrast (CSS variables)
+  - HC sidebar-active: background #7b2fff
+  - Toolbar active button: #7b2fff in HC, var(--accent) altrimenti
+- Lucide icons ovunque (no emoji nei componenti)
+- Link cliccabili in CanvasLabel (GroupBox)
+- LoadingOverlay: full-screen, fade-out 0.3s, rimosso dal DOM dopo transizione
 
 ## Logica frecce (exitPoint)
 ```js
@@ -109,13 +142,8 @@ function exitPoint(entity, isLbl, goingRight, goingDown, isHoriz, isSource) {
 }
 ```
 
-## Bug noti
-- Frecce tra elementi molto vicini possono avere curve strane
-- Label standalone mancano di createdAt (non compaiono con data in lista)
-- Nessuna persistenza cloud
-
 ## Prossimi step
-1. Supabase + auth magic link
-2. Immagini nel canvas e nelle note
-3. Export PDF / screenshot canvas
-4. Ricerca full-text tra le idee
+1. Immagini nel canvas (non solo nelle note)
+2. Export PDF / screenshot canvas
+3. Ricerca full-text tra le idee
+4. Collaborazione real-time (Supabase Realtime)

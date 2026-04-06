@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 
-function uid() { return Math.random().toString(36).slice(2, 9) }
+function uid() { return crypto.randomUUID() }
 
 // ── markdown parse ────────────────────────────────────────────────────────────
 export function parseMarkdown(md) {
