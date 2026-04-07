@@ -20,7 +20,7 @@
 ## Auth
 - `App` component: `session` state (undefined=loading, null=not logged in, object=logged in)
 - `supabase.auth.getSession()` + `onAuthStateChange` per mantenere sessione aggiornata
-- `session === undefined` → null (spinner rimosso, ora usa LoadingOverlay)
+- `session === undefined` → null (spinner rimosso, usa LoadingOverlay)
 - `session === null` → `<AuthPage />` (magic link via signInWithOtp)
 - `session` presente → `<AppInner userId={session.user.id} />`
 
@@ -53,7 +53,10 @@
 - `stack` – array di canvasId (root board in [0], canvas corrente in [last])
 - `displayName` – nome human-readable del canvas corrente, settato eagerly prima della navigazione per evitare flash UUID
 - `loading` – true durante init, mostra `<LoadingOverlay>`
-- Stack persistito in `localStorage` (STACK_KEY), validato al boot (controlla che stack[0] sia una board esistente)
+- `collapsedIds` – Set di id di cartelle/board collassati nella sidebar, persistito in `localStorage['olaboard_expanded']`
+- `sidebarFocusId` – id dell'elemento sidebar con focus tastiera (Up/Down/Enter)
+- `listSelectMode` – boolean, attiva la selezione multipla nella vista elenco
+- Stack persistito in `localStorage` (STACK_KEY), validato al boot
 
 ## Refs in AppInner
 - `dbRef` – sempre aggiornato a db corrente
@@ -69,15 +72,17 @@
 1. `fetchBoardsDB(userId)` – se vuoto, crea board + canvas di default
 2. Ripristina stack da localStorage (validato)
 3. `setDisplayName` con nome board/canvas iniziale
-4. `loadCanvasData(firstCanvasId, firstBoardId, initName)`
-5. `setLoading(false)`
+4. `loadedRef.current.add(firstCanvasId)` – previene double-fetch dal secondo useEffect
+5. `loadCanvasData(firstCanvasId, firstBoardId, initName)` + `centerCanvas(firstCanvasId, loaded)`
+6. `setLoading(false)`
 
 ### loadCanvasData(canvasId, boardId, folderName)
-1. `fetchCanvasDB(canvasId)` – se null (PGRST116), crea canvas con `createCanvasDB`
+1. `fetchCanvasDB(canvasId)` – se null, crea canvas con `createCanvasDB`
 2. Fetch cards + connections in parallelo
 3. `setDb` aggiorna entry del canvas
 4. `confirmedName = canvasData?.name || folderName || canvasId`
 5. Se `confirmedName` non è UUID e `canvasId === currentIdRef.current`, aggiorna `displayName`
+6. Ritorna `loadedCanvas` per uso immediato (es. centerCanvas)
 
 ### Sync debounced (ogni render, 500ms)
 - `upsertCards` + `deleteCardsByIds` (diff vs syncedRef)
@@ -85,44 +90,89 @@
 - `updateCanvasDB` per groups/labels
 
 ### Navigazione
-- `enterCanvas(id, name)` – setta `displayName` eagerly, aggiorna db stub, aggiunge a stack, chiama `loadCanvasData`
-- `navigateTo(idx)` – setta `displayName` eagerly, tronca stack all'indice
-- `handleSidebarNavigate(targetId)` – setta `displayName` eagerly, calcola path ricorsivo, setta stack
+- `enterCanvas(id, name)` – async, setta `displayName` eagerly, aggiorna db stub, aggiunge a stack, chiama `loadCanvasData`, poi `centerCanvas(id, loaded)`
+- `navigateTo(idx)` – setta `displayName` eagerly, tronca stack, chiama `centerCanvas` via setTimeout (dati già in memoria)
+- `handleSidebarNavigate(targetId)` – async, setta `displayName` eagerly, calcola path ricorsivo, chiama `loadCanvasData` + `centerCanvas(id, loaded)`
 - Board click in sidebar – setta `displayName` eagerly, setta stack a `[board.id]`
 
+### centerCanvas(canvasId, canvasOverride)
+- Legge `canvasOverride || dbRef.current[canvasId]` (ref, mai stale)
+- Calcola bounding box di card + group + label
+- Calcola scala e offset per fit all'80% del viewport
+
 ## Feature implementate
-- Lavagna infinita: pan (drag sfondo), zoom (scroll + bottoni +/−/1:1)
-- Post-it: doppio click sulla lavagna crea, doppio click su titolo rinomina inline
-  - 8 colori: yellow/orange/green/blue/pink/purple/white/red
-  - COLOR_MAP (light/dark), HC_COLOR_MAP (high-contrast, stile Commodore 64)
-  - getTextColor(bgHex): luminance-based testo scuro/chiaro automatico
+
+### Canvas
+- Pan/zoom infinito (drag sfondo, scroll, bottoni +/−)
+- Bottone **Center** (Maximize2 icon) nella toolbar: chiama `centerCanvas(currentId)` per adattare la vista agli elementi
+- Accentramento automatico al primo caricamento e ad ogni navigazione canvas
+- Post-it: doppio click crea, doppio click rinomina inline
+  - 8 colori, COLOR_MAP light/dark, HC_COLOR_MAP high-contrast
+  - `getTextColor(bgHex)`: testo scuro/chiaro automatico per luminanza
 - Cartelle: doppio click entra nel canvas figlio
-- Testo libero (isLabel:true): card senza sfondo, convertibile in post-it o cartella
-- Gruppi: box ridimensionabili 8 handle, titolo editabile, drag muove card interne
+- Testo libero (`isLabel:true`): card senza sfondo, testo `var(--text)` (bianco in HC)
+- Gruppi: box ridimensionabili, titolo editabile, drag muove card interne
 - Frecce bezier con exitPoint geometrico, control points adattivi
 - 4 connect dots per card (top/right/bottom/left), visibili su hover
 - Etichette frecce: input inline, cancellabile svuotando
+- ⚡ Quick (autoCreate): drag freccia → crea card collegata
+- Griglia puntini toggle
+- activeTool modale: `'note'|'text'|'group'`
+
+### Selezione multipla
+- ⬚ Select (lasso multi-selezione) nel canvas
+- Pannello selezione (destra, `position: absolute`, `zIndex: 200`) appare quando `multiSelected.length > 0`
+  - Header con conteggio elementi
+  - Lista con checkbox: togliere la spunta rimuove l'elemento dalla selezione senza eliminarlo
+  - Bottone "Elimina" rosso: elimina tutti gli elementi spuntati da stato locale + Supabase
+  - `onMouseDown={e.stopPropagation()}` sul pannello per evitare chiusura involontaria
+- **Vista Elenco**: bottone "☑ Seleziona" attiva `listSelectMode`
+  - Checkbox a sinistra di ogni riga
+  - Click sulla riga o checkbox toglie/aggiunge da `multiSelected`
+  - Riga evidenziata con bordo accent quando selezionata
+  - Disattivare "Seleziona" svuota la selezione
+
+### Delete tramite tastiera
+- `Delete`/`Backspace` su elementi multi-selezionati → `deleteMultiSelected()` (locale + Supabase)
+- `Delete`/`Backspace` su connessione selezionata → elimina solo la connessione
+- **Non elimina più board o sottocartelle via tastiera** — solo tramite il bottone esplicito nella sidebar
+
+### Sidebar
+- Logo "Olaboard" in alto (font system-ui, 18px, bold, letterSpacing -0.5px)
+- FolderTree collassabile: il ▾/▸ sulla board row collassa/espande l'intero albero; i folder item con figli (depth ≥ 2) mostrano ▶/▼ per collassare il sottoalbero
+- Stato collapsed persistito in `localStorage['olaboard_expanded']` (Set di id collassati, default tutti espansi)
+- `sidebarFocusId`: focus tastiera visivo (background `var(--border)`) su board row e folder items
+- Board row: `sidebarFocusId === board.id` → highlight, hover disabilitato quando già evidenziato
+
+### Tastiera
+- **S** – attiva Select mode
+- **Q** – attiva Quick mode
+- **G** – toggle tool Gruppo
+- **T** – toggle tool Testo
+- **Tab** – cicla canvas fratelli allo stesso livello (root: board list; annidato: folder figli del parent)
+- **↑/↓** – muove `sidebarFocusId` attraverso la lista flat degli item sidebar visibili (rispetta collapsed), wrap-around
+- **Enter** – naviga all'item `sidebarFocusId`
+- **Escape** – cancella `sidebarFocusId`
+- **Shift+↓** – entra nel canvas dell'item con focus (un livello più profondo)
+- **Shift+↑** – torna al canvas parent (equivalente a breadcrumb back)
+- Tutte le shortcut disabilitate quando focus su input/textarea/contenteditable
+
+### Legenda shortcut
+- `<kbd>` chips (S Q G T Tab) in basso a destra del canvas, `pointerEvents: none`
+
+### Note e organizzazione
 - Pannello note: side (380px) e full mode
-- BlockEditor stile Notion: p/h1/h2/h3/ul/ol/quote/code + blocchi immagine (URL inline)
-  - Link cliccabili nei blocchi `p` (regex URL, stile var(--accent))
-  - Slash commands, shortcut markdown
+- BlockEditor stile Notion: p/h1/h2/h3/ul/ol/quote/code + blocchi immagine
 - Preview body sui post-it (max 3 righe)
 - Vista Elenco con sort az/za/date
-- Sidebar: FolderTree multi-board, rinomina inline, cancella, + Nuova lavagna, Esci (logout)
-- Breadcrumb overlay bottom-left (visibile solo quando annidati)
+- Sidebar: multi-board, rinomina inline, cancella (con conferma), + Nuova lavagna, Esci
+- Breadcrumb overlay bottom-left (annidato)
 - Export markdown canvas
-- Delete/Backspace elimina elemento selezionato
-- Griglia puntini toggle
-- activeTool modale ('note'|'text'|'group')
-- ⚡ Quick (autoCreate): drag freccia → crea card collegata
-- ⬚ Select (lasso multi-selezione)
-- Zoom scroll sincrono via ref
-- Temi: light / dark / high-contrast (CSS variables)
-  - HC sidebar-active: background #7b2fff
-  - Toolbar active button: #7b2fff in HC, var(--accent) altrimenti
-- Lucide icons ovunque (no emoji nei componenti)
-- Link cliccabili in CanvasLabel (GroupBox)
-- LoadingOverlay: full-screen, fade-out 0.3s, rimosso dal DOM dopo transizione
+
+### Temi
+- Light / Dark / High Contrast (CSS variables)
+- HC: sidebar-active `#7b2fff`, toolbar active `#7b2fff`, testo libero `var(--text)` → bianco
+- Bottone tema fisso (fixed bottom-right, `Maximize2` icon)
 
 ## Logica frecce (exitPoint)
 ```js

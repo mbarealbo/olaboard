@@ -2,7 +2,7 @@
 
 A visual thinking tool for capturing and connecting ideas on an infinite canvas.
 
-![Olaboard](https://img.shields.io/badge/version-0.1.0-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![React](https://img.shields.io/badge/React-19-61dafb) ![Vite](https://img.shields.io/badge/Vite-8-646cff)
+![Olaboard](https://img.shields.io/badge/version-0.2.0-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![React](https://img.shields.io/badge/React-19-61dafb) ![Vite](https://img.shields.io/badge/Vite-8-646cff)
 
 ---
 
@@ -10,7 +10,7 @@ A visual thinking tool for capturing and connecting ideas on an infinite canvas.
 
 Olaboard is a personal idea management tool built around a visual canvas. Think of it as the missing middle ground between Miro (too collaborative, too expensive) and Notion (great for text, weak on visuals). It's opinionated, fast, and designed for solo thinkers.
 
-Everything runs locally in your browser. No account required. No data leaves your machine.
+Sync across devices via Supabase. Sign in with a magic link — no password required.
 
 ---
 
@@ -18,42 +18,69 @@ Everything runs locally in your browser. No account required. No data leaves you
 
 ### Canvas
 - Infinite canvas with pan and zoom
+- **Center button** — fits all elements in view with one click (or press nothing, it centers automatically on navigation)
 - **Post-it notes** with body preview, custom colors, and rich notes
-- **Folders** (nested canvases) with tab visual indicator
+- **Folders** (nested canvases) — double click to enter, breadcrumb to go back
 - **Free text labels** — transparent, draggable, connectable
-- **Group boxes** — resizable containers that move cards with them
+- **Group boxes** — resizable containers that move cards inside them
 - **Arrows** with smart bezier routing, labels, and color on selection
-- **Quick Connect** — drag an arrow to empty space to auto-create a connected element
-- **Multi-select** lasso tool — select and delete groups of elements
+- **Quick Connect** — drag an arrow to empty space to auto-create a connected card
+- **Multi-select** — lasso tool on canvas, or checkbox mode in list view
 - Dot grid background (toggleable)
+
+### Multi-select & Deletion
+- Lasso-select multiple elements on the canvas
+- Right panel shows selected items with checkboxes — uncheck any item to remove it from the selection without deleting it
+- **Elimina** button deletes only the checked items from both local state and Supabase
+- In list view: activate "☑ Seleziona" mode to select items with checkboxes, then delete in bulk
+- `Delete` / `Backspace` key deletes selected items (never deletes boards by accident)
 
 ### Notes
 - Full-width or side panel mode
 - **Block editor** inspired by Notion — slash commands, markdown shortcuts
 - Block types: paragraph, H1/H2/H3, bullet list, numbered list, quote, code
 - Auto-detect lists: type `- ` or `1. ` to convert
-- Bear-style red bullets
 - Custom post-it colors (8 options, theme-aware)
 
 ### Organization
-- **Multiple boards** with rename, delete, and keyboard shortcuts
-- **Nested folders** — infinite depth, full sidebar tree
+- **Multiple boards** with rename and delete (explicit button only — no accidental keyboard deletion)
+- **Nested folders** — infinite depth
+- **Collapsible sidebar tree** — click ▾/▸ on a board or ▼/▶ on any folder to collapse/expand; state persisted across sessions
 - **Breadcrumb** navigation anchored to canvas bottom-left
-- **List view** — all elements with type badge and creation date
+- **List view** — all elements with type badge, creation date, and bulk-select mode
 - **Export to Markdown** — current canvas exported as .md file
+
+### Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `S` | Activate Select (lasso) mode |
+| `Q` | Activate Quick Connect mode |
+| `G` | Toggle Group draw tool |
+| `T` | Toggle Text label tool |
+| `Tab` | Cycle to next sibling board/folder |
+| `↑` / `↓` | Move sidebar keyboard focus |
+| `Enter` | Navigate to sidebar-focused item |
+| `Shift+↓` | Enter the focused folder (go deeper) |
+| `Shift+↑` | Go back to parent canvas |
+| `Escape` | Clear sidebar focus |
+| `Delete` / `Backspace` | Delete selected elements (multi-select or connection) |
+| Double click (canvas) | Create new element |
+| Double click (post-it) | Open note panel |
+| Double click (folder) | Enter folder |
 
 ### Themes
 - Light (default)
 - Dark
-- High Contrast — Commodore 64 palette (cyan, magenta, green on deep blue)
+- High Contrast — Commodore 64 palette
 
 ---
 
 ## Stack
 
 - **React 19** + **Vite 8**
+- **Supabase** — auth (magic link) + Postgres + real-time sync
 - Pure CSS (no Tailwind)
-- `localStorage` for persistence
 - No canvas libraries — all SVG + DOM
 - Lucide React for icons
 
@@ -65,44 +92,27 @@ Everything runs locally in your browser. No account required. No data leaves you
 git clone https://github.com/yourusername/olaboard.git
 cd olaboard
 npm install
+```
+
+Create a `.env` file with your Supabase credentials:
+```
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
+```
+
+```bash
 npm run dev
 ```
 
-Open `http://localhost:5173` in Chrome (recommended).
-
----
-
-## Keyboard Shortcuts
-
-| Shortcut | Action |
-|----------|--------|
-| Double click (canvas) | Create new element |
-| Double click (post-it) | Open note panel |
-| Double click (folder) | Enter folder |
-| `Delete` / `Backspace` | Delete selected element |
-| `Ctrl+Z` | Undo *(coming soon)* |
-| `Escape` | Deselect / close panel |
-
----
-
-## Toolbar
-
-| Button | Description |
-|--------|-------------|
-| Gruppo | Draw a group box by dragging |
-| T Testo | Double click creates free text instead of post-it |
-| Grid | Toggle dot grid |
-| Quick | Drag arrow to empty space to auto-create and connect |
-| Select | Lasso multi-select |
+Open `http://localhost:5173`, enter your email to receive a magic link.
 
 ---
 
 ## Roadmap
 
-- [ ] Supabase sync + magic link auth (multi-device)
-- [ ] Images in notes and canvas
+- [ ] Images directly on the canvas
 - [ ] Undo / Redo
-- [ ] Full-text search
+- [ ] Full-text search across all notes
 - [ ] Export to PNG / PDF
 - [ ] Tauri desktop app (offline, iCloud sync)
 - [ ] Collaboration (real-time, shared boards)

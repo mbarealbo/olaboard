@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Trash2, Moon, Sun, Monitor, Zap, Folder, LogOut } from 'lucide-react'
+import { Trash2, Moon, Sun, Monitor, Zap, Folder, LogOut, Maximize2 } from 'lucide-react'
 import BlockEditor from './components/BlockEditor'
 import PostIt from './components/PostIt'
 import { Group, CanvasLabel } from './components/GroupBox'
@@ -26,32 +26,43 @@ import {
 const STACK_KEY = 'olaboard_stack'
 
 // ─── FolderTree ───────────────────────────────────────────────────────────────
-function FolderTree({ db, currentId, onNavigate, id, depth, theme }) {
+function FolderTree({ db, currentId, onNavigate, id, depth, theme, collapsedIds, onToggleCollapse, sidebarFocusId }) {
   depth = depth ?? 0
   const canvas = db[id]
   if (!canvas) return null
   const isActive = id === currentId ||
     canvas.cards.some(c => c.isFolder && c.id === currentId)
   const subFolders = canvas.cards.filter(c => c.isFolder && !c.isLabel)
+  const hasChildren = subFolders.length > 0
+  const isCollapsed = collapsedIds ? collapsedIds.has(id) : false
+  const isFocused = sidebarFocusId === id
+  const showToggle = depth > 1 && hasChildren
+
   return (
     <>
       <div
         className={isActive ? 'sidebar-active' : undefined}
         style={{
-          paddingLeft: depth * 12 + 8, paddingRight: 8,
+          paddingLeft: depth * 12 + (showToggle ? 4 : 8), paddingRight: 8,
           paddingTop: 4, paddingBottom: 4,
           cursor: 'pointer', fontSize: 12,
-          background: isActive ? '#EBF4FF' : 'transparent',
+          background: isFocused ? 'var(--border)' : isActive ? '#EBF4FF' : 'transparent',
           color: isActive ? 'var(--accent)' : 'var(--text)',
           display: 'flex', alignItems: 'center', gap: 4,
           userSelect: 'none',
         }}
         onClick={() => onNavigate(id)}
       >
+        {showToggle && (
+          <span
+            style={{ fontSize: 8, width: 12, flexShrink: 0, textAlign: 'center', color: 'var(--text-muted)' }}
+            onClick={e => { e.stopPropagation(); onToggleCollapse(id) }}
+          >{isCollapsed ? '▶' : '▼'}</span>
+        )}
         <span>{depth === 0 ? '🏠' : <Folder size={14} />}</span>
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{canvas.name}</span>
       </div>
-      {subFolders.map(f => {
+      {!isCollapsed && subFolders.map(f => {
         const fCanvas = db[f.id] || {
           id: f.id, name: f.title,
           cards: [], connections: [], groups: [], labels: []
@@ -65,6 +76,9 @@ function FolderTree({ db, currentId, onNavigate, id, depth, theme }) {
             id={f.id}
             depth={depth + 1}
             theme={theme}
+            collapsedIds={collapsedIds}
+            onToggleCollapse={onToggleCollapse}
+            sidebarFocusId={sidebarFocusId}
           />
         )
       })}
@@ -136,9 +150,17 @@ function AppInner({ userId }) {
   const [selectMode, setSelectMode] = useState(false)
   const [multiSelected, setMultiSelected] = useState([])
   const [selectionRect, setSelectionRect] = useState(null)
+  const [listSelectMode, setListSelectMode] = useState(false)
   const [selectedConn, setSelectedConn] = useState(null)
   const [editingConnId, setEditingConnId] = useState(null)
   const [editingConnValue, setEditingConnValue] = useState('')
+  const [collapsedIds, setCollapsedIds] = useState(() => {
+    try {
+      const s = JSON.parse(localStorage.getItem('olaboard_expanded'))
+      return new Set(Array.isArray(s) ? s : [])
+    } catch { return new Set() }
+  })
+  const [sidebarFocusId, setSidebarFocusId] = useState(null)
 
   const currentIdRef = useRef('__loading__')
   const dbRef = useRef(db)
@@ -148,6 +170,8 @@ function AppInner({ userId }) {
 
   // Stack persisted as UI preference only
   useEffect(() => { localStorage.setItem(STACK_KEY, JSON.stringify(stack)) }, [stack])
+  // Collapsed folders persisted
+  useEffect(() => { localStorage.setItem('olaboard_expanded', JSON.stringify([...collapsedIds])) }, [collapsedIds])
 
   // ── map Supabase rows → app shape ─────────────────────────────────────────
   function mapCard(row) {
@@ -172,19 +196,18 @@ function AppInner({ userId }) {
         fetchConnectionsDB(canvasId).catch(() => []),
       ])
       const confirmedName = canvasData?.name || folderName || canvasId
-      setDb(prev => ({
-        ...prev,
-        [canvasId]: {
-          id: canvasId,
-          name: confirmedName,
-          cards: (cardsData || []).map(mapCard),
-          connections: (connectionsData || []).map(mapConn),
-          groups: canvasData?.groups || [],
-          labels: canvasData?.labels || [],
-        }
-      }))
+      const loadedCanvas = {
+        id: canvasId,
+        name: confirmedName,
+        cards: (cardsData || []).map(mapCard),
+        connections: (connectionsData || []).map(mapConn),
+        groups: canvasData?.groups || [],
+        labels: canvasData?.labels || [],
+      }
+      setDb(prev => ({ ...prev, [canvasId]: loadedCanvas }))
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(confirmedName)
       if (canvasId === currentIdRef.current && !isUUID) setDisplayName(confirmedName)
+      return loadedCanvas
     } catch (err) {
       console.error('loadCanvasData error:', err)
     }
@@ -202,6 +225,7 @@ function AppInner({ userId }) {
         }
         const mapped = boardsData.map(b => ({ id: b.id, name: b.name }))
         setBoards(mapped)
+        setDisplayName(boardsData[0]?.name || 'La mia lavagna')
 
         const savedStack = (() => {
           try {
@@ -216,7 +240,9 @@ function AppInner({ userId }) {
         const firstBoardId = savedStack[0]
         const initName = mapped.find(b => b.id === firstCanvasId)?.name || mapped.find(b => b.id === firstBoardId)?.name || ''
         setDisplayName(initName)
-        await loadCanvasData(firstCanvasId, firstBoardId, initName)
+        loadedRef.current.add(firstCanvasId)
+        const loaded = await loadCanvasData(firstCanvasId, firstBoardId, initName)
+        centerCanvas(firstCanvasId, loaded)
       } catch (err) {
         console.error('init error:', err)
       } finally {
@@ -329,8 +355,8 @@ function AppInner({ userId }) {
   useEffect(() => { multiSelectedRef.current = multiSelected }, [multiSelected, multiSelectedRef])
 
   // ── navigation ───────────────────────────────────────────────────────────
-  function centerCanvas(canvasId) {
-    const canvas = db[canvasId]
+  function centerCanvas(canvasId, canvasOverride) {
+    const canvas = canvasOverride || dbRef.current[canvasId]
     if (!canvas) { setOffset({ x: 0, y: 0 }); setScale(1); return }
     const elements = [
       ...(canvas.cards || []).map(c => ({ x: c.x, y: c.y, w: CARD_W, h: CARD_H_HALF * 2 })),
@@ -355,7 +381,7 @@ function AppInner({ userId }) {
     setOffset({ x: vpW / 2 - contentCX * newScale, y: vpH / 2 - contentCY * newScale })
   }
 
-  function enterCanvas(id, name) {
+  async function enterCanvas(id, name) {
     const resolvedName = name || boardsRef.current.find(b => b.id === id)?.name || id
     setDisplayName(resolvedName)
     setDb(prev => prev[id] ? prev : { ...prev, [id]: { id, name: resolvedName, cards: [], connections: [], groups: [], labels: [] } })
@@ -363,9 +389,11 @@ function AppInner({ userId }) {
     setSelected(null); setActiveNoteId(null)
     if (!loadedRef.current.has(id)) {
       loadedRef.current.add(id)
-      loadCanvasData(id, stack[0], resolvedName)
+      const loaded = await loadCanvasData(id, stack[0], resolvedName)
+      centerCanvas(id, loaded)
+    } else {
+      setTimeout(() => centerCanvas(id), 50)
     }
-    setTimeout(() => centerCanvas(id), 50)
   }
 
   function navigateTo(idx) {
@@ -377,7 +405,7 @@ function AppInner({ userId }) {
     setTimeout(() => centerCanvas(targetId), 50)
   }
 
-  const handleSidebarNavigate = useCallback((targetId) => {
+  const handleSidebarNavigate = useCallback(async (targetId) => {
     if (targetId === currentIdRef.current) return
 
     function findPath(canvasId, target, pathSoFar) {
@@ -413,60 +441,88 @@ function AppInner({ userId }) {
       }
     }
 
-    setDb(prev => {
-      if (prev[targetId]) return prev
-      function findCard(canvasId) {
-        const cv = prev[canvasId]
-        if (!cv) return null
-        const found = cv.cards.find(c => c.id === targetId)
-        if (found) return found
-        for (const c of cv.cards) if (c.isFolder) {
-          const r = findCard(c.id); if (r) return r
+    // Resolve human-readable name: already-loaded canvas > board root > card title in parent
+    function findCardTitle(id) {
+      for (const board of boardsRef.current) {
+        function search(canvasId) {
+          const cv = dbRef.current[canvasId]
+          if (!cv) return null
+          const found = cv.cards.find(c => c.id === id)
+          if (found) return found.title
+          for (const c of cv.cards) {
+            if (c.isFolder) { const r = search(c.id); if (r) return r }
+          }
+          return null
         }
-        return null
+        const r = search(board.id)
+        if (r) return r
       }
-      const fc = findCard('root')
-      return {
-        ...prev,
-        [targetId]: {
-          id: targetId,
-          name: fc?.name || fc?.title || targetId,
-          cards: [], connections: [], groups: [], labels: []
-        }
-      }
-    })
+      return null
+    }
 
     const targetName = dbRef.current[targetId]?.name
       || boardsRef.current.find(b => b.id === targetId)?.name
-      || (() => { for (const b of boardsRef.current) { function fc(id) { const cv = dbRef.current[id]; if (!cv) return null; const f = cv.cards.find(c => c.id === targetId); if (f) return f.title; for (const c of cv.cards) if (c.isFolder) { const r = fc(c.id); if (r) return r } return null } const r = fc(b.id); if (r) return r } return '' })()
-    setDisplayName(targetName || '')
+      || findCardTitle(targetId)
+      || ''
+
+    setDb(prev => {
+      if (prev[targetId]) return prev
+      return {
+        ...prev,
+        [targetId]: { id: targetId, name: targetName || targetId, cards: [], connections: [], groups: [], labels: [] }
+      }
+    })
+
+    setDisplayName(targetName)
     setStack(path)
     setSelected(null)
     setActiveNoteId(null)
-    setTimeout(() => centerCanvas(targetId), 50)
-  }, [])
 
-  // ── connection delete ─────────────────────────────────────────────────────
+    if (!loadedRef.current.has(targetId)) {
+      loadedRef.current.add(targetId)
+      const loaded = await loadCanvasData(targetId, path[0], targetName)
+      centerCanvas(targetId, loaded)
+    } else {
+      setTimeout(() => centerCanvas(targetId), 50)
+    }
+  }, [loadCanvasData])
+
+  // ── multi-select delete ───────────────────────────────────────────────────
+  function deleteMultiSelected() {
+    const ids = new Set(multiSelected)
+    const cId = currentIdRef.current
+    const canvas = dbRef.current[cId]
+    if (!canvas) return
+    const removedConnIds = canvas.connections
+      .filter(c => ids.has(c.from) || ids.has(c.to))
+      .map(c => c.id)
+    setDb(prev => {
+      const cv = prev[cId]
+      if (!cv) return prev
+      return {
+        ...prev, [cId]: {
+          ...cv,
+          cards: cv.cards.filter(c => !ids.has(c.id)),
+          connections: cv.connections.filter(c => !ids.has(c.from) && !ids.has(c.to)),
+          groups: (cv.groups || []).filter(g => !ids.has(g.id)),
+          labels: (cv.labels || []).filter(l => !ids.has(l.id)),
+        }
+      }
+    })
+    deleteCardsByIds([...ids]).catch(err => console.error('deleteCardsByIds error:', err))
+    if (removedConnIds.length > 0) {
+      deleteConnectionsByIds(removedConnIds).catch(err => console.error('deleteConnectionsByIds error:', err))
+    }
+    setMultiSelected([])
+  }
+
+  // ── connection delete (keyboard) ──────────────────────────────────────────
   useEffect(() => {
     function onKey(e) {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (multiSelected.length > 0) {
-          const ids = new Set(multiSelected)
-          setDb(prev => {
-            const cId = currentIdRef.current
-            const canvas = prev[cId]
-            if (!canvas) return prev
-            return {
-              ...prev, [cId]: {
-                ...canvas,
-                cards: canvas.cards.filter(c => !ids.has(c.id)),
-                groups: (canvas.groups || []).filter(g => !ids.has(g.id)),
-                labels: (canvas.labels || []).filter(l => !ids.has(l.id)),
-              }
-            }
-          })
-          setMultiSelected([])
+          deleteMultiSelected()
           return
         }
         if (selectedConn) {
@@ -482,77 +538,100 @@ function AppInner({ userId }) {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selectedConn, multiSelected])
+  }, [selectedConn, multiSelected]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── board / subfolder delete (keyboard) ──────────────────────────────────
+  // ── tool + navigation keyboard shortcuts ─────────────────────────────────
   useEffect(() => {
     function onKey(e) {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selected === null) {
-        const cId = stack[stack.length - 1]
-        const isSubfolder = stack.length > 1
-
-        if (isSubfolder) {
-          // Delete current subfolder canvas
-          if (!window.confirm('Eliminare questa cartella e tutto il suo contenuto?')) return
-          function collectIds(db, id) {
-            const canvas = db[id]
-            if (!canvas) return [id]
-            const ids = [id]
-            for (const c of canvas.cards) {
-              if (c.isFolder && !c.isLabel) ids.push(...collectIds(db, c.id))
+      if (e.key === 'Tab') {
+        e.preventDefault()
+        const isRoot = stack.length === 1
+        if (isRoot) {
+          const idx = boards.findIndex(b => b.id === stack[0])
+          const next = boards[(idx + 1) % boards.length]
+          if (next && next.id !== stack[0]) handleSidebarNavigate(next.id)
+        } else {
+          const parentId = stack[stack.length - 2]
+          const parentCanvas = dbRef.current[parentId]
+          if (parentCanvas) {
+            const siblings = parentCanvas.cards.filter(c => c.isFolder && !c.isLabel)
+            const idx = siblings.findIndex(c => c.id === currentIdRef.current)
+            if (siblings.length > 1) {
+              const next = siblings[(idx + 1) % siblings.length]
+              handleSidebarNavigate(next.id)
             }
-            return ids
           }
-          setDb(prev => {
-            const idsToRemove = collectIds(prev, cId)
-            const next = { ...prev }
-            for (const id of idsToRemove) delete next[id]
-            // Also remove the card from parent canvas
-            const parentId = stack[stack.length - 2]
-            if (next[parentId]) {
-              next[parentId] = {
-                ...next[parentId],
-                cards: next[parentId].cards.filter(c => c.id !== cId),
-                connections: next[parentId].connections.filter(c => c.from !== cId && c.to !== cId),
-              }
-            }
-            return next
-          })
-          navigateTo(stack.length - 2)
-        } else if (boards.length > 1) {
-          // Delete entire board
-          const boardId = stack[0]
-          if (!window.confirm('Eliminare questa lavagna e tutto il suo contenuto?')) return
-          function collectIds(db, id) {
-            const canvas = db[id]
-            if (!canvas) return [id]
-            const ids = [id]
-            for (const c of canvas.cards) {
-              if (c.isFolder && !c.isLabel) ids.push(...collectIds(db, c.id))
-            }
-            return ids
-          }
-          setBoards(prev => {
-            const next = prev.filter(b => b.id !== boardId)
-            const firstId = next[0].id
-            setDb(prev2 => {
-              const idsToRemove = collectIds(prev2, boardId)
-              const next2 = { ...prev2 }
-              for (const id of idsToRemove) delete next2[id]
-              return next2
-            })
-            setStack([firstId])
-            setSelected(null); setActiveNoteId(null)
-            setOffset({ x: 0, y: 0 }); setScale(1)
-            return next
-          })
         }
+        return
+      }
+      if (view !== 'canvas') return
+      if (e.key === 's' || e.key === 'S') {
+        setSelectMode(true); setActiveTool('note'); setAutoCreate(false)
+      } else if (e.key === 'q' || e.key === 'Q') {
+        setAutoCreate(true); setSelectMode(false); setActiveTool('note')
+      } else if (e.key === 'g' || e.key === 'G') {
+        setActiveTool(t => t === 'group' ? 'note' : 'group'); setSelectMode(false); setAutoCreate(false)
+      } else if (e.key === 't' || e.key === 'T') {
+        setActiveTool(t => t === 'text' ? 'note' : 'text'); setSelectMode(false); setAutoCreate(false)
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selected, boards, stack])
+  }, [view, stack, boards, handleSidebarNavigate]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── sidebar collapse toggle ───────────────────────────────────────────────
+  function toggleCollapse(id) {
+    setCollapsedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
+  // ── sidebar keyboard navigation ───────────────────────────────────────────
+  useEffect(() => {
+    function onKey(e) {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        if (e.shiftKey) {
+          e.preventDefault()
+          if (e.key === 'ArrowDown' && sidebarFocusId) handleSidebarNavigate(sidebarFocusId)
+          else if (e.key === 'ArrowUp' && stack.length > 1) navigateTo(stack.length - 2)
+          return
+        }
+        e.preventDefault()
+        // Build flat list of visible sidebar items
+        const items = []
+        for (const board of boards) {
+          items.push({ id: board.id })
+          if (stack[0] === board.id && !collapsedIds.has(board.id)) {
+            function addItems(canvasId) {
+              const canvas = dbRef.current[canvasId]
+              if (!canvas) return
+              for (const f of canvas.cards.filter(c => c.isFolder && !c.isLabel)) {
+                items.push({ id: f.id })
+                if (!collapsedIds.has(f.id)) addItems(f.id)
+              }
+            }
+            addItems(board.id)
+          }
+        }
+        const curIdx = sidebarFocusId ? items.findIndex(it => it.id === sidebarFocusId) : -1
+        const nextIdx = e.key === 'ArrowDown'
+          ? (curIdx < items.length - 1 ? curIdx + 1 : 0)
+          : (curIdx > 0 ? curIdx - 1 : items.length - 1)
+        setSidebarFocusId(items[nextIdx]?.id ?? null)
+      } else if (e.key === 'Enter' && sidebarFocusId) {
+        handleSidebarNavigate(sidebarFocusId)
+        setSidebarFocusId(null)
+      } else if (e.key === 'Escape') {
+        setSidebarFocusId(null)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [sidebarFocusId, stack, boards, collapsedIds, handleSidebarNavigate]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── connection label ──────────────────────────────────────────────────────
   function saveConnLabel(connId, label) {
@@ -633,7 +712,8 @@ function AppInner({ userId }) {
         <div style={{ width: 210, flexShrink: 0, background: 'var(--sidebar-bg)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           {/* Top scrollable section */}
           <div style={{ flex: 1, overflowY: 'auto' }}>
-            <div style={{ padding: '10px 12px 4px', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: 1, textTransform: 'uppercase' }}>Lavagne</div>
+            <div style={{ padding: '14px 12px 10px', fontSize: 18, fontWeight: 700, letterSpacing: '-0.5px', color: 'var(--text)', fontFamily: 'system-ui, sans-serif' }}>Olaboard</div>
+            <div style={{ padding: '0 12px 4px', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: 1, textTransform: 'uppercase' }}>Lavagne</div>
             {boards.map(board => {
               const isActive = stack[0] === board.id
               const isRenaming = renamingBoardId === board.id
@@ -641,7 +721,7 @@ function AppInner({ userId }) {
                 <div key={board.id}>
                   {/* Board row */}
                   <div
-                    style={{ padding: '6px 12px', fontSize: 13, fontWeight: isActive ? 600 : 400, color: isActive ? 'var(--text)' : 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, background: 'transparent' }}
+                    style={{ padding: '6px 12px', fontSize: 13, fontWeight: isActive ? 600 : 400, color: isActive ? 'var(--text)' : 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, background: sidebarFocusId === board.id ? 'var(--border)' : 'transparent' }}
                     onClick={() => {
                       if (isRenaming) return
                       if (!isActive) {
@@ -654,10 +734,13 @@ function AppInner({ userId }) {
                         setRenamingBoardId(board.id)
                       }
                     }}
-                    onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = '#f5f5f5' }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+                    onMouseEnter={e => { if (!isActive && sidebarFocusId !== board.id) e.currentTarget.style.background = '#f5f5f5' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = sidebarFocusId === board.id ? 'var(--border)' : 'transparent' }}
                   >
-                    <span style={{ fontSize: 11 }}>{isActive ? '▾' : '▸'}</span>
+                    <span
+                      style={{ fontSize: 11, cursor: isActive ? 'pointer' : 'default' }}
+                      onClick={isActive ? e => { e.stopPropagation(); toggleCollapse(board.id) } : undefined}
+                    >{isActive ? (collapsedIds.has(board.id) ? '▸' : '▾') : '▸'}</span>
                     {isRenaming ? (
                       <input
                         autoFocus
@@ -692,9 +775,9 @@ function AppInner({ userId }) {
                       ><Trash2 size={14} /></button>
                     )}
                   </div>
-                  {/* Folder tree when active */}
-                  {isActive && (
-                    <FolderTree db={db} currentId={currentId} onNavigate={handleSidebarNavigate} id={board.id} depth={1} theme={theme} />
+                  {/* Folder tree when active and not collapsed */}
+                  {isActive && !collapsedIds.has(board.id) && (
+                    <FolderTree db={db} currentId={currentId} onNavigate={handleSidebarNavigate} id={board.id} depth={1} theme={theme} collapsedIds={collapsedIds} onToggleCollapse={toggleCollapse} sidebarFocusId={sidebarFocusId} />
                   )}
                 </div>
               )
@@ -783,7 +866,7 @@ function AppInner({ userId }) {
             <div style={{ display: 'flex', gap: 2 }}>
               <button disabled={view !== 'canvas'} style={{ ...smallBtn, ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }} onClick={view === 'canvas' ? () => zoomBy(1.2) : undefined}>+</button>
               <button disabled={view !== 'canvas'} style={{ ...smallBtn, ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }} onClick={view === 'canvas' ? () => zoomBy(0.8) : undefined}>−</button>
-              <button disabled={view !== 'canvas'} style={{ ...smallBtn, ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }} onClick={view === 'canvas' ? () => { setScale(1); setOffset({ x: 0, y: 0 }) } : undefined}>1:1</button>
+              <button disabled={view !== 'canvas'} style={{ ...smallBtn, ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }} onClick={view === 'canvas' ? () => centerCanvas(currentId) : undefined} title="Centra elementi"><Maximize2 size={13} /></button>
             </div>
           </>)(theme === 'high-contrast' ? '#7b2fff' : 'var(--accent)')}
 
@@ -1031,6 +1114,66 @@ function AppInner({ userId }) {
                   )
                 })}
               </div>
+              {/* Multi-select panel */}
+              {multiSelected.length > 0 && (
+                <div
+                  onMouseDown={e => e.stopPropagation()}
+                  style={{
+                  position: 'absolute', top: 16, right: 16, zIndex: 200,
+                  width: 220, background: 'var(--bg-panel)', border: '1px solid var(--border)',
+                  borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+                  display: 'flex', flexDirection: 'column', overflow: 'hidden',
+                  fontFamily: 'system-ui, sans-serif',
+                }}>
+                  <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>
+                    {multiSelected.length} element{multiSelected.length === 1 ? 'o' : 'i'} selezionat{multiSelected.length === 1 ? 'o' : 'i'}
+                  </div>
+                  <div style={{ maxHeight: 220, overflowY: 'auto', padding: '6px 0' }}>
+                    {multiSelected.map(id => {
+                      const card = cards.find(c => c.id === id)
+                      const group = groups.find(g => g.id === id)
+                      const label = labels.find(l => l.id === id)
+                      const name = card?.title || group?.title || label?.text || 'Senza titolo'
+                      const type = card ? (card.isFolder ? 'Cartella' : card.isLabel ? 'Testo' : 'Post-it') : group ? 'Gruppo' : 'Testo'
+                      return (
+                        <label key={id} style={{ padding: '4px 10px 4px 10px', fontSize: 12, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked
+                            onChange={() => setMultiSelected(prev => prev.filter(i => i !== id))}
+                            style={{ flexShrink: 0, cursor: 'pointer', accentColor: 'var(--accent)' }}
+                          />
+                          <span style={{ color: 'var(--text-muted)', fontSize: 11, minWidth: 48, flexShrink: 0 }}>{type}</span>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{name}</span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                  <div style={{ padding: '10px 14px', borderTop: '1px solid var(--border)' }}>
+                    <button
+                      onClick={deleteMultiSelected}
+                      style={{ width: '100%', padding: '7px 0', fontSize: 13, fontWeight: 600, border: 'none', borderRadius: 6, cursor: 'pointer', background: '#e53935', color: '#fff' }}
+                    >Elimina</button>
+                  </div>
+                </div>
+              )}
+
+              {/* Keyboard shortcut legend */}
+              <div style={{
+                position: 'absolute', bottom: 16, right: 72, zIndex: 50,
+                display: 'flex', gap: 4, alignItems: 'center',
+                pointerEvents: 'none', userSelect: 'none',
+              }}>
+                {['S', 'Q', 'G', 'T', 'Tab'].map(k => (
+                  <kbd key={k} style={{
+                    fontSize: 10, color: 'var(--text-muted)',
+                    background: 'var(--bg-panel)', border: '1px solid var(--border)',
+                    borderRadius: 4, padding: '1px 5px', fontFamily: 'monospace',
+                    boxShadow: '0 1px 0 var(--border)',
+                  }}>{k}</kbd>
+                ))}
+              </div>
+
               {/* Breadcrumb overlay */}
               {stack.length > 1 && (
                 <div style={{
@@ -1067,6 +1210,10 @@ function AppInner({ userId }) {
                 {[['az', 'A→Z'], ['za', 'Z→A'], ['date', 'Creazione']].map(([v, l]) => (
                   <button key={v} onClick={() => setListSort(v)} style={{ ...smallBtn, fontWeight: listSort === v ? 700 : 400, background: listSort === v ? 'var(--accent)' : 'var(--btn-bg)', color: listSort === v ? '#fff' : 'var(--btn-text)', border: '1px solid var(--border)' }}>{l}</button>
                 ))}
+                <button
+                  onClick={() => { setListSelectMode(v => !v); if (listSelectMode) setMultiSelected([]) }}
+                  style={{ ...smallBtn, marginLeft: 'auto', background: listSelectMode ? 'var(--accent)' : 'var(--btn-bg)', color: listSelectMode ? '#fff' : 'var(--btn-text)', border: '1px solid var(--border)' }}
+                >☑ Seleziona</button>
               </div>
               {listItems.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Nessun elemento in questo canvas.</p>}
               {listItems.map(item => {
@@ -1075,7 +1222,12 @@ function AppInner({ userId }) {
                 const dateStr = item.createdAt
                   ? new Date(item.createdAt).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' })
                   : '—'
+                const isChecked = multiSelected.includes(item.id)
                 function handleClick() {
+                  if (listSelectMode) {
+                    setMultiSelected(prev => isChecked ? prev.filter(i => i !== item.id) : [...prev, item.id])
+                    return
+                  }
                   if (item.type === 'folder') enterCanvas(item._card.id, item._card.title)
                   else if (item.type === 'note') openNote(item._card)
                   else setSelected(item.id)
@@ -1083,9 +1235,18 @@ function AppInner({ userId }) {
                 return (
                   <div
                     key={item.id}
-                    style={{ background: 'var(--bg-panel)', borderRadius: 6, padding: '10px 14px', marginBottom: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, border: '1px solid var(--border)' }}
+                    style={{ background: isChecked ? 'color-mix(in srgb, var(--accent) 10%, var(--bg-panel))' : 'var(--bg-panel)', borderRadius: 6, padding: '10px 14px', marginBottom: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, border: `1px solid ${isChecked ? 'var(--accent)' : 'var(--border)'}` }}
                     onClick={handleClick}
                   >
+                    {listSelectMode && (
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={handleClick}
+                        onClick={e => e.stopPropagation()}
+                        style={{ flexShrink: 0, cursor: 'pointer', accentColor: 'var(--accent)' }}
+                      />
+                    )}
                     <span style={{ fontSize: 11, color: 'var(--text-muted)', minWidth: 70, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4 }}>{badgeIcon}{badgeLabel}</span>
                     <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</span>
                     <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{dateStr}</span>

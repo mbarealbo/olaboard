@@ -118,7 +118,7 @@ export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit
           ref={elRef}
           contentEditable
           suppressContentEditableWarning
-          style={{ fontSize: label.fontSize, color: '#555', outline: 'none', minWidth: 80, cursor: 'text', whiteSpace: 'pre-wrap' }}
+          style={{ fontSize: label.fontSize, color: 'var(--text)', outline: 'none', minWidth: 80, cursor: 'text', whiteSpace: 'pre-wrap' }}
           onMouseDown={e => e.stopPropagation()}
           onBlur={e => {
             const text = e.target.textContent.trim()
@@ -132,7 +132,7 @@ export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit
           }}
         />
       ) : (
-        <p style={{ fontSize: label.fontSize, color: '#555', margin: 0, minWidth: 80, whiteSpace: 'pre-wrap', cursor: 'move' }}>
+        <p style={{ fontSize: label.fontSize, color: 'var(--text)', margin: 0, minWidth: 80, whiteSpace: 'pre-wrap', cursor: 'move' }}>
           {parseTextWithLinks(label.text)}
         </p>
       )}
