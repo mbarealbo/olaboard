@@ -26,7 +26,7 @@ import {
 const STACK_KEY = 'olaboard_stack'
 
 // ─── FolderTree ───────────────────────────────────────────────────────────────
-function FolderTree({ db, currentId, onNavigate, id, depth, theme, collapsedIds, onToggleCollapse, sidebarFocusId }) {
+function FolderTree({ db, currentId, onNavigate, id, depth, theme, collapsedIds, onToggleCollapse, sidebarFocusId, skipSelf }) {
   depth = depth ?? 0
   const canvas = db[id]
   if (!canvas) return null
@@ -36,32 +36,34 @@ function FolderTree({ db, currentId, onNavigate, id, depth, theme, collapsedIds,
   const hasChildren = subFolders.length > 0
   const isCollapsed = collapsedIds ? collapsedIds.has(id) : false
   const isFocused = sidebarFocusId === id
-  const showToggle = depth > 1 && hasChildren
+  const showToggle = !skipSelf && hasChildren
 
   return (
     <>
-      <div
-        className={isActive ? 'sidebar-active' : undefined}
-        style={{
-          paddingLeft: depth * 12 + (showToggle ? 4 : 8), paddingRight: 8,
-          paddingTop: 4, paddingBottom: 4,
-          cursor: 'pointer', fontSize: 12,
-          background: isFocused ? 'var(--border)' : isActive ? '#EBF4FF' : 'transparent',
-          color: isActive ? 'var(--accent)' : 'var(--text)',
-          display: 'flex', alignItems: 'center', gap: 4,
-          userSelect: 'none',
-        }}
-        onClick={() => onNavigate(id)}
-      >
-        {showToggle && (
-          <span
-            style={{ fontSize: 8, width: 12, flexShrink: 0, textAlign: 'center', color: 'var(--text-muted)' }}
-            onClick={e => { e.stopPropagation(); onToggleCollapse(id) }}
-          >{isCollapsed ? '▶' : '▼'}</span>
-        )}
-        <span>{depth === 0 ? '🏠' : <Folder size={14} />}</span>
-        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{canvas.name}</span>
-      </div>
+      {!skipSelf && (
+        <div
+          className={isActive ? 'sidebar-active' : undefined}
+          style={{
+            paddingLeft: depth * 12 + (showToggle ? 4 : 8), paddingRight: 8,
+            paddingTop: 4, paddingBottom: 4,
+            cursor: 'pointer', fontSize: 12,
+            background: isFocused ? 'var(--border)' : isActive ? '#EBF4FF' : 'transparent',
+            color: isActive ? 'var(--accent)' : 'var(--text)',
+            display: 'flex', alignItems: 'center', gap: 4,
+            userSelect: 'none',
+          }}
+          onClick={() => onNavigate(id)}
+        >
+          {showToggle && (
+            <span
+              style={{ fontSize: 8, width: 12, flexShrink: 0, textAlign: 'center', color: 'var(--text-muted)' }}
+              onClick={e => { e.stopPropagation(); onToggleCollapse(id) }}
+            >{isCollapsed ? '▶' : '▼'}</span>
+          )}
+          <span><Folder size={14} /></span>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{canvas.name}</span>
+        </div>
+      )}
       {!isCollapsed && subFolders.map(f => {
         const fCanvas = db[f.id] || {
           id: f.id, name: f.title,
@@ -153,6 +155,8 @@ function AppInner({ userId }) {
   const [listSelectMode, setListSelectMode] = useState(false)
   const [selectedConn, setSelectedConn] = useState(null)
   const [editingConnId, setEditingConnId] = useState(null)
+  const [editingGroupId, setEditingGroupId] = useState(null)
+  const [selectedGroup, setSelectedGroup] = useState(null)
   const [editingConnValue, setEditingConnValue] = useState('')
   const [collapsedIds, setCollapsedIds] = useState(() => {
     try {
@@ -254,6 +258,16 @@ function AppInner({ userId }) {
   // ── load canvas data when navigating to an unloaded canvas ────────────────
   const loadedRef = useRef(new Set())
   const currentId = stack[stack.length - 1]
+  // Auto-expand the current canvas in the sidebar when navigating into it
+  useEffect(() => {
+    if (!currentId || currentId === '__loading__') return
+    setCollapsedIds(prev => {
+      if (!prev.has(currentId)) return prev
+      const next = new Set(prev)
+      next.delete(currentId)
+      return next
+    })
+  }, [currentId])
   useEffect(() => {
     if (loading || !currentId || currentId === '__loading__') return
     if (loadedRef.current.has(currentId)) return
@@ -348,7 +362,7 @@ function AppInner({ userId }) {
     onGroupTitleBarMouseDown, onGroupResizeHandleMouseDown,
     onLabelMouseDown, zoomBy,
     activeAutoCreateRef, activeToolRef, multiSelectedRef,
-  } = useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnectionFn, setActiveNoteId, view, activeTool, setActiveTool, selectMode, setMultiSelected, setSelectionRect })
+  } = useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnectionFn, setActiveNoteId, view, activeTool, setActiveTool, selectMode, setMultiSelected, setSelectionRect, onGroupCreated: id => setEditingGroupId(id) })
 
   useEffect(() => { activeAutoCreateRef.current = autoCreate }, [autoCreate, activeAutoCreateRef])
   useEffect(() => { activeToolRef.current = activeTool }, [activeTool, activeToolRef])
@@ -525,6 +539,16 @@ function AppInner({ userId }) {
           deleteMultiSelected()
           return
         }
+        if (selectedGroup) {
+          setDb(prev => {
+            const cId = currentIdRef.current
+            const canvas = prev[cId]
+            if (!canvas) return prev
+            return { ...prev, [cId]: { ...canvas, groups: (canvas.groups || []).filter(g => g.id !== selectedGroup) } }
+          })
+          setSelectedGroup(null)
+          return
+        }
         if (selectedConn) {
           setDb(prev => {
             const cId = currentIdRef.current
@@ -538,7 +562,7 @@ function AppInner({ userId }) {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selectedConn, multiSelected]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedConn, selectedGroup, multiSelected]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── tool + navigation keyboard shortcuts ─────────────────────────────────
   useEffect(() => {
@@ -565,11 +589,30 @@ function AppInner({ userId }) {
         }
         return
       }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+        if (view !== 'canvas') return
+        e.preventDefault()
+        const canvas = dbRef.current[currentIdRef.current]
+        if (!canvas) return
+        const allIds = [
+          ...canvas.cards.map(c => c.id),
+          ...(canvas.groups || []).map(g => g.id),
+          ...(canvas.labels || []).map(l => l.id),
+        ]
+        if (selectMode && multiSelected.length === allIds.length) {
+          setMultiSelected([]); setSelectMode(false)
+        } else {
+          setMultiSelected(allIds); setSelectMode(true)
+        }
+        return
+      }
       if (view !== 'canvas') return
       if (e.key === 's' || e.key === 'S') {
-        setSelectMode(true); setActiveTool('note'); setAutoCreate(false)
+        if (selectMode) { setSelectMode(false); setMultiSelected([]) }
+        else { setSelectMode(true); setActiveTool('note'); setAutoCreate(false) }
       } else if (e.key === 'q' || e.key === 'Q') {
-        setAutoCreate(true); setSelectMode(false); setActiveTool('note')
+        if (autoCreate) { setAutoCreate(false) }
+        else { setAutoCreate(true); setSelectMode(false); setActiveTool('note') }
       } else if (e.key === 'g' || e.key === 'G') {
         setActiveTool(t => t === 'group' ? 'note' : 'group'); setSelectMode(false); setAutoCreate(false)
       } else if (e.key === 't' || e.key === 'T') {
@@ -578,7 +621,7 @@ function AppInner({ userId }) {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [view, stack, boards, handleSidebarNavigate]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [view, stack, boards, selectMode, autoCreate, multiSelected, handleSidebarNavigate]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── sidebar collapse toggle ───────────────────────────────────────────────
   function toggleCollapse(id) {
@@ -721,35 +764,24 @@ function AppInner({ userId }) {
                 <div key={board.id}>
                   {/* Board row */}
                   <div
-                    style={{ padding: '6px 12px', fontSize: 13, fontWeight: isActive ? 600 : 400, color: isActive ? 'var(--text)' : 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, background: sidebarFocusId === board.id ? 'var(--border)' : 'transparent' }}
-                    onClick={() => {
-                      if (isRenaming) return
-                      if (!isActive) {
-                        setDisplayName(board.name)
-                        setStack([board.id])
-                        setSelected(null); setActiveNoteId(null)
-                        setOffset({ x: 0, y: 0 }); setScale(1)
-                        setDb(prev => prev[board.id] ? prev : { ...prev, [board.id]: { id: board.id, name: board.name, cards: [], connections: [], groups: [], labels: [] } })
-                      } else {
-                        setRenamingBoardId(board.id)
-                      }
-                    }}
-                    onMouseEnter={e => { if (!isActive && sidebarFocusId !== board.id) e.currentTarget.style.background = '#f5f5f5' }}
-                    onMouseLeave={e => { e.currentTarget.style.background = sidebarFocusId === board.id ? 'var(--border)' : 'transparent' }}
+                    style={{ padding: '4px 8px 4px 12px', fontSize: 13, fontWeight: isActive ? 600 : 400, color: isActive ? 'var(--text)' : 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4, background: sidebarFocusId === board.id ? 'var(--border)' : 'transparent' }}
+                    onMouseEnter={e => { e.currentTarget.dataset.hover = '1'; if (sidebarFocusId !== board.id) e.currentTarget.style.background = 'var(--border)'; e.currentTarget.querySelectorAll('.board-action').forEach(b => b.style.opacity = '1') }}
+                    onMouseLeave={e => { e.currentTarget.dataset.hover = ''; e.currentTarget.style.background = sidebarFocusId === board.id ? 'var(--border)' : 'transparent'; e.currentTarget.querySelectorAll('.board-action').forEach(b => b.style.opacity = '0') }}
                   >
                     <span
-                      style={{ fontSize: 11, cursor: isActive ? 'pointer' : 'default' }}
-                      onClick={isActive ? e => { e.stopPropagation(); toggleCollapse(board.id) } : undefined}
-                    >{isActive ? (collapsedIds.has(board.id) ? '▸' : '▾') : '▸'}</span>
+                      style={{ fontSize: 11, cursor: 'pointer', flexShrink: 0 }}
+                      onClick={e => { e.stopPropagation(); toggleCollapse(board.id) }}
+                    >{collapsedIds.has(board.id) ? '▸' : '▾'}</span>
                     {isRenaming ? (
                       <input
                         autoFocus
                         defaultValue={board.name}
-                        style={{ border: 'none', outline: 'none', fontSize: 13, fontWeight: 600, color: 'var(--text)', background: 'transparent', width: '100%', fontFamily: 'inherit' }}
+                        style={{ border: 'none', outline: 'none', fontSize: 13, fontWeight: 600, color: 'var(--text)', background: 'transparent', flex: 1, fontFamily: 'inherit' }}
                         onBlur={e => {
                           const name = e.target.value.trim() || board.name
                           setBoards(prev => prev.map(b => b.id === board.id ? { ...b, name } : b))
                           setDb(prev => prev[board.id] ? { ...prev, [board.id]: { ...prev[board.id], name } } : prev)
+                          if (board.id === currentIdRef.current) setDisplayName(name)
                           updateBoardDB(board.id, { name }).catch(console.error)
                           setRenamingBoardId(null)
                         }}
@@ -757,13 +789,26 @@ function AppInner({ userId }) {
                         onClick={e => e.stopPropagation()}
                       />
                     ) : (
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{board.name}</span>
+                      <span
+                        style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, cursor: 'pointer' }}
+                        onClick={() => handleSidebarNavigate(board.id)}
+                      >{board.name}</span>
                     )}
-                    {!isActive && boards.length > 1 && (
+                    <button
+                      className="board-action"
+                      style={{ opacity: 0, flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '2px 3px', borderRadius: 4, lineHeight: 1 }}
+                      onMouseEnter={e => { e.currentTarget.style.color = 'var(--text)' }}
+                      onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)' }}
+                      onMouseDown={e => e.stopPropagation()}
+                      onClick={e => { e.stopPropagation(); setRenamingBoardId(board.id) }}
+                      title="Rinomina"
+                    ><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+                    {boards.length > 1 && (
                       <button
-                        style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 12, lineHeight: 1, padding: '0 2px', flexShrink: 0 }}
+                        className="board-action"
+                        style={{ opacity: 0, flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '2px 3px', borderRadius: 4, lineHeight: 1 }}
                         onMouseEnter={e => { e.currentTarget.style.color = '#e53935' }}
-                        onMouseLeave={e => { e.currentTarget.style.color = '#bbb' }}
+                        onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)' }}
                         onMouseDown={e => e.stopPropagation()}
                         onClick={e => {
                           e.stopPropagation()
@@ -772,12 +817,13 @@ function AppInner({ userId }) {
                           setDb(prev => { const next = { ...prev }; delete next[board.id]; return next })
                           deleteBoardDB(board.id).catch(console.error)
                         }}
-                      ><Trash2 size={14} /></button>
+                        title="Elimina"
+                      ><Trash2 size={12} /></button>
                     )}
                   </div>
                   {/* Folder tree when active and not collapsed */}
                   {isActive && !collapsedIds.has(board.id) && (
-                    <FolderTree db={db} currentId={currentId} onNavigate={handleSidebarNavigate} id={board.id} depth={1} theme={theme} collapsedIds={collapsedIds} onToggleCollapse={toggleCollapse} sidebarFocusId={sidebarFocusId} />
+                    <FolderTree db={db} currentId={currentId} onNavigate={handleSidebarNavigate} id={board.id} depth={1} theme={theme} collapsedIds={collapsedIds} onToggleCollapse={toggleCollapse} sidebarFocusId={sidebarFocusId} skipSelf />
                   )}
                 </div>
               )
@@ -789,15 +835,22 @@ function AppInner({ userId }) {
               style={{ width: '100%', textAlign: 'left', padding: '10px 12px', fontSize: 13, border: 'none', background: 'none', cursor: 'pointer', color: 'var(--accent)' }}
               onMouseEnter={e => { e.currentTarget.style.background = '#f5f5f5' }}
               onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
-              onClick={() => {
-                const id = uid()
+              onClick={async () => {
                 const name = 'Nuova lavagna'
-                setBoards(prev => [...prev, { id, name }])
-                setDb(prev => ({ ...prev, [id]: { id, name, cards: [], connections: [], groups: [], labels: [] } }))
-                setDisplayName(name)
-                setStack([id]); localStorage.setItem(STACK_KEY, JSON.stringify([id])); setSelected(null); setActiveNoteId(null)
-                setOffset({ x: 0, y: 0 }); setScale(1)
-                setRenamingBoardId(id)
+                try {
+                  const board = await createBoardDB({ name, userId })
+                  const id = board.id
+                  await createCanvasDB({ id, boardId: id, name, userId })
+                  loadedRef.current.add(id)
+                  setBoards(prev => [...prev, { id, name }])
+                  setDb(prev => ({ ...prev, [id]: { id, name, cards: [], connections: [], groups: [], labels: [] } }))
+                  setDisplayName(name)
+                  setStack([id]); localStorage.setItem(STACK_KEY, JSON.stringify([id])); setSelected(null); setActiveNoteId(null)
+                  setOffset({ x: 0, y: 0 }); setScale(1)
+                  setRenamingBoardId(id)
+                } catch (err) {
+                  console.error('createBoard error:', err)
+                }
               }}
             >+ Nuova lavagna</button>
             <button
@@ -880,7 +933,7 @@ function AppInner({ userId }) {
             <div
               ref={boardRef}
               style={{ flex: 1, position: 'relative', overflow: 'hidden', cursor: boardCursor, userSelect: 'none', backgroundColor: 'var(--bg)', backgroundImage: showGrid ? 'radial-gradient(circle, var(--grid-dot) 1px, transparent 1px)' : 'none', backgroundSize: `${20 * scale}px ${20 * scale}px`, backgroundPosition: `${offset.x % (20 * scale)}px ${offset.y % (20 * scale)}px` }}
-              onMouseDown={e => { setSelectedConn(null); onBoardMouseDown(e) }}
+              onMouseDown={e => { setSelectedConn(null); setSelectedGroup(null); onBoardMouseDown(e) }}
               onDoubleClick={onBoardDblClick}
             >
               {/* SVG overlay – arrows in screen-space */}
@@ -1019,6 +1072,9 @@ function AppInner({ userId }) {
                       if (!canvas) return prev
                       return { ...prev, [cId]: { ...canvas, groups: (canvas.groups||[]).map(g => g.id === group.id ? { ...g, title } : g) } }
                     })}
+                    initialEditing={editingGroupId === group.id}
+                    isSelected={selectedGroup === group.id}
+                    onSelect={() => { setSelectedGroup(group.id); setSelectedConn(null) }}
                   />
                 ))}
 
@@ -1091,6 +1147,7 @@ function AppInner({ userId }) {
                       card={card}
                       selected={selected === card.id || multiSelected.includes(card.id)}
                       onMouseDown={e => onCardMouseDown(e, card)}
+                      onClick={e => { if (activeNoteId && !card.isFolder) { e.stopPropagation(); openNote(card) } }}
                       onDblClick={e => { e.stopPropagation(); if (card.isFolder) enterCanvas(card.id, card.title); else openNote(card) }}
                       onRename={title => updateCardFn(card.id, { title })}
                       onNoteOpen={() => openNote(card)}

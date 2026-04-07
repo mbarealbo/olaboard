@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { uid, anchorPoint } from '../utils'
 
-export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnectionFn, setActiveNoteId, view, activeTool, setActiveTool, selectMode, setMultiSelected, setSelectionRect }) {
+export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnectionFn, setActiveNoteId, view, activeTool, setActiveTool, selectMode, setMultiSelected, setSelectionRect, onGroupCreated }) {
   const [offset, setOffset] = useState({ x: 0, y: 0 })
   const [scale, setScale] = useState(1)
   const [connectLine, setConnectLine] = useState(null)
@@ -199,6 +199,7 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
               .filter(c => { const cx = c.x + 65, cy = c.y + 37; return cx >= rx && cx <= rx + rw && cy >= ry && cy <= ry + rh })
               .map(c => c.id)
             const newGroup = { id: uid(), title: 'Gruppo', x: rx, y: ry, width: Math.max(120, rw), height: Math.max(80, rh), cardIds }
+            if (onGroupCreated) setTimeout(() => onGroupCreated(newGroup.id), 0)
             return { ...prev, [cId]: { ...canvas, groups: [...(canvas.groups||[]), newGroup] } }
           })
         }

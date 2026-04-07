@@ -37,23 +37,45 @@ const RESIZE_HANDLES = [
   { id: 'w',  style: { top: 'calc(50% - 4px)', left: -4, cursor: 'w-resize' } },
 ]
 
-export function Group({ group, onTitleBarMouseDown, onResizeHandleMouseDown, onDelete, onTitleChange }) {
+export function Group({ group, onTitleBarMouseDown, onResizeHandleMouseDown, onDelete, onTitleChange, initialEditing, isSelected, onSelect }) {
+  const titleRef = useRef(null)
+
+  useEffect(() => {
+    if (initialEditing && titleRef.current) {
+      const el = titleRef.current
+      el.focus()
+      const range = document.createRange()
+      range.selectNodeContents(el)
+      const sel = window.getSelection()
+      sel.removeAllRanges()
+      sel.addRange(range)
+    }
+  }, [initialEditing])
+
   return (
     <div
       style={{
         position: 'absolute', left: group.x, top: group.y,
         width: group.width, height: group.height,
         background: 'rgba(255,255,255,0.6)',
-        border: '1.5px solid #d0d0d0', borderRadius: 8,
+        border: isSelected ? '1.5px solid rgba(55,138,221,0.7)' : '1.5px solid #d0d0d0', borderRadius: 8,
         zIndex: 0,
+        boxShadow: 'none',
+      }}
+      onMouseDown={e => {
+        if (e.target.closest('[data-card-id]')) return
+        e.stopPropagation()
+        onSelect()
+        onTitleBarMouseDown(e)
       }}
     >
       {/* Title bar */}
       <div
         style={{ height: 24, padding: '0 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'move' }}
-        onMouseDown={onTitleBarMouseDown}
+        onMouseDown={e => { e.stopPropagation(); onTitleBarMouseDown(e) }}
       >
         <span
+          ref={titleRef}
           contentEditable
           suppressContentEditableWarning
           style={{ fontSize: 11, fontWeight: 600, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5, outline: 'none', background: 'transparent', cursor: 'text', minWidth: 20 }}

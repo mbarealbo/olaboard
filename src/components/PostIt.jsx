@@ -22,7 +22,7 @@ const HC_COLOR_MAP = {
   white: '#000099', red: '#ff0000',
 }
 
-export default function PostIt({ card, selected, onMouseDown, onDblClick, onRename, onNoteOpen, onToggleFolder, onConvertToLabel, onConnectDot, initialEditing, onEditStarted, cardColor, theme }) {
+export default function PostIt({ card, selected, onMouseDown, onClick, onDblClick, onRename, onNoteOpen, onToggleFolder, onConvertToLabel, onConnectDot, initialEditing, onEditStarted, cardColor, theme }) {
   const titleRef = useRef(null)
   const isHC = theme === 'high-contrast'
 
@@ -63,6 +63,7 @@ export default function PostIt({ card, selected, onMouseDown, onDblClick, onRena
       className={`postit${card.isFolder ? ' is-folder' : ''}${selected ? ' selected' : ''}`}
       style={{ left: card.x, top: card.y, zIndex: 2, ...(bg ? { background: bg } : {}) }}
       onMouseDown={onMouseDown}
+      onClick={onClick}
       onDoubleClick={onDblClick}
     >
       <div
