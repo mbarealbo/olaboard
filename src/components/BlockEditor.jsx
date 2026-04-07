@@ -141,10 +141,12 @@ function parseTextWithLinks(text) {
 }
 
 // ── ImageBlock ────────────────────────────────────────────────────────────────
-function ImageBlock({ block, onUpdate }) {
+function ImageBlock({ block, onUpdate, onUpload }) {
   const [editing, setEditing] = useState(!block.url)
   const [urlInput, setUrlInput] = useState(block.url || '')
   const [hovered, setHovered] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef(null)
 
   function commitUrl() {
     const trimmed = urlInput.trim()
@@ -154,14 +156,30 @@ function ImageBlock({ block, onUpdate }) {
     }
   }
 
+  async function handleFileChange(e) {
+    const file = e.target.files?.[0]
+    if (!file || !onUpload) return
+    setUploading(true)
+    try {
+      const { url } = await onUpload(file)
+      onUpdate(block.id, { url })
+      setEditing(false)
+    } catch (err) {
+      alert(err.message)
+    } finally {
+      setUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
   // URL input row — shown when no url yet or clicking image to re-edit
   if (editing || !block.url) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 0', minHeight: '1.6em' }}>
         <span style={{ fontSize: 14, userSelect: 'none', flexShrink: 0 }}>🖼</span>
         <input
-          autoFocus
-          style={{ border: 'none', outline: 'none', background: 'transparent', fontSize: 14, color: 'var(--text-muted)', width: '100%', fontFamily: 'inherit' }}
+          autoFocus={!uploading}
+          style={{ border: 'none', outline: 'none', background: 'transparent', fontSize: 14, color: 'var(--text-muted)', flex: 1, fontFamily: 'inherit' }}
           placeholder="Incolla URL immagine..."
           value={urlInput}
           onChange={e => setUrlInput(e.target.value)}
@@ -172,6 +190,22 @@ function ImageBlock({ block, onUpdate }) {
           }}
           onBlur={commitUrl}
         />
+        {onUpload && (
+          <>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              style={{ display: 'none' }}
+              onChange={handleFileChange}
+            />
+            <button
+              style={{ flexShrink: 0, border: '1px solid #ddd', borderRadius: 4, padding: '2px 8px', fontSize: 12, cursor: uploading ? 'wait' : 'pointer', background: '#fff', color: '#555', whiteSpace: 'nowrap' }}
+              onMouseDown={e => e.preventDefault()}
+              onClick={() => !uploading && fileInputRef.current?.click()}
+            >{uploading ? '…' : 'Carica'}</button>
+          </>
+        )}
       </div>
     )
   }
@@ -206,7 +240,7 @@ function ImageBlock({ block, onUpdate }) {
 }
 
 // ── BlockItem ─────────────────────────────────────────────────────────────────
-function BlockItem({ block, olIndex, onKeyDown, onInput, onBlur, registerRef, onUpdate }) {
+function BlockItem({ block, olIndex, onKeyDown, onInput, onBlur, registerRef, onUpdate, onUpload }) {
   const elRef = useRef(null)
   const [focused, setFocused] = useState(false)
 
@@ -244,7 +278,7 @@ function BlockItem({ block, olIndex, onKeyDown, onInput, onBlur, registerRef, on
   )
 
   if (block.type === 'image') {
-    return <ImageBlock block={block} onUpdate={onUpdate} />
+    return <ImageBlock block={block} onUpdate={onUpdate} onUpload={onUpload} />
   }
 
   // 'p' blocks: when not focused, show read-only view with clickable links.
@@ -293,7 +327,7 @@ function BlockItem({ block, olIndex, onKeyDown, onInput, onBlur, registerRef, on
 }
 
 // ── BlockEditor ───────────────────────────────────────────────────────────────
-export default function BlockEditor({ value, onChange }) {
+export default function BlockEditor({ value, onChange, uploadImage }) {
   const [blocks, setBlocks] = useState(() => parseMarkdown(value))
   const [slashMenu, setSlashMenu] = useState(null) // { blockId, query, x, y }
   const [slashMenuIdx, setSlashMenuIdx] = useState(0)
@@ -545,6 +579,7 @@ export default function BlockEditor({ value, onChange }) {
           onBlur={handleBlur}
           registerRef={registerRef}
           onUpdate={updateBlock}
+          onUpload={uploadImage}
         />
       ))}
 

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { uid, anchorPoint } from '../utils'
 
-export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnectionFn, setActiveNoteId, view, activeTool, setActiveTool, selectMode, setMultiSelected, setSelectionRect, onGroupCreated }) {
+export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnectionFn, setActiveNoteId, view, activeTool, setActiveTool, selectMode, setMultiSelected, setSelectionRect, onGroupCreated, pushCommand }) {
   const [offset, setOffset] = useState({ x: 0, y: 0 })
   const [scale, setScale] = useState(1)
   const [connectLine, setConnectLine] = useState(null)
@@ -21,17 +21,19 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
   const activeAutoCreateRef = useRef(false)
   const activeToolRef = useRef('note')
   const multiSelectedRef = useRef([])
+  const pushCommandRef = useRef(pushCommand)
 
   useEffect(() => { offsetRef.current = offset }, [offset])
   useEffect(() => { scaleRef.current = scale }, [scale])
   useEffect(() => { dbRef.current = db }, [db])
+  useEffect(() => { pushCommandRef.current = pushCommand }, [pushCommand])
 
-  // ── world-to-screen ──────────────────────────────��────────────────────────
+  // ── world-to-screen ───────────────────────────────────────────────────────
   function w2s(wx, wy) {
     return [wx * scale + offset.x, wy * scale + offset.y]
   }
 
-  // ── global mouse events ──────────────────────────��────────────────────────
+  // ── global mouse events ───────────────────────────────────────────────────
   useEffect(() => {
     function getBoardRect() { return boardRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 } }
 
@@ -93,13 +95,17 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
         const o = offsetRef.current, s = scaleRef.current
         const wx = (e.clientX - r.left - o.x) / s
         const wy = (e.clientY - r.top  - o.y) / s
-        updateCardFn(d.cardId, { x: d.origX + (wx - d.startWX), y: d.origY + (wy - d.startWY) })
+        const nx = d.origX + (wx - d.startWX)
+        const ny = d.origY + (wy - d.startWY)
+        d.finalX = nx; d.finalY = ny
+        updateCardFn(d.cardId, { x: nx, y: ny })
       } else if (d.type === 'multi') {
         const r = getBoardRect()
         const o = offsetRef.current, s = scaleRef.current
         const wx = (e.clientX - r.left - o.x) / s
         const wy = (e.clientY - r.top  - o.y) / s
         const dx = wx - d.startWX, dy = wy - d.startWY
+        d.finalDX = dx; d.finalDY = dy
         setDb(prev => {
           const cId = currentIdRef.current
           const canvas = prev[cId]
@@ -117,6 +123,7 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
         const wx = (e.clientX - r.left - o.x) / s
         const wy = (e.clientY - r.top  - o.y) / s
         const dx = wx - d.startWX, dy = wy - d.startWY
+        d.finalDX = dx; d.finalDY = dy
         setDb(prev => {
           const cId = currentIdRef.current
           const canvas = prev[cId]
@@ -142,12 +149,29 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
         if (h.includes('s')) height = Math.max(80,  d.origGH + dy)
         if (h.includes('w')) { const nw = Math.max(120, d.origGW - dx); x = d.origGX + (d.origGW - nw); width = nw }
         if (h.includes('n')) { const nh = Math.max(80,  d.origGH - dy); y = d.origGY + (d.origGH - nh); height = nh }
+        d.finalX = x; d.finalY = y; d.finalW = width; d.finalH = height
         setDb(prev => {
           const cId = currentIdRef.current
           const canvas = prev[cId]
           if (!canvas) return prev
           return { ...prev, [cId]: { ...canvas, groups: (canvas.groups||[]).map(g => g.id === d.groupId ? { ...g, x, y, width, height } : g) } }
         })
+      } else if (d.type === 'image-resize') {
+        const r = getBoardRect()
+        const o = offsetRef.current, s = scaleRef.current
+        const wx = (e.clientX - r.left - o.x) / s
+        const wy = (e.clientY - r.top  - o.y) / s
+        const dx = wx - d.startWX
+        const dy = wy - d.startWY
+        // lock aspect ratio: pick whichever drag axis implies a larger resize
+        const aspect = d.origW / d.origH
+        const scaleFromW = (d.origW + dx) / d.origW
+        const scaleFromH = (d.origH + dy) / d.origH
+        const sc = Math.max(scaleFromW, scaleFromH, 40 / d.origW)
+        const newW = Math.round(d.origW * sc)
+        const newH = Math.round(newW / aspect)
+        d.finalW = newW; d.finalH = newH
+        updateCardFn(d.cardId, { width: newW, height: newH })
       } else if (d.type === 'select') {
         const r = getBoardRect()
         const o = offsetRef.current, s = scaleRef.current
@@ -164,6 +188,7 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
         const wy = (e.clientY - r.top  - o.y) / s
         const nx = d.origX + (wx - d.startWX)
         const ny = d.origY + (wy - d.startWY)
+        d.finalX = nx; d.finalY = ny
         setDb(prev => {
           const cId = currentIdRef.current
           const canvas = prev[cId]
@@ -191,8 +216,8 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
         const rx = Math.min(wx, startWX), ry = Math.min(wy, startWY)
         const rw = Math.abs(wx - startWX), rh = Math.abs(wy - startWY)
         if (rw >= 30 && rh >= 30) {
+          const cId = currentIdRef.current
           setDb(prev => {
-            const cId = currentIdRef.current
             const canvas = prev[cId]
             if (!canvas) return prev
             const cardIds = canvas.cards
@@ -200,6 +225,18 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
               .map(c => c.id)
             const newGroup = { id: uid(), title: 'Gruppo', x: rx, y: ry, width: Math.max(120, rw), height: Math.max(80, rh), cardIds }
             if (onGroupCreated) setTimeout(() => onGroupCreated(newGroup.id), 0)
+            pushCommandRef.current({
+              undo: () => setDb(prev => {
+                const cv = prev[cId]
+                if (!cv) return prev
+                return { ...prev, [cId]: { ...cv, groups: (cv.groups || []).filter(g => g.id !== newGroup.id) } }
+              }),
+              redo: () => setDb(prev => {
+                const cv = prev[cId]
+                if (!cv) return prev
+                return { ...prev, [cId]: { ...cv, groups: [...(cv.groups || []), newGroup] } }
+              }),
+            })
             return { ...prev, [cId]: { ...canvas, groups: [...(canvas.groups||[]), newGroup] } }
           })
         }
@@ -216,11 +253,24 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
         const toId = connecting.current.toCardId
         const toAnchor = connecting.current.toAnchor || 'left'
         if (toId) {
+          const newConn = { id: uid(), from: fromId, to: toId, fromAnchor, toAnchor, label: '' }
+          const cId = currentIdRef.current
           setDb(prev => {
-            const cId = currentIdRef.current
             const canvas = prev[cId]
             if (!canvas) return prev
-            return { ...prev, [cId]: { ...canvas, connections: [...canvas.connections, { id: uid(), from: fromId, to: toId, fromAnchor, toAnchor, label: '' }] } }
+            return { ...prev, [cId]: { ...canvas, connections: [...canvas.connections, newConn] } }
+          })
+          pushCommandRef.current({
+            undo: () => setDb(prev => {
+              const cv = prev[cId]
+              if (!cv) return prev
+              return { ...prev, [cId]: { ...cv, connections: cv.connections.filter(c => c.id !== newConn.id) } }
+            }),
+            redo: () => setDb(prev => {
+              const cv = prev[cId]
+              if (!cv) return prev
+              return { ...prev, [cId]: { ...cv, connections: [...cv.connections, newConn] } }
+            }),
           })
         } else if (activeAutoCreateRef.current) {
           const r = getBoardRect()
@@ -232,8 +282,9 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
           const newCard = isText
             ? { id: newId, isLabel: true, title: 'Testo libero', x: wx - 56, y: wy - 20 }
             : { id: newId, isLabel: false, title: 'Nuova idea', x: wx - 65, y: wy - 37 }
+          const newConn = { id: uid(), from: fromId, to: newId, fromAnchor, toAnchor, label: '' }
+          const cId = currentIdRef.current
           setDb(prev => {
-            const cId = currentIdRef.current
             const canvas = prev[cId]
             if (!canvas) return prev
             return {
@@ -241,9 +292,21 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
               [cId]: {
                 ...canvas,
                 cards: [...canvas.cards, newCard],
-                connections: [...canvas.connections, { id: uid(), from: fromId, to: newId, fromAnchor, toAnchor, label: '' }],
+                connections: [...canvas.connections, newConn],
               },
             }
+          })
+          pushCommandRef.current({
+            undo: () => setDb(prev => {
+              const cv = prev[cId]
+              if (!cv) return prev
+              return { ...prev, [cId]: { ...cv, cards: cv.cards.filter(c => c.id !== newId), connections: cv.connections.filter(c => c.id !== newConn.id) } }
+            }),
+            redo: () => setDb(prev => {
+              const cv = prev[cId]
+              if (!cv) return prev
+              return { ...prev, [cId]: { ...cv, cards: [...cv.cards, newCard], connections: [...cv.connections, newConn] } }
+            }),
           })
         }
         connecting.current = null
@@ -280,9 +343,85 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
         return
       }
 
+      // Image resize completion: push history
+      if (dragging.current?.type === 'image-resize' && dragging.current.finalW !== undefined) {
+        const d = dragging.current
+        if ((d.finalW !== d.origW || d.finalH !== d.origH) && d.canvasSnapshot) {
+          const cId = d.canvasId
+          const bc = d.canvasSnapshot
+          const cardId = d.cardId
+          const afterCards = (bc.cards || []).map(c =>
+            c.id === cardId ? { ...c, width: Math.round(d.finalW), height: Math.round(d.finalH) } : c
+          )
+          const afterCanvas = { ...bc, cards: afterCards }
+          pushCommandRef.current({
+            undo: () => setDb(prev => ({ ...prev, [cId]: bc })),
+            redo: () => setDb(prev => ({ ...prev, [cId]: afterCanvas })),
+          })
+        }
+      }
+
+      // Multi drag completion: push history
+      if (dragging.current?.type === 'multi' && dragging.current.finalDX !== undefined) {
+        const d = dragging.current
+        const dx = d.finalDX, dy = d.finalDY
+        if ((dx !== 0 || dy !== 0) && d.canvasSnapshot) {
+          const cId = d.canvasId
+          const bc = d.canvasSnapshot
+          const movedCards = (bc.cards || []).map(c => {
+            const origin = d.cardOrigins.find(o => o.id === c.id)
+            return origin ? { ...c, x: origin.x + dx, y: origin.y + dy } : c
+          })
+          const afterCanvas = { ...bc, cards: movedCards }
+          pushCommandRef.current({
+            undo: () => setDb(prev => ({ ...prev, [cId]: bc })),
+            redo: () => setDb(prev => ({ ...prev, [cId]: afterCanvas })),
+          })
+        }
+      }
+
+      // Label drag completion: push history
+      if (dragging.current?.type === 'label' && dragging.current.finalX !== undefined) {
+        const d = dragging.current
+        if ((d.finalX !== d.origX || d.finalY !== d.origY) && d.canvasSnapshot) {
+          const cId = d.canvasId
+          const bc = d.canvasSnapshot
+          const labelId = d.labelId
+          let afterCanvas
+          if (d.isCardLabel) {
+            afterCanvas = { ...bc, cards: bc.cards.map(c => c.id === labelId ? { ...c, x: d.finalX, y: d.finalY } : c) }
+          } else {
+            afterCanvas = { ...bc, labels: (bc.labels || []).map(l => l.id === labelId ? { ...l, x: d.finalX, y: d.finalY } : l) }
+          }
+          pushCommandRef.current({
+            undo: () => setDb(prev => ({ ...prev, [cId]: bc })),
+            redo: () => setDb(prev => ({ ...prev, [cId]: afterCanvas })),
+          })
+        }
+      }
+
+      // Group-resize completion: push history
+      if (dragging.current?.type === 'group-resize' && dragging.current.finalX !== undefined) {
+        const d = dragging.current
+        if ((d.finalX !== d.origGX || d.finalY !== d.origGY || d.finalW !== d.origGW || d.finalH !== d.origGH) && d.canvasSnapshot) {
+          const cId = d.canvasId
+          const bc = d.canvasSnapshot
+          const groupId = d.groupId
+          const afterGroups = (bc.groups || []).map(g =>
+            g.id === groupId ? { ...g, x: d.finalX, y: d.finalY, width: d.finalW, height: d.finalH } : g
+          )
+          const afterCanvas = { ...bc, groups: afterGroups }
+          pushCommandRef.current({
+            undo: () => setDb(prev => ({ ...prev, [cId]: bc })),
+            redo: () => setDb(prev => ({ ...prev, [cId]: afterCanvas })),
+          })
+        }
+      }
+
       // Group drop: sync cardIds based on final positions
       if (dragging.current?.type === 'group') {
-        const groupId = dragging.current.groupId
+        const d = dragging.current
+        const groupId = d.groupId
         setDb(prev => {
           const cId = currentIdRef.current
           const canvas = prev[cId]
@@ -299,11 +438,39 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
           const newGroups = (canvas.groups || []).map(g => g.id === groupId ? { ...g, cardIds: newCardIds } : g)
           return { ...prev, [cId]: { ...canvas, groups: newGroups } }
         })
+        // Push history for group move
+        if (d.finalDX !== undefined && (d.finalDX !== 0 || d.finalDY !== 0) && d.canvasSnapshot) {
+          const cId = d.canvasId
+          const bc = d.canvasSnapshot
+          const dx = d.finalDX, dy = d.finalDY
+          const movedCards = (bc.cards || []).map(c => {
+            const origin = d.cardOrigins.find(o => o.id === c.id)
+            return origin ? { ...c, x: origin.x + dx, y: origin.y + dy } : c
+          })
+          const movedGroup = { ...(bc.groups || []).find(g => g.id === groupId), x: d.origGX + dx, y: d.origGY + dy }
+          const afterGroups = (bc.groups || []).map(g => {
+            if (g.id !== groupId) return g
+            const newCardIds = movedCards
+              .filter(c => {
+                const cx = c.x + 65, cy = c.y + 37
+                return cx >= movedGroup.x && cx <= movedGroup.x + movedGroup.width &&
+                       cy >= movedGroup.y && cy <= movedGroup.y + movedGroup.height
+              })
+              .map(c => c.id)
+            return { ...movedGroup, cardIds: newCardIds }
+          })
+          const afterCanvas = { ...bc, cards: movedCards, groups: afterGroups }
+          pushCommandRef.current({
+            undo: () => setDb(prev => ({ ...prev, [cId]: bc })),
+            redo: () => setDb(prev => ({ ...prev, [cId]: afterCanvas })),
+          })
+        }
       }
 
-      // Card drop: recalculate group membership
+      // Card drop: recalculate group membership + push history
       if (dragging.current?.type === 'card') {
-        const cardId = dragging.current.cardId
+        const d = dragging.current
+        const cardId = d.cardId
         setDb(prev => {
           const cId = currentIdRef.current
           const canvas = prev[cId]
@@ -318,6 +485,24 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
           })
           return { ...prev, [cId]: { ...canvas, groups: newGroups } }
         })
+        // Push history for card move
+        if (d.finalX !== undefined && (d.finalX !== d.origX || d.finalY !== d.origY) && d.canvasSnapshot) {
+          const cId = d.canvasId
+          const bc = d.canvasSnapshot
+          const afterX = d.finalX, afterY = d.finalY
+          const cx = afterX + 65, cy = afterY + 37
+          const afterCards = (bc.cards || []).map(c => c.id === cardId ? { ...c, x: afterX, y: afterY } : c)
+          const afterGroups = (bc.groups || []).map(g => {
+            const inside = cx >= g.x && cx <= g.x + g.width && cy >= g.y && cy <= g.y + g.height
+            const filtered = g.cardIds.filter(id => id !== cardId)
+            return { ...g, cardIds: inside ? [...filtered, cardId] : filtered }
+          })
+          const afterCanvas = { ...bc, cards: afterCards, groups: afterGroups }
+          pushCommandRef.current({
+            undo: () => setDb(prev => ({ ...prev, [cId]: bc })),
+            redo: () => setDb(prev => ({ ...prev, [cId]: afterCanvas })),
+          })
+        }
       }
 
       dragging.current = null
@@ -334,38 +519,77 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selected) {
+          const cId = currentIdRef.current
+          const canvas = dbRef.current[cId]
+          const deletedCard = canvas?.cards.find(c => c.id === selected)
+          const deletedConns = canvas?.connections.filter(c => c.from === selected || c.to === selected) || []
+          const groupsWithoutCard = (canvas?.groups || []).map(g => ({ ...g, cardIds: g.cardIds.filter(id => id !== selected) }))
           setDb(prev => {
-            const cId = currentIdRef.current
-            const canvas = prev[cId]
-            if (!canvas) return prev
+            const cv = prev[cId]
+            if (!cv) return prev
             return {
               ...prev,
               [cId]: {
-                ...canvas,
-                cards: canvas.cards.filter(c => c.id !== selected),
-                connections: canvas.connections.filter(c => c.from !== selected && c.to !== selected),
-                groups: (canvas.groups||[]).map(g => ({ ...g, cardIds: g.cardIds.filter(id => id !== selected) })),
+                ...cv,
+                cards: cv.cards.filter(c => c.id !== selected),
+                connections: cv.connections.filter(c => c.from !== selected && c.to !== selected),
+                groups: (cv.groups||[]).map(g => ({ ...g, cardIds: g.cardIds.filter(id => id !== selected) })),
               }
             }
           })
           setSelected(null)
           setActiveNoteId(id => id === selected ? null : id)
+          if (deletedCard) {
+            pushCommandRef.current({
+              undo: () => setDb(prev => {
+                const cv = prev[cId]
+                if (!cv) return prev
+                return { ...prev, [cId]: { ...cv, cards: [...cv.cards, deletedCard], connections: [...cv.connections, ...deletedConns], groups: groupsWithoutCard.map((g, i) => ({ ...g, cardIds: [...g.cardIds, ...(canvas?.groups?.[i]?.cardIds?.includes(selected) ? [selected] : [])] })) } }
+              }),
+              redo: () => setDb(prev => {
+                const cv = prev[cId]
+                if (!cv) return prev
+                return { ...prev, [cId]: { ...cv, cards: cv.cards.filter(c => c.id !== selected), connections: cv.connections.filter(c => c.from !== selected && c.to !== selected), groups: (cv.groups||[]).map(g => ({ ...g, cardIds: g.cardIds.filter(id => id !== selected) })) } }
+              }),
+            })
+          }
         } else if (selectedLabel) {
+          const cId = currentIdRef.current
+          const canvas = dbRef.current[cId]
+          const deletedLabel = canvas?.labels?.find(l => l.id === selectedLabel)
+          const deletedCardLabel = canvas?.cards.find(c => c.id === selectedLabel)
+          const deletedConns = canvas?.connections.filter(c => c.from === selectedLabel || c.to === selectedLabel) || []
           setDb(prev => {
-            const cId = currentIdRef.current
-            const canvas = prev[cId]
-            if (!canvas) return prev
+            const cv = prev[cId]
+            if (!cv) return prev
             return {
               ...prev,
               [cId]: {
-                ...canvas,
-                labels: (canvas.labels||[]).filter(l => l.id !== selectedLabel),
-                cards: canvas.cards.filter(c => c.id !== selectedLabel),
-                connections: canvas.connections.filter(c => c.from !== selectedLabel && c.to !== selectedLabel),
+                ...cv,
+                labels: (cv.labels||[]).filter(l => l.id !== selectedLabel),
+                cards: cv.cards.filter(c => c.id !== selectedLabel),
+                connections: cv.connections.filter(c => c.from !== selectedLabel && c.to !== selectedLabel),
               }
             }
           })
           setSelectedLabel(null)
+          if (deletedLabel || deletedCardLabel) {
+            pushCommandRef.current({
+              undo: () => setDb(prev => {
+                const cv = prev[cId]
+                if (!cv) return prev
+                if (deletedLabel) {
+                  return { ...prev, [cId]: { ...cv, labels: [...(cv.labels || []), deletedLabel], connections: [...cv.connections, ...deletedConns] } }
+                }
+                return { ...prev, [cId]: { ...cv, cards: [...cv.cards, deletedCardLabel], connections: [...cv.connections, ...deletedConns] } }
+              }),
+              redo: () => setDb(prev => {
+                const cv = prev[cId]
+                if (!cv) return prev
+                return { ...prev, [cId]: { ...cv, labels: (cv.labels||[]).filter(l => l.id !== selectedLabel), cards: cv.cards.filter(c => c.id !== selectedLabel), connections: cv.connections.filter(c => c.from !== selectedLabel && c.to !== selectedLabel) } }
+              }),
+            })
+          }
         }
       }
     }
@@ -399,7 +623,7 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
     return () => el.removeEventListener('wheel', onWheel)
   }, [view])
 
-  // ── board event handlers ──────────────────────────────���───────────────────
+  // ── board event handlers ──────────────────────────────────────────────────
   function onBoardMouseDown(e) {
     if (e.target.closest('.postit')) return
 
@@ -450,16 +674,17 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
     const wx = (e.clientX - r.left - o.x) / s
     const wy = (e.clientY - r.top  - o.y) / s
     const ms = multiSelectedRef.current
+    const cId = currentIdRef.current
     if (ms.length > 0 && ms.includes(card.id)) {
-      const allCards = dbRef.current[currentIdRef.current]?.cards || []
+      const allCards = dbRef.current[cId]?.cards || []
       const cardOrigins = ms
         .map(id => allCards.find(c => c.id === id))
         .filter(Boolean)
         .map(c => ({ id: c.id, x: c.x, y: c.y }))
-      dragging.current = { type: 'multi', startWX: wx, startWY: wy, cardOrigins }
+      dragging.current = { type: 'multi', startWX: wx, startWY: wy, cardOrigins, canvasId: cId, canvasSnapshot: dbRef.current[cId] }
     } else {
       setSelected(card.id); setSelectedLabel(null)
-      dragging.current = { type: 'card', cardId: card.id, startWX: wx, startWY: wy, origX: card.x, origY: card.y }
+      dragging.current = { type: 'card', cardId: card.id, startWX: wx, startWY: wy, origX: card.x, origY: card.y, canvasId: cId, canvasSnapshot: dbRef.current[cId] }
     }
   }
 
@@ -479,7 +704,8 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
     const o = offsetRef.current, s = scaleRef.current
     const wx = (e.clientX - r.left - o.x) / s
     const wy = (e.clientY - r.top  - o.y) / s
-    const cards = dbRef.current[currentIdRef.current]?.cards || []
+    const cId = currentIdRef.current
+    const cards = dbRef.current[cId]?.cards || []
     const cardOrigins = cards
       .filter(card => {
         const cx = card.x + 65, cy = card.y + 37
@@ -487,7 +713,7 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
                cy >= group.y && cy <= group.y + group.height
       })
       .map(card => ({ id: card.id, x: card.x, y: card.y }))
-    dragging.current = { type: 'group', groupId: group.id, startWX: wx, startWY: wy, origGX: group.x, origGY: group.y, cardOrigins }
+    dragging.current = { type: 'group', groupId: group.id, startWX: wx, startWY: wy, origGX: group.x, origGY: group.y, cardOrigins, canvasId: cId, canvasSnapshot: dbRef.current[cId] }
   }
 
   function onGroupResizeHandleMouseDown(e, group, handle) {
@@ -496,10 +722,22 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
     const o = offsetRef.current, s = scaleRef.current
     const wx = (e.clientX - r.left - o.x) / s
     const wy = (e.clientY - r.top  - o.y) / s
-    dragging.current = { type: 'group-resize', groupId: group.id, handle, startWX: wx, startWY: wy, origGX: group.x, origGY: group.y, origGW: group.width, origGH: group.height }
+    const cId = currentIdRef.current
+    dragging.current = { type: 'group-resize', groupId: group.id, handle, startWX: wx, startWY: wy, origGX: group.x, origGY: group.y, origGW: group.width, origGH: group.height, canvasId: cId, canvasSnapshot: dbRef.current[cId] }
   }
 
-  // ── label event handlers ────────────────────────────────────��─────────────
+  // ── image resize handler ──────────────────────────────────────────────────
+  function onImageResizeMouseDown(e, card) {
+    e.stopPropagation()
+    const r = boardRef.current.getBoundingClientRect()
+    const o = offsetRef.current, s = scaleRef.current
+    const wx = (e.clientX - r.left - o.x) / s
+    const wy = (e.clientY - r.top  - o.y) / s
+    const cId = currentIdRef.current
+    dragging.current = { type: 'image-resize', cardId: card.id, startWX: wx, startWY: wy, origW: card.width || 200, origH: card.height || 200, canvasId: cId, canvasSnapshot: dbRef.current[cId] }
+  }
+
+  // ── label event handlers ──────────────────────────────────────────────────
   function onLabelMouseDown(e, label, isCardLabel) {
     e.stopPropagation()
     setSelectedLabel(label.id); setSelected(null)
@@ -507,10 +745,11 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
     const o = offsetRef.current, s = scaleRef.current
     const wx = (e.clientX - r.left - o.x) / s
     const wy = (e.clientY - r.top  - o.y) / s
-    dragging.current = { type: 'label', labelId: label.id, startWX: wx, startWY: wy, origX: label.x, origY: label.y, isCardLabel: !!isCardLabel }
+    const cId = currentIdRef.current
+    dragging.current = { type: 'label', labelId: label.id, startWX: wx, startWY: wy, origX: label.x, origY: label.y, isCardLabel: !!isCardLabel, canvasId: cId, canvasSnapshot: dbRef.current[cId] }
   }
 
-  // ── zoom buttons ────────────────────────────────���─────────────────────────
+  // ── zoom buttons ──────────────────────────────────────────────────────────
   function zoomBy(factor) {
     const el = boardRef.current
     if (!el) return
@@ -527,11 +766,23 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
   // ── card creation ─────────────────────────────────────────────────────────
   function createCard(wx, wy) {
     const card = { id: uid(), title: 'Nuova idea', body: '', x: wx, y: wy, isFolder: false }
+    const cId = currentIdRef.current
     setDb(prev => {
-      const cId = currentIdRef.current
       const canvas = prev[cId]
       if (!canvas) return prev
       return { ...prev, [cId]: { ...canvas, cards: [...canvas.cards, card] } }
+    })
+    pushCommandRef.current({
+      undo: () => setDb(prev => {
+        const cv = prev[cId]
+        if (!cv) return prev
+        return { ...prev, [cId]: { ...cv, cards: cv.cards.filter(c => c.id !== card.id) } }
+      }),
+      redo: () => setDb(prev => {
+        const cv = prev[cId]
+        if (!cv) return prev
+        return { ...prev, [cId]: { ...cv, cards: [...cv.cards, card] } }
+      }),
     })
     return card.id
   }
@@ -539,11 +790,23 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
   // ── label creation & update ───────────────────────────────────────────────
   function createLabel(wx, wy) {
     const label = { id: uid(), x: wx, y: wy, text: '', fontSize: 16 }
+    const cId = currentIdRef.current
     setDb(prev => {
-      const cId = currentIdRef.current
       const canvas = prev[cId]
       if (!canvas) return prev
       return { ...prev, [cId]: { ...canvas, labels: [...(canvas.labels||[]), label] } }
+    })
+    pushCommandRef.current({
+      undo: () => setDb(prev => {
+        const cv = prev[cId]
+        if (!cv) return prev
+        return { ...prev, [cId]: { ...cv, labels: (cv.labels || []).filter(l => l.id !== label.id) } }
+      }),
+      redo: () => setDb(prev => {
+        const cv = prev[cId]
+        if (!cv) return prev
+        return { ...prev, [cId]: { ...cv, labels: [...(cv.labels || []), label] } }
+      }),
     })
     return label.id
   }
@@ -575,6 +838,7 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
     onBoardMouseDown, onBoardDblClick,
     onCardMouseDown, onConnectDotMouseDown,
     onGroupTitleBarMouseDown, onGroupResizeHandleMouseDown,
+    onImageResizeMouseDown,
     onLabelMouseDown, zoomBy,
     createLabel, updateLabel,
     activeAutoCreateRef, activeToolRef, multiSelectedRef,

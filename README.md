@@ -2,7 +2,9 @@
 
 A visual thinking tool for capturing and connecting ideas on an infinite canvas.
 
-![Olaboard](https://img.shields.io/badge/version-0.2.0-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![React](https://img.shields.io/badge/React-19-61dafb) ![Vite](https://img.shields.io/badge/Vite-8-646cff)
+![Olaboard](https://img.shields.io/badge/version-0.5.0-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![React](https://img.shields.io/badge/React-19-61dafb) ![Vite](https://img.shields.io/badge/Vite-8-646cff)
+
+Made by [olab.quest](https://olab.quest)
 
 ---
 
@@ -20,6 +22,7 @@ Sync across devices via Supabase. Sign in with a magic link — no password requ
 - Infinite canvas with pan and zoom
 - **Center button** — fits all elements in view with one click (or press nothing, it centers automatically on navigation)
 - **Post-it notes** with body preview, custom colors, and rich notes
+- **Image cards** — drag & drop images onto the canvas, resize with aspect-ratio lock, connect with arrows
 - **Folders** (nested canvases) — double click to enter, breadcrumb to go back
 - **Free text labels** — transparent, draggable, connectable
 - **Group boxes** — resizable containers that move cards inside them
@@ -28,24 +31,26 @@ Sync across devices via Supabase. Sign in with a magic link — no password requ
 - **Multi-select** — lasso tool on canvas, or checkbox mode in list view
 - Dot grid background (toggleable)
 
-### Multi-select & Deletion
-- Lasso-select multiple elements on the canvas
-- Right panel shows selected items with checkboxes — uncheck any item to remove it from the selection without deleting it
-- **Elimina** button deletes only the checked items from both local state and Supabase
-- In list view: activate "☑ Seleziona" mode to select items with checkboxes, then delete in bulk
-- `Delete` / `Backspace` key deletes selected items (never deletes boards by accident)
+### Undo / Redo
+- Full undo/redo history (Ctrl+Z / Ctrl+Shift+Z) for all canvas operations
+- Covers moves, creates, deletes, renames, group ops, connections, label edits
+- Floating buttons bottom-left above the breadcrumb
 
 ### Notes
 - Full-width or side panel mode
 - **Block editor** inspired by Notion — slash commands, markdown shortcuts
-- Block types: paragraph, H1/H2/H3, bullet list, numbered list, quote, code
+- Block types: paragraph, H1/H2/H3, bullet list, numbered list, quote, code, **image**
 - Auto-detect lists: type `- ` or `1. ` to convert
-- Custom post-it colors (8 options, theme-aware)
+
+### Storage
+- Drag & drop images directly onto the canvas (stored in Supabase Storage)
+- Image blocks inside note editor
+- 100 MB per-user storage limit with usage indicator in account panel
 
 ### Organization
-- **Multiple boards** with rename and delete (explicit button only — no accidental keyboard deletion)
+- **Multiple boards** with rename and delete
 - **Nested folders** — infinite depth
-- **Collapsible sidebar tree** — click ▾/▸ on a board or ▼/▶ on any folder to collapse/expand; state persisted across sessions
+- **Collapsible sidebar tree** — state persisted across sessions
 - **Breadcrumb** navigation anchored to canvas bottom-left
 - **List view** — all elements with type badge, creation date, and bulk-select mode
 - **Export to Markdown** — current canvas exported as .md file
@@ -58,14 +63,16 @@ Sync across devices via Supabase. Sign in with a magic link — no password requ
 | `Q` | Activate Quick Connect mode |
 | `G` | Toggle Group draw tool |
 | `T` | Toggle Text label tool |
+| `Ctrl+Z` | Undo |
+| `Ctrl+Shift+Z` | Redo |
 | `Tab` | Cycle to next sibling board/folder |
 | `↑` / `↓` | Move sidebar keyboard focus |
 | `Enter` | Navigate to sidebar-focused item |
 | `Shift+↓` | Enter the focused folder (go deeper) |
 | `Shift+↑` | Go back to parent canvas |
 | `Escape` | Clear sidebar focus |
-| `Delete` / `Backspace` | Delete selected elements (multi-select or connection) |
-| Double click (canvas) | Create new element |
+| `Delete` / `Backspace` | Delete selected elements |
+| Double click (canvas) | Create new post-it |
 | Double click (post-it) | Open note panel |
 | Double click (folder) | Enter folder |
 
@@ -79,7 +86,7 @@ Sync across devices via Supabase. Sign in with a magic link — no password requ
 ## Stack
 
 - **React 19** + **Vite 8**
-- **Supabase** — auth (magic link) + Postgres + real-time sync
+- **Supabase** — auth (magic link) + Postgres + Storage
 - Pure CSS (no Tailwind)
 - No canvas libraries — all SVG + DOM
 - Lucide React for icons
@@ -105,17 +112,6 @@ npm run dev
 ```
 
 Open `http://localhost:5173`, enter your email to receive a magic link.
-
----
-
-## Roadmap
-
-- [ ] Images directly on the canvas
-- [ ] Undo / Redo
-- [ ] Full-text search across all notes
-- [ ] Export to PNG / PDF
-- [ ] Tauri desktop app (offline, iCloud sync)
-- [ ] Collaboration (real-time, shared boards)
 
 ---
 

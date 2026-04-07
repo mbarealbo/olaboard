@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Trash2, Moon, Sun, Monitor, Zap, Folder, LogOut, Maximize2 } from 'lucide-react'
+import { Trash2, Moon, Sun, Monitor, Zap, Folder, LogOut, Maximize2, Undo2, Redo2, User } from 'lucide-react'
 import BlockEditor from './components/BlockEditor'
 import PostIt from './components/PostIt'
+import ImageCard from './components/ImageCard'
 import { Group, CanvasLabel } from './components/GroupBox'
 import { useCanvas } from './hooks/useCanvas'
+import { useHistory } from './hooks/useHistory'
 import { CARD_W, CARD_H_HALF, uid } from './utils'
 import { supabase } from './lib/supabase'
 import AuthPage from './components/AuthPage'
@@ -21,6 +23,9 @@ import {
   deleteCardsByIds,
   upsertConnections,
   deleteConnectionsByIds,
+  uploadImage as uploadImageDB,
+  deleteImage as deleteImageDB,
+  getUserStorageUsed,
 } from './lib/db'
 
 const STACK_KEY = 'olaboard_stack'
@@ -129,10 +134,10 @@ export default function App() {
   if (session === undefined) return null // loading
   if (session === null) return <AuthPage />
 
-  return <AppInner userId={session.user.id} />
+  return <AppInner userId={session.user.id} userEmail={session.user.email} />
 }
 
-function AppInner({ userId }) {
+function AppInner({ userId, userEmail }) {
   const [db, setDb] = useState({})
   const [boards, setBoards] = useState([])
   const [loading, setLoading] = useState(true)
@@ -165,6 +170,10 @@ function AppInner({ userId }) {
     } catch { return new Set() }
   })
   const [sidebarFocusId, setSidebarFocusId] = useState(null)
+  const [showAccount, setShowAccount] = useState(false)
+  const [storageUsed, setStorageUsed] = useState(null) // bytes or null if not yet fetched
+
+  const { push: pushCommand, undo, redo, canUndo, canRedo } = useHistory()
 
   const currentIdRef = useRef('__loading__')
   const dbRef = useRef(db)
@@ -179,7 +188,18 @@ function AppInner({ userId }) {
 
   // ── map Supabase rows → app shape ─────────────────────────────────────────
   function mapCard(row) {
-    return { id: row.id, title: row.title || '', body: row.body || '', x: row.x, y: row.y, isFolder: row.is_folder || false, isLabel: row.is_label || false, color: row.color || 'yellow', createdAt: row.created_at }
+    return { id: row.id, title: row.title || '', body: row.body || '', x: row.x, y: row.y, isFolder: row.is_folder || false, isLabel: row.is_label || false, color: row.color || 'yellow', createdAt: row.created_at, url: row.url || null, width: row.width || null, height: row.height || null, isImage: !!(row.url) }
+  }
+
+  // ── image upload helpers ───────────────────────────────────────────────────
+  async function handleUploadImage(file) {
+    return uploadImageDB(file, userId)
+  }
+
+  function getStoragePath(url) {
+    const marker = '/storage/v1/object/public/images/'
+    const idx = url?.indexOf(marker)
+    return idx >= 0 ? url.slice(idx + marker.length) : null
   }
   function mapConn(row) {
     return { id: row.id, from: row.from_card_id, to: row.to_card_id, label: row.label || '', fromAnchor: row.from_anchor || 'right', toAnchor: row.to_anchor || 'left' }
@@ -360,9 +380,10 @@ function AppInner({ userId }) {
     onBoardMouseDown, onBoardDblClick,
     onCardMouseDown, onConnectDotMouseDown,
     onGroupTitleBarMouseDown, onGroupResizeHandleMouseDown,
+    onImageResizeMouseDown,
     onLabelMouseDown, zoomBy,
     activeAutoCreateRef, activeToolRef, multiSelectedRef,
-  } = useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnectionFn, setActiveNoteId, view, activeTool, setActiveTool, selectMode, setMultiSelected, setSelectionRect, onGroupCreated: id => setEditingGroupId(id) })
+  } = useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnectionFn, setActiveNoteId, view, activeTool, setActiveTool, selectMode, setMultiSelected, setSelectionRect, onGroupCreated: id => setEditingGroupId(id), pushCommand })
 
   useEffect(() => { activeAutoCreateRef.current = autoCreate }, [autoCreate, activeAutoCreateRef])
   useEffect(() => { activeToolRef.current = activeTool }, [activeTool, activeToolRef])
@@ -373,7 +394,7 @@ function AppInner({ userId }) {
     const canvas = canvasOverride || dbRef.current[canvasId]
     if (!canvas) { setOffset({ x: 0, y: 0 }); setScale(1); return }
     const elements = [
-      ...(canvas.cards || []).map(c => ({ x: c.x, y: c.y, w: CARD_W, h: CARD_H_HALF * 2 })),
+      ...(canvas.cards || []).map(c => ({ x: c.x, y: c.y, w: c.isImage ? (c.width || 200) : CARD_W, h: c.isImage ? (c.height || 200) : CARD_H_HALF * 2 })),
       ...(canvas.groups || []).map(g => ({ x: g.x, y: g.y, w: g.width, h: g.height })),
       ...(canvas.labels || []).map(l => ({ x: l.x, y: l.y, w: 100, h: 30 })),
     ]
@@ -507,9 +528,11 @@ function AppInner({ userId }) {
     const cId = currentIdRef.current
     const canvas = dbRef.current[cId]
     if (!canvas) return
-    const removedConnIds = canvas.connections
-      .filter(c => ids.has(c.from) || ids.has(c.to))
-      .map(c => c.id)
+    const deletedCards = canvas.cards.filter(c => ids.has(c.id))
+    const deletedConns = canvas.connections.filter(c => ids.has(c.from) || ids.has(c.to))
+    const deletedGroups = (canvas.groups || []).filter(g => ids.has(g.id))
+    const deletedLabels = (canvas.labels || []).filter(l => ids.has(l.id))
+    const removedConnIds = deletedConns.map(c => c.id)
     setDb(prev => {
       const cv = prev[cId]
       if (!cv) return prev
@@ -527,7 +550,22 @@ function AppInner({ userId }) {
     if (removedConnIds.length > 0) {
       deleteConnectionsByIds(removedConnIds).catch(err => console.error('deleteConnectionsByIds error:', err))
     }
+    deletedCards.filter(c => c.isImage && c.url).forEach(c => deleteImageDB(getStoragePath(c.url)).catch(console.error))
     setMultiSelected([])
+    if (deletedCards.length > 0 || deletedGroups.length > 0 || deletedLabels.length > 0 || deletedConns.length > 0) {
+      pushCommand({
+        undo: () => setDb(prev => {
+          const cv = prev[cId]
+          if (!cv) return prev
+          return { ...prev, [cId]: { ...cv, cards: [...cv.cards, ...deletedCards], connections: [...cv.connections, ...deletedConns], groups: [...(cv.groups || []), ...deletedGroups], labels: [...(cv.labels || []), ...deletedLabels] } }
+        }),
+        redo: () => setDb(prev => {
+          const cv = prev[cId]
+          if (!cv) return prev
+          return { ...prev, [cId]: { ...cv, cards: cv.cards.filter(c => !ids.has(c.id)), connections: cv.connections.filter(c => !ids.has(c.from) && !ids.has(c.to)), groups: (cv.groups || []).filter(g => !ids.has(g.id)), labels: (cv.labels || []).filter(l => !ids.has(l.id)) } }
+        }),
+      })
+    }
   }
 
   // ── connection delete (keyboard) ──────────────────────────────────────────
@@ -540,23 +578,55 @@ function AppInner({ userId }) {
           return
         }
         if (selectedGroup) {
+          const cId = currentIdRef.current
+          const canvas = dbRef.current[cId]
+          const deletedGroup = (canvas?.groups || []).find(g => g.id === selectedGroup)
           setDb(prev => {
-            const cId = currentIdRef.current
-            const canvas = prev[cId]
-            if (!canvas) return prev
-            return { ...prev, [cId]: { ...canvas, groups: (canvas.groups || []).filter(g => g.id !== selectedGroup) } }
+            const cv = prev[cId]
+            if (!cv) return prev
+            return { ...prev, [cId]: { ...cv, groups: (cv.groups || []).filter(g => g.id !== selectedGroup) } }
           })
           setSelectedGroup(null)
+          if (deletedGroup) {
+            pushCommand({
+              undo: () => setDb(prev => {
+                const cv = prev[cId]
+                if (!cv) return prev
+                return { ...prev, [cId]: { ...cv, groups: [...(cv.groups || []), deletedGroup] } }
+              }),
+              redo: () => setDb(prev => {
+                const cv = prev[cId]
+                if (!cv) return prev
+                return { ...prev, [cId]: { ...cv, groups: (cv.groups || []).filter(g => g.id !== deletedGroup.id) } }
+              }),
+            })
+          }
           return
         }
         if (selectedConn) {
+          const cId = currentIdRef.current
+          const canvas = dbRef.current[cId]
+          const deletedConn = canvas?.connections.find(c => c.id === selectedConn)
           setDb(prev => {
-            const cId = currentIdRef.current
-            const canvas = prev[cId]
-            if (!canvas) return prev
-            return { ...prev, [cId]: { ...canvas, connections: canvas.connections.filter(c => c.id !== selectedConn) } }
+            const cv = prev[cId]
+            if (!cv) return prev
+            return { ...prev, [cId]: { ...cv, connections: cv.connections.filter(c => c.id !== selectedConn) } }
           })
           setSelectedConn(null)
+          if (deletedConn) {
+            pushCommand({
+              undo: () => setDb(prev => {
+                const cv = prev[cId]
+                if (!cv) return prev
+                return { ...prev, [cId]: { ...cv, connections: [...cv.connections, deletedConn] } }
+              }),
+              redo: () => setDb(prev => {
+                const cv = prev[cId]
+                if (!cv) return prev
+                return { ...prev, [cId]: { ...cv, connections: cv.connections.filter(c => c.id !== deletedConn.id) } }
+              }),
+            })
+          }
         }
       }
     }
@@ -623,6 +693,19 @@ function AppInner({ userId }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [view, stack, boards, selectMode, autoCreate, multiSelected, handleSidebarNavigate]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── undo / redo keyboard shortcut ────────────────────────────────────────
+  useEffect(() => {
+    function onKey(e) {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        e.preventDefault()
+        if (e.shiftKey) redo(); else undo()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [undo, redo])
+
   // ── sidebar collapse toggle ───────────────────────────────────────────────
   function toggleCollapse(id) {
     setCollapsedIds(prev => {
@@ -678,12 +761,27 @@ function AppInner({ userId }) {
 
   // ── connection label ──────────────────────────────────────────────────────
   function saveConnLabel(connId, label) {
+    const cId = currentIdRef.current
+    const oldLabel = dbRef.current[cId]?.connections.find(c => c.id === connId)?.label ?? ''
     setDb(prev => {
-      const cId = currentIdRef.current
       const canvas = prev[cId]
       if (!canvas) return prev
       return { ...prev, [cId]: { ...canvas, connections: canvas.connections.map(c => c.id === connId ? { ...c, label } : c) } }
     })
+    if (oldLabel !== label) {
+      pushCommand({
+        undo: () => setDb(prev => {
+          const cv = prev[cId]
+          if (!cv) return prev
+          return { ...prev, [cId]: { ...cv, connections: cv.connections.map(c => c.id === connId ? { ...c, label: oldLabel } : c) } }
+        }),
+        redo: () => setDb(prev => {
+          const cv = prev[cId]
+          if (!cv) return prev
+          return { ...prev, [cId]: { ...cv, connections: cv.connections.map(c => c.id === connId ? { ...c, label } : c) } }
+        }),
+      })
+    }
   }
 
   // ── note panel ────────────────────────────────────────────────────────────
@@ -853,12 +951,14 @@ function AppInner({ userId }) {
                 }
               }}
             >+ Nuova lavagna</button>
-            <button
-              style={{ width: '100%', textAlign: 'left', padding: '10px 12px', fontSize: 13, border: 'none', background: 'none', cursor: 'pointer', color: '#555', display: 'flex', alignItems: 'center', gap: 6 }}
-              onMouseEnter={e => { e.currentTarget.style.background = '#f5f5f5' }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
-              onClick={() => supabase.auth.signOut()}
-            ><LogOut size={14} /> Esci</button>
+            <div style={{ padding: '10px 12px 12px', borderTop: '1px solid #eee', marginTop: 4 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#222', lineHeight: 1.4 }}>Olaboard</div>
+              <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>
+                Made by{' '}
+                <a href="https://olab.quest" target="_blank" rel="noopener noreferrer" style={{ color: '#378ADD', textDecoration: 'none' }}>olab.quest</a>
+              </div>
+              <div style={{ fontSize: 10, color: '#bbb', marginTop: 2 }}>v0.5.0</div>
+            </div>
           </div>
         </div>
       )}
@@ -924,7 +1024,59 @@ function AppInner({ userId }) {
           </>)(theme === 'high-contrast' ? '#7b2fff' : 'var(--accent)')}
 
           <button disabled={view !== 'canvas'} style={{ ...smallBtn, ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }} onClick={view === 'canvas' ? exportMd : undefined}>↓ MD</button>
+
+          {/* Account button */}
+          <button
+            style={{ ...iconBtn, position: 'relative' }}
+            title="Account"
+            onClick={async () => {
+              setShowAccount(v => {
+                if (!v) getUserStorageUsed(userId).then(setStorageUsed).catch(() => {})
+                return !v
+              })
+            }}
+          ><User size={16} /></button>
         </div>
+
+        {/* Account panel */}
+        {showAccount && (
+          <div
+            onMouseDown={e => e.stopPropagation()}
+            style={{
+              position: 'fixed', top: 52, right: 12, zIndex: 9999,
+              width: 260, background: 'var(--bg-panel)', border: '1px solid var(--border)',
+              borderRadius: 10, boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+              padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12,
+              fontFamily: 'system-ui, sans-serif',
+            }}
+          >
+            {/* Close on outside click */}
+            <div
+              style={{ position: 'fixed', inset: 0, zIndex: -1 }}
+              onClick={() => setShowAccount(false)}
+            />
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: 0.5, textTransform: 'uppercase' }}>Account</div>
+            <div style={{ fontSize: 13, color: 'var(--text)', wordBreak: 'break-all' }}>{userEmail}</div>
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>
+                <span>Storage</span>
+                <span>{storageUsed !== null ? `${(storageUsed / 1024 / 1024).toFixed(1)} MB / 100 MB` : '…'}</span>
+              </div>
+              <div style={{ height: 6, borderRadius: 3, background: 'var(--border)', overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%', borderRadius: 3,
+                  background: storageUsed > 90 * 1024 * 1024 ? '#e53935' : 'var(--accent)',
+                  width: storageUsed !== null ? `${Math.min(100, (storageUsed / (100 * 1024 * 1024)) * 100).toFixed(1)}%` : '0%',
+                  transition: 'width 0.4s ease',
+                }} />
+              </div>
+            </div>
+            <button
+              onClick={() => supabase.auth.signOut()}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 0', fontSize: 13, border: 'none', background: 'none', cursor: 'pointer', color: '#e53935', fontFamily: 'inherit' }}
+            ><LogOut size={13} /> Esci</button>
+          </div>
+        )}
 
         {/* ── Content ─────────────────────────────────────────────���────────── */}
         <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
@@ -935,6 +1087,37 @@ function AppInner({ userId }) {
               style={{ flex: 1, position: 'relative', overflow: 'hidden', cursor: boardCursor, userSelect: 'none', backgroundColor: 'var(--bg)', backgroundImage: showGrid ? 'radial-gradient(circle, var(--grid-dot) 1px, transparent 1px)' : 'none', backgroundSize: `${20 * scale}px ${20 * scale}px`, backgroundPosition: `${offset.x % (20 * scale)}px ${offset.y % (20 * scale)}px` }}
               onMouseDown={e => { setSelectedConn(null); setSelectedGroup(null); onBoardMouseDown(e) }}
               onDoubleClick={onBoardDblClick}
+              onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy' }}
+              onDrop={async e => {
+                e.preventDefault()
+                const file = [...e.dataTransfer.files].find(f => f.type.startsWith('image/'))
+                if (!file) return
+                const r = boardRef.current.getBoundingClientRect()
+                const wx = (e.clientX - r.left - offset.x) / scale
+                const wy = (e.clientY - r.top - offset.y) / scale
+                try {
+                  const { url } = await handleUploadImage(file)
+                  const dims = await new Promise(resolve => {
+                    const img = new Image()
+                    img.onload = () => { const maxW = 400; const ratio = Math.min(1, maxW / img.naturalWidth); resolve({ w: Math.round(img.naturalWidth * ratio), h: Math.round(img.naturalHeight * ratio) }) }
+                    img.onerror = () => resolve({ w: 300, h: 200 })
+                    img.src = url
+                  })
+                  const newCard = { id: uid(), isImage: true, url, width: dims.w, height: dims.h, x: Math.round(wx - dims.w / 2), y: Math.round(wy - dims.h / 2), title: '', body: '', isFolder: false, isLabel: false, color: 'yellow' }
+                  const cId = currentIdRef.current
+                  setDb(prev => {
+                    const cv = prev[cId]
+                    if (!cv) return prev
+                    return { ...prev, [cId]: { ...cv, cards: [...cv.cards, newCard] } }
+                  })
+                  pushCommand({
+                    undo: () => setDb(prev => { const cv = prev[cId]; if (!cv) return prev; return { ...prev, [cId]: { ...cv, cards: cv.cards.filter(c => c.id !== newCard.id) } } }),
+                    redo: () => setDb(prev => { const cv = prev[cId]; if (!cv) return prev; return { ...prev, [cId]: { ...cv, cards: [...cv.cards, newCard] } } }),
+                  })
+                } catch (err) {
+                  alert(err.message)
+                }
+              }}
             >
               {/* SVG overlay – arrows in screen-space */}
               <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
@@ -960,15 +1143,19 @@ function AppInner({ userId }) {
                   const toRes   = resolveEntity(conn.to)
                   if (!fromRes || !toRes) return null
                   const fe = fromRes.entity, te = toRes.entity
-                  const fCX = fromRes.isLabel ? fe.x + 50 : fe.x + CARD_W / 2
-                  const fCY = fromRes.isLabel ? fe.y + 15 : fe.y + CARD_H_HALF
-                  const tCX = toRes.isLabel   ? te.x + 50 : te.x + CARD_W / 2
-                  const tCY = toRes.isLabel   ? te.y + 15 : te.y + CARD_H_HALF
+                  const feW = fromRes.isLabel ? 100 : (fe.isImage ? (fe.width || 200) : CARD_W)
+                  const feH = fromRes.isLabel ? 30  : (fe.isImage ? (fe.height || 200) : CARD_H_HALF * 2)
+                  const teW = toRes.isLabel   ? 100 : (te.isImage ? (te.width || 200) : CARD_W)
+                  const teH = toRes.isLabel   ? 30  : (te.isImage ? (te.height || 200) : CARD_H_HALF * 2)
+                  const fCX = fe.x + feW / 2
+                  const fCY = fe.y + feH / 2
+                  const tCX = te.x + teW / 2
+                  const tCY = te.y + teH / 2
                   const wdx = tCX - fCX, wdy = tCY - fCY
                   const horiz = Math.abs(wdx) > Math.abs(wdy)
-                  function exitPoint(entity, isLbl, goingRight, goingDown, isHoriz, isSource) {
-                    const w = isLbl ? 112 : CARD_W
-                    const h = isLbl ? 40 : CARD_H_HALF * 2
+                  function exitPoint(entity, isLbl, goingRight, goingDown, isHoriz, isSource, ew, eh) {
+                    const w = ew
+                    const h = eh
                     const P = isSource ? 0 : (isLbl ? 20 : 36)
                     const cx = entity.x + w / 2
                     const cy = entity.y + h / 2
@@ -980,8 +1167,8 @@ function AppInner({ userId }) {
                       else          return goingDown ? [cx, entity.y - P]     : [cx, entity.y + h + P]
                     }
                   }
-                  const [fpx, fpy] = exitPoint(fe, fromRes.isLabel, wdx > 0, wdy > 0, horiz, true)
-                  const [tpx, tpy] = exitPoint(te, toRes.isLabel,   wdx > 0, wdy > 0, horiz, false)
+                  const [fpx, fpy] = exitPoint(fe, fromRes.isLabel, wdx > 0, wdy > 0, horiz, true,  feW, feH)
+                  const [tpx, tpy] = exitPoint(te, toRes.isLabel,   wdx > 0, wdy > 0, horiz, false, teW, teH)
                   const [sx1, sy1] = w2s(fpx, fpy)
                   const [sx2, sy2] = w2s(tpx, tpy)
                   const dist = Math.sqrt((sx2 - sx1) ** 2 + (sy2 - sy1) ** 2)
@@ -1060,18 +1247,50 @@ function AppInner({ userId }) {
                     group={group}
                     onTitleBarMouseDown={e => onGroupTitleBarMouseDown(e, group)}
                     onResizeHandleMouseDown={(e, handle) => onGroupResizeHandleMouseDown(e, group, handle)}
-                    onDelete={() => setDb(prev => {
+                    onDelete={() => {
                       const cId = currentId
-                      const canvas = prev[cId]
-                      if (!canvas) return prev
-                      return { ...prev, [cId]: { ...canvas, groups: (canvas.groups||[]).filter(g => g.id !== group.id) } }
-                    })}
-                    onTitleChange={title => setDb(prev => {
+                      const deletedGroup = group
+                      setDb(prev => {
+                        const canvas = prev[cId]
+                        if (!canvas) return prev
+                        return { ...prev, [cId]: { ...canvas, groups: (canvas.groups||[]).filter(g => g.id !== group.id) } }
+                      })
+                      pushCommand({
+                        undo: () => setDb(prev => {
+                          const cv = prev[cId]
+                          if (!cv) return prev
+                          return { ...prev, [cId]: { ...cv, groups: [...(cv.groups || []), deletedGroup] } }
+                        }),
+                        redo: () => setDb(prev => {
+                          const cv = prev[cId]
+                          if (!cv) return prev
+                          return { ...prev, [cId]: { ...cv, groups: (cv.groups || []).filter(g => g.id !== deletedGroup.id) } }
+                        }),
+                      })
+                    }}
+                    onTitleChange={title => {
                       const cId = currentId
-                      const canvas = prev[cId]
-                      if (!canvas) return prev
-                      return { ...prev, [cId]: { ...canvas, groups: (canvas.groups||[]).map(g => g.id === group.id ? { ...g, title } : g) } }
-                    })}
+                      const oldTitle = group.title
+                      setDb(prev => {
+                        const canvas = prev[cId]
+                        if (!canvas) return prev
+                        return { ...prev, [cId]: { ...canvas, groups: (canvas.groups||[]).map(g => g.id === group.id ? { ...g, title } : g) } }
+                      })
+                      if (oldTitle !== title) {
+                        pushCommand({
+                          undo: () => setDb(prev => {
+                            const cv = prev[cId]
+                            if (!cv) return prev
+                            return { ...prev, [cId]: { ...cv, groups: (cv.groups||[]).map(g => g.id === group.id ? { ...g, title: oldTitle } : g) } }
+                          }),
+                          redo: () => setDb(prev => {
+                            const cv = prev[cId]
+                            if (!cv) return prev
+                            return { ...prev, [cId]: { ...cv, groups: (cv.groups||[]).map(g => g.id === group.id ? { ...g, title } : g) } }
+                          }),
+                        })
+                      }
+                    }}
                     initialEditing={editingGroupId === group.id}
                     isSelected={selectedGroup === group.id}
                     onSelect={() => { setSelectedGroup(group.id); setSelectedConn(null) }}
@@ -1099,12 +1318,31 @@ function AppInner({ userId }) {
                     onMouseDown={e => onLabelMouseDown(e, label)}
                     onStartEdit={() => setEditingLabelId(label.id)}
                     onEndEdit={() => setEditingLabelId(null)}
-                    onTextChange={text => setDb(prev => {
-                      const cId = currentId
-                      const canvas = prev[cId]
-                      if (!canvas) return prev
-                      return { ...prev, [cId]: { ...canvas, labels: (canvas.labels||[]).map(l => l.id === label.id ? { ...l, text } : l) } }
-                    })}
+                    onTextChange={text => {
+                      const oldText = label.text
+                      setDb(prev => {
+                        const cId = currentId
+                        const canvas = prev[cId]
+                        if (!canvas) return prev
+                        return { ...prev, [cId]: { ...canvas, labels: (canvas.labels||[]).map(l => l.id === label.id ? { ...l, text } : l) } }
+                      })
+                      if (oldText !== text) {
+                        const cId = currentId
+                        const labelId = label.id
+                        pushCommand({
+                          undo: () => setDb(prev => {
+                            const cv = prev[cId]
+                            if (!cv) return prev
+                            return { ...prev, [cId]: { ...cv, labels: (cv.labels||[]).map(l => l.id === labelId ? { ...l, text: oldText } : l) } }
+                          }),
+                          redo: () => setDb(prev => {
+                            const cv = prev[cId]
+                            if (!cv) return prev
+                            return { ...prev, [cId]: { ...cv, labels: (cv.labels||[]).map(l => l.id === labelId ? { ...l, text } : l) } }
+                          }),
+                        })
+                      }
+                    }}
                     onDelete={() => setDb(prev => {
                       const cId = currentId
                       const canvas = prev[cId]
@@ -1117,6 +1355,27 @@ function AppInner({ userId }) {
 
                 {/* Cards – on top */}
                 {cards.map(card => {
+                  if (card.isImage) {
+                    return (
+                      <ImageCard
+                        key={card.id}
+                        card={card}
+                        selected={selected === card.id || multiSelected.includes(card.id)}
+                        onMouseDown={e => onCardMouseDown(e, card)}
+                        onDelete={() => {
+                          if (card.url) deleteImageDB(getStoragePath(card.url)).catch(console.error)
+                          const cId = currentIdRef.current
+                          setDb(prev => {
+                            const cv = prev[cId]
+                            if (!cv) return prev
+                            return { ...prev, [cId]: { ...cv, cards: cv.cards.filter(c => c.id !== card.id), connections: cv.connections.filter(c => c.from !== card.id && c.to !== card.id) } }
+                          })
+                        }}
+                        onResizeMouseDown={e => onImageResizeMouseDown(e, card)}
+                        onConnectDot={(e, anchor) => onConnectDotMouseDown(e, card, anchor)}
+                      />
+                    )
+                  }
                   if (card.isLabel) {
                     const labelObj = { id: card.id, x: card.x, y: card.y, text: card.title || '', fontSize: 16 }
                     return (
@@ -1128,7 +1387,16 @@ function AppInner({ userId }) {
                         onMouseDown={e => onLabelMouseDown(e, labelObj, true)}
                         onStartEdit={() => setEditingLabelId(card.id)}
                         onEndEdit={() => setEditingLabelId(null)}
-                        onTextChange={text => updateCardFn(card.id, { title: text })}
+                        onTextChange={text => {
+                          const oldTitle = card.title
+                          updateCardFn(card.id, { title: text })
+                          if (oldTitle !== text) {
+                            pushCommand({
+                              undo: () => updateCardFn(card.id, { title: oldTitle }),
+                              redo: () => updateCardFn(card.id, { title: text }),
+                            })
+                          }
+                        }}
                         onDelete={() => setDb(prev => {
                           const cId = currentId
                           const canvas = prev[cId]
@@ -1136,8 +1404,20 @@ function AppInner({ userId }) {
                           return { ...prev, [cId]: { ...canvas, cards: canvas.cards.filter(c => c.id !== card.id) } }
                         })}
                         onConnectDot={(e, anchor) => onConnectDotMouseDown(e, labelObj, anchor)}
-                        onConvertToPostIt={() => updateCardFn(card.id, { isLabel: false })}
-                        onConvertToFolder={() => updateCardFn(card.id, { isLabel: false, isFolder: true })}
+                        onConvertToPostIt={() => {
+                          updateCardFn(card.id, { isLabel: false })
+                          pushCommand({
+                            undo: () => updateCardFn(card.id, { isLabel: true }),
+                            redo: () => updateCardFn(card.id, { isLabel: false }),
+                          })
+                        }}
+                        onConvertToFolder={() => {
+                          updateCardFn(card.id, { isLabel: false, isFolder: true })
+                          pushCommand({
+                            undo: () => updateCardFn(card.id, { isLabel: true, isFolder: false }),
+                            redo: () => updateCardFn(card.id, { isLabel: false, isFolder: true }),
+                          })
+                        }}
                       />
                     )
                   }
@@ -1149,7 +1429,16 @@ function AppInner({ userId }) {
                       onMouseDown={e => onCardMouseDown(e, card)}
                       onClick={e => { if (activeNoteId && !card.isFolder) { e.stopPropagation(); openNote(card) } }}
                       onDblClick={e => { e.stopPropagation(); if (card.isFolder) enterCanvas(card.id, card.title); else openNote(card) }}
-                      onRename={title => updateCardFn(card.id, { title })}
+                      onRename={title => {
+                        const oldTitle = card.title
+                        updateCardFn(card.id, { title })
+                        if (oldTitle !== title) {
+                          pushCommand({
+                            undo: () => updateCardFn(card.id, { title: oldTitle }),
+                            redo: () => updateCardFn(card.id, { title }),
+                          })
+                        }
+                      }}
                       onNoteOpen={() => openNote(card)}
                       onToggleFolder={() => {
                         const becomingFolder = !card.isFolder
@@ -1160,8 +1449,18 @@ function AppInner({ userId }) {
                             [card.id]: { id: card.id, name: card.title, cards: [], connections: [], groups: [], labels: [] },
                           })
                         }
+                        pushCommand({
+                          undo: () => updateCardFn(card.id, { isFolder: !becomingFolder }),
+                          redo: () => updateCardFn(card.id, { isFolder: becomingFolder }),
+                        })
                       }}
-                      onConvertToLabel={() => updateCardFn(card.id, { isLabel: true })}
+                      onConvertToLabel={() => {
+                        updateCardFn(card.id, { isLabel: true })
+                        pushCommand({
+                          undo: () => updateCardFn(card.id, { isLabel: false }),
+                          redo: () => updateCardFn(card.id, { isLabel: true }),
+                        })
+                      }}
                       onConnectDot={(e, anchor) => onConnectDotMouseDown(e, card, anchor)}
                       initialEditing={editingCardId === card.id}
                       onEditStarted={() => setEditingCardId(null)}
@@ -1175,6 +1474,7 @@ function AppInner({ userId }) {
               {multiSelected.length > 0 && (
                 <div
                   onMouseDown={e => e.stopPropagation()}
+                  onWheel={e => e.nativeEvent.stopPropagation()}
                   style={{
                   position: 'absolute', top: 16, right: 16, zIndex: 200,
                   width: 220, background: 'var(--bg-panel)', border: '1px solid var(--border)',
@@ -1229,6 +1529,50 @@ function AppInner({ userId }) {
                     boxShadow: '0 1px 0 var(--border)',
                   }}>{k}</kbd>
                 ))}
+              </div>
+
+              {/* Undo / Redo overlay */}
+              <div
+                onMouseDown={e => e.stopPropagation()}
+                onDoubleClick={e => e.stopPropagation()}
+                onWheel={e => e.nativeEvent.stopPropagation()}
+                style={{
+                  position: 'absolute', bottom: 58, left: 16, zIndex: 100,
+                  display: 'flex', gap: 4, pointerEvents: 'all',
+                }}
+              >
+                <button
+                  disabled={!canUndo}
+                  onClick={canUndo ? undo : undefined}
+                  title="Annulla (Ctrl+Z)"
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: 30, height: 30, borderRadius: 8,
+                    border: '1px solid var(--border)',
+                    background: theme === 'light' ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.6)',
+                    backdropFilter: 'blur(4px)',
+                    color: canUndo ? 'var(--text)' : 'var(--text-muted)',
+                    cursor: canUndo ? 'pointer' : 'default',
+                    opacity: canUndo ? 1 : 0.4,
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                  }}
+                ><Undo2 size={14} /></button>
+                <button
+                  disabled={!canRedo}
+                  onClick={canRedo ? redo : undefined}
+                  title="Ripeti (Ctrl+Shift+Z)"
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: 30, height: 30, borderRadius: 8,
+                    border: '1px solid var(--border)',
+                    background: theme === 'light' ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.6)',
+                    backdropFilter: 'blur(4px)',
+                    color: canRedo ? 'var(--text)' : 'var(--text-muted)',
+                    cursor: canRedo ? 'pointer' : 'default',
+                    opacity: canRedo ? 1 : 0.4,
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                  }}
+                ><Redo2 size={14} /></button>
               </div>
 
               {/* Breadcrumb overlay */}
@@ -1318,6 +1662,7 @@ function AppInner({ userId }) {
             <NotePanel
               mode={notePanelMode}
               noteForm={noteForm}
+              uploadImage={handleUploadImage}
               onChangeForm={setNoteForm}
               onSave={saveNote}
               onClose={() => setActiveNoteId(null)}
@@ -1353,7 +1698,7 @@ const HC_NOTE_COLOR_MAP = {
   white: '#000099', red: '#ff0000',
 }
 
-function NotePanel({ mode, noteForm, onChangeForm, onSave, onClose, onToggleMode, activeCard, onColorChange, theme }) {
+function NotePanel({ mode, noteForm, onChangeForm, onSave, onClose, onToggleMode, activeCard, onColorChange, theme, uploadImage }) {
   const isFull = mode === 'full'
   const [titleFocused, setTitleFocused] = useState(false)
 
@@ -1405,7 +1750,7 @@ function NotePanel({ mode, noteForm, onChangeForm, onSave, onClose, onToggleMode
               </div>
             </div>
           )}
-          <BlockEditor value={noteForm.body} onChange={body => onChangeForm(f => ({ ...f, body }))} />
+          <BlockEditor value={noteForm.body} onChange={body => onChangeForm(f => ({ ...f, body }))} uploadImage={uploadImage} />
         </div>
       </div>
       <button onClick={onSave} style={{ height: 44, width: '100%', background: '#111', color: '#fff', border: 'none', borderRadius: 0, cursor: 'pointer', fontSize: 13, fontWeight: 600, flexShrink: 0 }}>Salva</button>

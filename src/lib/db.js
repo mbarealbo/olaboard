@@ -163,9 +163,48 @@ export async function upsertCards(cards, canvasId) {
     is_folder: c.isFolder || false,
     is_label: c.isLabel || false,
     color: c.color || 'yellow',
+    url: c.url || null,
+    width: c.width || null,
+    height: c.height || null,
   }))
   const { error } = await supabase.from('cards').upsert(rows, { onConflict: 'id' })
   if (error) throw error
+}
+
+// ── STORAGE ───────────────────────────────────────────────────────────────────
+
+const STORAGE_BUCKET = 'images'
+const STORAGE_LIMIT = 100 * 1024 * 1024 // 100 MB
+
+export async function getUserStorageUsed(userId) {
+  const { data, error } = await supabase.storage
+    .from(STORAGE_BUCKET)
+    .list(userId, { limit: 1000 })
+  if (error || !data) return 0
+  return data.reduce((sum, file) => sum + (file.metadata?.size || 0), 0)
+}
+
+export async function uploadImage(file, userId) {
+  const used = await getUserStorageUsed(userId)
+  if (used + file.size > STORAGE_LIMIT) {
+    const usedMB = Math.round(used / 1024 / 1024)
+    throw new Error(`Limite storage superato (100 MB). In uso: ${usedMB} MB`)
+  }
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
+  const path = `${userId}/${crypto.randomUUID()}.${ext}`
+  const { error } = await supabase.storage.from(STORAGE_BUCKET).upload(path, file, {
+    contentType: file.type,
+    upsert: false,
+  })
+  if (error) throw error
+  const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path)
+  return { url: data.publicUrl, path }
+}
+
+export async function deleteImage(path) {
+  if (!path) return
+  const { error } = await supabase.storage.from(STORAGE_BUCKET).remove([path])
+  if (error) console.error('deleteImage error:', error)
 }
 
 export async function deleteCardsByIds(ids) {

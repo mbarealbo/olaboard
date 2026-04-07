@@ -42,11 +42,13 @@ export function buildPath(db, targetId) {
 }
 
 export function anchorPoint(card, anchor) {
+  const w = card.isImage ? (card.width || 200) : CARD_W
+  const h = card.isImage ? (card.height || 200) : CARD_H_HALF * 2
   switch (anchor) {
-    case 'top':    return [card.x + CARD_W / 2, card.y]
-    case 'bottom': return [card.x + CARD_W / 2, card.y + CARD_H_HALF * 2]
-    case 'left':   return [card.x,              card.y + CARD_H_HALF]
+    case 'top':    return [card.x + w / 2, card.y]
+    case 'bottom': return [card.x + w / 2, card.y + h]
+    case 'left':   return [card.x,         card.y + h / 2]
     case 'right':
-    default:       return [card.x + CARD_W,     card.y + CARD_H_HALF]
+    default:       return [card.x + w,     card.y + h / 2]
   }
 }
