@@ -141,12 +141,9 @@ body { font-family: system-ui, sans-serif; background: var(--bg); height: 100vh;
 }
 
 /* ── Block editor ───────────────────────────────────────────────────────────── */
-.block-editor-block:empty::before {
-  content: attr(data-placeholder);
-  color: #bbb;
-  pointer-events: none;
-}
 .block-editor-block:focus:empty::before {
+  content: attr(data-placeholder);
   color: #ccc;
+  pointer-events: none;
 }
 

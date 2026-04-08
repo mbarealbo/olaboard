@@ -166,6 +166,7 @@ export async function upsertCards(cards, canvasId) {
     url: c.url || null,
     width: c.width || null,
     height: c.height || null,
+    updated_at: c.updatedAt || new Date().toISOString(),
   }))
   const { error } = await supabase.from('cards').upsert(rows, { onConflict: 'id' })
   if (error) throw error

@@ -32,7 +32,11 @@ create table if not exists cards (
   is_folder boolean not null default false,
   is_label boolean not null default false,
   color text not null default 'yellow',
-  created_at timestamptz default now()
+  url text,
+  width float,
+  height float,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
 );
 
 -- CONNECTIONS

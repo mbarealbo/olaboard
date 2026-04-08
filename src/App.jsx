@@ -188,7 +188,7 @@ function AppInner({ userId, userEmail }) {
 
   // ── map Supabase rows → app shape ─────────────────────────────────────────
   function mapCard(row) {
-    return { id: row.id, title: row.title || '', body: row.body || '', x: row.x, y: row.y, isFolder: row.is_folder || false, isLabel: row.is_label || false, color: row.color || 'yellow', createdAt: row.created_at, url: row.url || null, width: row.width || null, height: row.height || null, isImage: !!(row.url) }
+    return { id: row.id, title: row.title || '', body: row.body || '', x: row.x, y: row.y, isFolder: row.is_folder || false, isLabel: row.is_label || false, color: row.color || 'yellow', createdAt: row.created_at, updatedAt: row.updated_at || row.created_at, url: row.url || null, width: row.width || null, height: row.height || null, isImage: !!(row.url) }
   }
 
   // ── image upload helpers ───────────────────────────────────────────────────
@@ -341,7 +341,8 @@ function AppInner({ userId, userEmail }) {
       const cId = currentIdRef.current
       const canvas = prev[cId]
       if (!canvas) return prev
-      const next = { ...prev, [cId]: { ...canvas, cards: canvas.cards.map(c => c.id === cardId ? { ...c, ...updates } : c) } }
+      const now = new Date().toISOString()
+      const next = { ...prev, [cId]: { ...canvas, cards: canvas.cards.map(c => c.id === cardId ? { ...c, ...updates, updatedAt: now } : c) } }
       // If renaming a folder card, also update the canvas entry name
       if (updates.title && prev[cardId]) {
         next[cardId] = { ...prev[cardId], name: updates.title }
@@ -572,6 +573,9 @@ function AppInner({ userId, userEmail }) {
   useEffect(() => {
     function onKey(e) {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return
+      if (e.key === 'Enter') {
+        if (selected) { setActiveNoteId(selected); return }
+      }
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (multiSelected.length > 0) {
           deleteMultiSelected()
@@ -632,7 +636,7 @@ function AppInner({ userId, userEmail }) {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selectedConn, selectedGroup, multiSelected]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selected, selectedConn, selectedGroup, multiSelected]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── tool + navigation keyboard shortcuts ─────────────────────────────────
   useEffect(() => {
@@ -1664,7 +1668,8 @@ function AppInner({ userId, userEmail }) {
               noteForm={noteForm}
               uploadImage={handleUploadImage}
               onChangeForm={setNoteForm}
-              onSave={saveNote}
+              onTitleChange={title => { setNoteForm(f => ({ ...f, title })); updateCardFn(activeNoteId, { title }) }}
+              onBodyChange={body => { setNoteForm(f => ({ ...f, body })); updateCardFn(activeNoteId, { body }) }}
               onClose={() => setActiveNoteId(null)}
               activeCard={cards.find(c => c.id === activeNoteId)}
               onColorChange={color => updateCardFn(activeNoteId, { color })}
@@ -1698,7 +1703,7 @@ const HC_NOTE_COLOR_MAP = {
   white: '#000099', red: '#ff0000',
 }
 
-function NotePanel({ mode, noteForm, onChangeForm, onSave, onClose, onToggleMode, activeCard, onColorChange, theme, uploadImage }) {
+function NotePanel({ mode, noteForm, onChangeForm, onTitleChange, onBodyChange, onClose, onToggleMode, activeCard, onColorChange, theme, uploadImage }) {
   const isFull = mode === 'full'
   const [titleFocused, setTitleFocused] = useState(false)
 
@@ -1718,12 +1723,31 @@ function NotePanel({ mode, noteForm, onChangeForm, onSave, onClose, onToggleMode
         <div style={isFull ? { maxWidth: 800, width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', flex: 1 } : { display: 'flex', flexDirection: 'column', flex: 1 }}>
           <input
             value={noteForm.title}
-            onChange={e => onChangeForm(f => ({ ...f, title: e.target.value }))}
+            onChange={e => onTitleChange(e.target.value)}
             placeholder="Titolo"
             onFocus={() => setTitleFocused(true)}
             onBlur={() => setTitleFocused(false)}
             style={{ width: '100%', border: 'none', outline: 'none', borderBottom: `2px solid ${titleFocused ? 'var(--accent)' : 'var(--border)'}`, padding: '12px 20px', fontSize: 16, fontWeight: 600, color: 'var(--text)', fontFamily: 'inherit', background: 'transparent' }}
           />
+          {activeCard && (activeCard.createdAt || activeCard.updatedAt) && (
+            <div style={{ padding: '6px 20px 10px', display: 'flex', flexDirection: 'column', gap: 4, borderBottom: '1px solid var(--border)' }}>
+              {activeCard.createdAt && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1 }}>✦</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Creata il {new Date(activeCard.createdAt).toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
+                </div>
+              )}
+              {activeCard.updatedAt && activeCard.updatedAt !== activeCard.createdAt && (
+                <>
+                  <div style={{ height: 1, background: 'var(--border)', margin: '2px 0' }} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                    <span style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1 }}>✎</span>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Modificata il {new Date(activeCard.updatedAt).toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
           {activeCard && !activeCard.isFolder && onColorChange && (
             <div style={{ padding: '8px 20px', borderBottom: '1px solid var(--border)' }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 }}>Colore</div>
@@ -1750,10 +1774,9 @@ function NotePanel({ mode, noteForm, onChangeForm, onSave, onClose, onToggleMode
               </div>
             </div>
           )}
-          <BlockEditor value={noteForm.body} onChange={body => onChangeForm(f => ({ ...f, body }))} uploadImage={uploadImage} />
+          <BlockEditor value={noteForm.body} onChange={onBodyChange} uploadImage={uploadImage} />
         </div>
       </div>
-      <button onClick={onSave} style={{ height: 44, width: '100%', background: '#111', color: '#fff', border: 'none', borderRadius: 0, cursor: 'pointer', fontSize: 13, fontWeight: 600, flexShrink: 0 }}>Salva</button>
     </div>
   )
 }

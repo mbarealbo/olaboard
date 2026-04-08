@@ -281,7 +281,7 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
           const newId = uid()
           const newCard = isText
             ? { id: newId, isLabel: true, title: 'Testo libero', x: wx - 56, y: wy - 20 }
-            : { id: newId, isLabel: false, title: 'Nuova idea', x: wx - 65, y: wy - 37 }
+            : { id: newId, isLabel: false, title: nextCardTitle(), x: wx - 65, y: wy - 37 }
           const newConn = { id: uid(), from: fromId, to: newId, fromAnchor, toAnchor, label: '' }
           const cId = currentIdRef.current
           setDb(prev => {
@@ -764,8 +764,14 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
   }
 
   // ── card creation ─────────────────────────────────────────────────────────
+  function nextCardTitle() {
+    const n = (parseInt(localStorage.getItem('olaboard_card_counter') || '0', 10) || 0) + 1
+    localStorage.setItem('olaboard_card_counter', String(n))
+    return `Nuova idea #${n}`
+  }
+
   function createCard(wx, wy) {
-    const card = { id: uid(), title: 'Nuova idea', body: '', x: wx, y: wy, isFolder: false }
+    const card = { id: uid(), title: nextCardTitle(), body: '', x: wx, y: wy, isFolder: false }
     const cId = currentIdRef.current
     setDb(prev => {
       const canvas = prev[cId]

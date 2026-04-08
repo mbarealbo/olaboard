@@ -240,7 +240,7 @@ function ImageBlock({ block, onUpdate, onUpload }) {
 }
 
 // ── BlockItem ─────────────────────────────────────────────────────────────────
-function BlockItem({ block, olIndex, onKeyDown, onInput, onBlur, registerRef, onUpdate, onUpload }) {
+function BlockItem({ block, olIndex, onKeyDown, onInput, onBlur, registerRef, onUpdate, onUpload, isOnlyBlock }) {
   const elRef = useRef(null)
   const [focused, setFocused] = useState(false)
 
@@ -296,7 +296,9 @@ function BlockItem({ block, olIndex, onKeyDown, onInput, onBlur, registerRef, on
           >
             {block.content
               ? parseTextWithLinks(block.content)
-              : <span style={{ color: '#bbb', pointerEvents: 'none' }}>{PLACEHOLDERS.p}</span>
+              : isOnlyBlock
+                ? <span style={{ color: '#bbb', pointerEvents: 'none' }}>{PLACEHOLDERS.p}</span>
+                : null
             }
           </p>
         )}
@@ -338,6 +340,7 @@ export default function BlockEditor({ value, onChange, uploadImage }) {
   const menuRef = useRef(null)
   const menuItemsRef = useRef([])    // always-current filtered menu items
   const prevValueRef = useRef(value)
+  const allSelectedRef = useRef(false) // tracks Cmd+A "select all" state
 
   useEffect(() => { blocksRef.current = blocks }, [blocks])
 
@@ -462,6 +465,28 @@ export default function BlockEditor({ value, onChange, uploadImage }) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       const content = getContent(block.id)
+
+      // List blocks: continue list or exit on empty item
+      if (block.type === 'ul' || block.type === 'ol') {
+        if (content === '') {
+          // Empty list item → exit list, convert to p
+          const updated = blocksRef.current.map(b => b.id === block.id ? { ...b, type: 'p', content: '' } : b)
+          emit(updated)
+          setBlocks(updated)
+          pendingFocus.current = { id: block.id, atEnd: false }
+        } else {
+          // Non-empty → add new item of the same list type
+          const newBlock = { id: uid(), type: block.type, content: '' }
+          const updated = blocksRef.current.map(b => b.id === block.id ? { ...b, content } : b)
+          const next = [...updated.slice(0, idx + 1), newBlock, ...updated.slice(idx + 1)]
+          emit(next)
+          setBlocks(next)
+          pendingFocus.current = { id: newBlock.id, atEnd: false }
+        }
+        setSlashMenu(null)
+        return
+      }
+
       const newBlock = { id: uid(), type: 'p', content: '' }
       const updated = blocksRef.current.map(b => b.id === block.id ? { ...b, content } : b)
       const next = [...updated.slice(0, idx + 1), newBlock, ...updated.slice(idx + 1)]
@@ -472,8 +497,33 @@ export default function BlockEditor({ value, onChange, uploadImage }) {
       return
     }
 
+    if (e.key === 'Backspace' || e.key === 'Delete') {
+      if (allSelectedRef.current) {
+        allSelectedRef.current = false
+        e.preventDefault()
+        const newBlock = { id: uid(), type: 'p', content: '' }
+        emit([newBlock])
+        setBlocks([newBlock])
+        pendingFocus.current = { id: newBlock.id, atEnd: false }
+        return
+      }
+    }
+
+    // Any key resets the all-selected flag
+    if (e.key !== 'Meta' && e.key !== 'Control') allSelectedRef.current = false
+
     if (e.key === 'Backspace') {
       const content = getContent(block.id)
+      // Empty list block → convert back to paragraph (regardless of how many blocks exist)
+      if (content === '' && (block.type === 'ul' || block.type === 'ol')) {
+        e.preventDefault()
+        const updated = blocksRef.current.map(b => b.id === block.id ? { ...b, type: 'p', content: '' } : b)
+        emit(updated)
+        setBlocks(updated)
+        pendingFocus.current = { id: block.id, atEnd: false }
+        setSlashMenu(null)
+        return
+      }
       if (content === '' && cur.length > 1) {
         e.preventDefault()
         const prevBlock = cur[idx - 1]
@@ -513,6 +563,22 @@ export default function BlockEditor({ value, onChange, uploadImage }) {
 
     if (e.key === 'Escape') { setSlashMenu(null); return }
 
+    if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+      e.preventDefault()
+      allSelectedRef.current = true
+      // Also select text within the current block visually
+      try {
+        const el = domRefs.current[block.id]
+        if (el) {
+          const range = document.createRange()
+          range.selectNodeContents(el)
+          const sel = window.getSelection()
+          sel.removeAllRanges()
+          sel.addRange(range)
+        }
+      } catch (_) {}
+      return
+    }
     if ((e.ctrlKey || e.metaKey) && e.key === 'b') { e.preventDefault(); document.execCommand('bold'); return }
     if ((e.ctrlKey || e.metaKey) && e.key === 'i') { e.preventDefault(); document.execCommand('italic'); return }
   }
@@ -568,7 +634,15 @@ export default function BlockEditor({ value, onChange, uploadImage }) {
   })
 
   return (
-    <div style={{ flex: 1, padding: '8px 20px 16px', overflowY: 'auto', position: 'relative' }}>
+    <div
+      style={{ flex: 1, padding: '8px 20px 16px', overflowY: 'auto', position: 'relative' }}
+      onClick={e => {
+        if (e.target === e.currentTarget) {
+          const last = blocksRef.current[blocksRef.current.length - 1]
+          if (last) { pendingFocus.current = { id: last.id, atEnd: true }; setBlocks(b => [...b]) }
+        }
+      }}
+    >
       {blocks.map((block) => (
         <BlockItem
           key={block.id}
@@ -580,6 +654,7 @@ export default function BlockEditor({ value, onChange, uploadImage }) {
           registerRef={registerRef}
           onUpdate={updateBlock}
           onUpload={uploadImage}
+          isOnlyBlock={blocks.every(b => !b.content && b.type === 'p')}
         />
       ))}
 

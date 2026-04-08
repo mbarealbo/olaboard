@@ -2,7 +2,7 @@
 
 A visual thinking tool for capturing and connecting ideas on an infinite canvas.
 
-![Olaboard](https://img.shields.io/badge/version-0.5.0-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![React](https://img.shields.io/badge/React-19-61dafb) ![Vite](https://img.shields.io/badge/Vite-8-646cff)
+![Olaboard](https://img.shields.io/badge/version-0.6.0-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![React](https://img.shields.io/badge/React-19-61dafb) ![Vite](https://img.shields.io/badge/Vite-8-646cff)
 
 Made by [olab.quest](https://olab.quest)
 
@@ -41,6 +41,12 @@ Sync across devices via Supabase. Sign in with a magic link — no password requ
 - **Block editor** inspired by Notion — slash commands, markdown shortcuts
 - Block types: paragraph, H1/H2/H3, bullet list, numbered list, quote, code, **image**
 - Auto-detect lists: type `- ` or `1. ` to convert
+
+### Notes
+- Auto-save on every keystroke — no save button
+- Creation date and last-modified date shown below the title
+- Block editor with list continuation (Enter adds next item, double Enter exits)
+- Cmd+A then Delete clears all content
 
 ### Storage
 - Drag & drop images directly onto the canvas (stored in Supabase Storage)
