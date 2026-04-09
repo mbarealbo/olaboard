@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useLang } from './contexts/LangContext'
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { Trash2, Moon, Sun, Monitor, Zap, Folder, LogOut, Maximize2, Undo2, Redo2, User } from 'lucide-react'
 import BlockEditor from './components/BlockEditor'
@@ -175,6 +176,7 @@ export default function App() {
 }
 
 function AppInner({ userId, userEmail }) {
+  const { t, lang, setLang } = useLang()
   const [db, setDb] = useState({})
   const [boards, setBoards] = useState([])
   const [loading, setLoading] = useState(true)
@@ -190,7 +192,7 @@ function AppInner({ userId, userEmail }) {
   const [showGrid, setShowGrid] = useState(true)
   const [theme, setTheme] = useState('light')
   const [activeTool, setActiveTool] = useState('note')
-  const [autoCreate, setAutoCreate] = useState(false)
+  const [autoCreate, setAutoCreate] = useState(true)
   const [selectMode, setSelectMode] = useState(false)
   const [multiSelected, setMultiSelected] = useState([])
   const [selectionRect, setSelectionRect] = useState(null)
@@ -230,7 +232,7 @@ function AppInner({ userId, userEmail }) {
 
   // ── image upload helpers ───────────────────────────────────────────────────
   async function handleUploadImage(file) {
-    if (userId === 'local') throw new Error('Upload non disponibile in modalità demo')
+    if (userId === 'local') throw new Error(t('demoUploadError'))
     return uploadImageDB(file, userId)
   }
 
@@ -295,7 +297,7 @@ function AppInner({ userId, userEmail }) {
   // ── initial load: boards + first canvas ───────────────────────────────────
   useEffect(() => {
     if (userId === 'local') {
-      const boardName = 'La mia lavagna'
+      const boardName = t('defaultBoardName')
       const board = { id: LOCAL_BOARD_ID, name: boardName }
       const savedDb = loadLocalDb()
       const rootCanvas = savedDb?.[LOCAL_BOARD_ID] || { id: LOCAL_BOARD_ID, name: boardName, cards: [], connections: [], groups: [], labels: [] }
@@ -312,13 +314,13 @@ function AppInner({ userId, userEmail }) {
       try {
         let boardsData = await fetchBoardsDB(userId)
         if (!boardsData.length) {
-          const board = await createBoardDB({ name: 'La mia lavagna', userId })
+          const board = await createBoardDB({ name: t('defaultBoardName'), userId })
           await createCanvasDB({ id: board.id, boardId: board.id, name: board.name, userId })
           boardsData = [board]
         }
         const mapped = boardsData.map(b => ({ id: b.id, name: b.name }))
         setBoards(mapped)
-        setDisplayName(boardsData[0]?.name || 'La mia lavagna')
+        setDisplayName(boardsData[0]?.name || t('defaultBoardName'))
 
         const savedStack = (() => {
           try {
@@ -761,9 +763,9 @@ function AppInner({ userId, userEmail }) {
         if (autoCreate) { setAutoCreate(false) }
         else { setAutoCreate(true); setSelectMode(false); setActiveTool('note') }
       } else if (e.key === 'g' || e.key === 'G') {
-        setActiveTool(t => t === 'group' ? 'note' : 'group'); setSelectMode(false); setAutoCreate(false)
+        setActiveTool(prev => prev === 'group' ? 'note' : 'group'); setSelectMode(false); setAutoCreate(false)
       } else if (e.key === 't' || e.key === 'T') {
-        setActiveTool(t => t === 'text' ? 'note' : 'text'); setSelectMode(false); setAutoCreate(false)
+        setActiveTool(prev => prev === 'text' ? 'note' : 'text'); setSelectMode(false); setAutoCreate(false)
       }
     }
     window.addEventListener('keydown', onKey)
@@ -877,11 +879,11 @@ function AppInner({ userId, userEmail }) {
     const canvas = db[currentId]
     let md = `# ${canvas.name}\n\n`
     cards.filter(c => !c.isFolder).forEach(c => {
-      md += `### ${c.title || 'Senza titolo'}\n\n`
+      md += `### ${c.title || t('untitled')}\n\n`
       if (c.body) md += `${c.body}\n\n`
     })
     if (connections.length) {
-      md += `## Connessioni\n\n`
+      md += `## ${t('connections')}\n\n`
       connections.forEach(cn => {
         const from = cards.find(c => c.id === cn.from)
         const to = cards.find(c => c.id === cn.to)
@@ -899,14 +901,14 @@ function AppInner({ userId, userEmail }) {
   const listItems = [
     ...cards.map(c => ({
       id: c.id,
-      title: c.title || 'Senza titolo',
+      title: c.title || t('untitled'),
       type: c.isFolder ? 'folder' : c.isLabel ? 'label' : 'note',
       createdAt: c.createdAt || null,
       _card: c,
     })),
     ...labels.map(l => ({
       id: l.id,
-      title: l.text || 'Senza titolo',
+      title: l.text || t('untitled'),
       type: 'label',
       createdAt: l.createdAt || null,
       _label: l,
@@ -931,7 +933,7 @@ function AppInner({ userId, userEmail }) {
           {/* Top scrollable section */}
           <div style={{ flex: 1, overflowY: 'auto' }}>
             <div style={{ padding: '14px 12px 10px', fontSize: 18, fontWeight: 700, letterSpacing: '-0.5px', color: 'var(--text)', fontFamily: 'system-ui, sans-serif' }}>Olaboard</div>
-            <div style={{ padding: '0 12px 4px', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: 1, textTransform: 'uppercase' }}>Lavagne</div>
+            <div style={{ padding: '0 12px 4px', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: 1, textTransform: 'uppercase' }}>{t('boards')}</div>
             {boards.map(board => {
               const isActive = stack[0] === board.id
               const isRenaming = renamingBoardId === board.id
@@ -976,7 +978,7 @@ function AppInner({ userId, userEmail }) {
                       onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)' }}
                       onMouseDown={e => e.stopPropagation()}
                       onClick={e => { e.stopPropagation(); setRenamingBoardId(board.id) }}
-                      title="Rinomina"
+                      title={t('renameBoard')}
                     ><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
                     {boards.length > 1 && (
                       <button
@@ -987,12 +989,12 @@ function AppInner({ userId, userEmail }) {
                         onMouseDown={e => e.stopPropagation()}
                         onClick={e => {
                           e.stopPropagation()
-                          if (!window.confirm('Eliminare questa lavagna e tutto il suo contenuto?')) return
+                          if (!window.confirm(t('deleteBoardConfirm'))) return
                           setBoards(prev => prev.filter(b => b.id !== board.id))
                           setDb(prev => { const next = { ...prev }; delete next[board.id]; return next })
                           deleteBoardDB(board.id).catch(console.error)
                         }}
-                        title="Elimina"
+                        title={t('deleteBoard')}
                       ><Trash2 size={12} /></button>
                     )}
                   </div>
@@ -1011,11 +1013,16 @@ function AppInner({ userId, userEmail }) {
               onMouseEnter={e => { e.currentTarget.style.background = '#f5f5f5' }}
               onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
               onClick={async () => {
-                const name = 'Nuova lavagna'
+                const name = t('newBoardName')
                 try {
-                  const board = await createBoardDB({ name, userId })
-                  const id = board.id
-                  await createCanvasDB({ id, boardId: id, name, userId })
+                  let id
+                  if (userId === 'local') {
+                    id = uid()
+                  } else {
+                    const board = await createBoardDB({ name, userId })
+                    id = board.id
+                    await createCanvasDB({ id, boardId: id, name, userId })
+                  }
                   loadedRef.current.add(id)
                   setBoards(prev => [...prev, { id, name }])
                   setDb(prev => ({ ...prev, [id]: { id, name, cards: [], connections: [], groups: [], labels: [] } }))
@@ -1027,7 +1034,7 @@ function AppInner({ userId, userEmail }) {
                   console.error('createBoard error:', err)
                 }
               }}
-            >+ Nuova lavagna</button>
+            >{t('newBoard')}</button>
             <div style={{ padding: '10px 12px 12px', borderTop: '1px solid #eee', marginTop: 4 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#222', lineHeight: 1.4 }}>Olaboard</div>
               <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>
@@ -1054,7 +1061,7 @@ function AppInner({ userId, userEmail }) {
 
           {/* View tabs */}
           <div style={{ display: 'flex', background: '#f3f4f6', borderRadius: 8, padding: 2, gap: 1 }}>
-            {[['canvas', 'Canvas'], ['list', 'Elenco']].map(([v, l]) => (
+            {[['canvas', t('viewCanvas')], ['list', t('viewList')]].map(([v, l]) => (
               <button key={v} onClick={() => setView(v)} style={{ fontSize: 12, padding: '3px 12px', borderRadius: 6, border: 'none', cursor: 'pointer', background: view === v ? 'var(--btn-bg)' : 'transparent', color: view === v ? 'var(--btn-text)' : 'var(--text-muted)', fontWeight: view === v ? 600 : 400, boxShadow: view === v ? '0 1px 2px rgba(0,0,0,0.08)' : 'none' }}>{l}</button>
             ))}
           </div>
@@ -1065,32 +1072,32 @@ function AppInner({ userId, userEmail }) {
               <button
                 disabled={view !== 'canvas'}
                 style={{ ...smallBtn, background: activeTool === 'group' ? activeColor : 'var(--btn-bg)', color: activeTool === 'group' ? '#fff' : 'var(--btn-text)', borderColor: activeTool === 'group' ? activeColor : 'var(--btn-border)', ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }}
-                onClick={view === 'canvas' ? () => setActiveTool(t => t === 'group' ? 'note' : 'group') : undefined}
-                title="Disegna gruppo"
-              >□ Gruppo</button>
+                onClick={view === 'canvas' ? () => setActiveTool(prev => prev === 'group' ? 'note' : 'group') : undefined}
+                title={t('groupToolTitle')}
+              >{t('groupTool')}</button>
               <button
                 disabled={view !== 'canvas'}
                 style={{ ...smallBtn, background: activeTool === 'text' ? activeColor : 'var(--btn-bg)', color: activeTool === 'text' ? '#fff' : 'var(--btn-text)', borderColor: activeTool === 'text' ? activeColor : 'var(--btn-border)', ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }}
-                onClick={view === 'canvas' ? () => setActiveTool(t => t === 'text' ? 'note' : 'text') : undefined}
-                title="Aggiungi testo"
-              >T Testo</button>
+                onClick={view === 'canvas' ? () => setActiveTool(prev => prev === 'text' ? 'note' : 'text') : undefined}
+                title={t('textToolTitle')}
+              >{t('textTool')}</button>
               <button
                 disabled={view !== 'canvas'}
                 style={{ ...smallBtn, ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }}
                 onClick={view === 'canvas' ? () => setShowGrid(v => !v) : undefined}
-                title="Mostra/nascondi griglia"
+                title={t('gridToggleTitle')}
               >{showGrid ? '⊞ Grid' : '⊟ Grid'}</button>
               <button
                 disabled={view !== 'canvas'}
                 style={{ ...smallBtn, background: autoCreate ? activeColor : 'var(--btn-bg)', color: autoCreate ? '#fff' : 'var(--btn-text)', borderColor: autoCreate ? activeColor : 'var(--btn-border)', ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }}
                 onClick={view === 'canvas' ? () => setAutoCreate(v => !v) : undefined}
-                title="Crea elemento al termine della freccia"
+                title={t('quickConnectTitle')}
               ><Zap size={14} /> Quick</button>
               <button
                 disabled={view !== 'canvas'}
                 style={{ ...smallBtn, background: selectMode ? activeColor : 'var(--btn-bg)', color: selectMode ? '#fff' : 'var(--btn-text)', borderColor: selectMode ? activeColor : 'var(--btn-border)', ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }}
                 onClick={view === 'canvas' ? () => { setSelectMode(v => !v); setActiveTool('note'); setAutoCreate(false) } : undefined}
-                title="Selezione multipla"
+                title={t('selectTitle')}
               >⬚ Select</button>
             </div>
             <div style={{ display: 'flex', gap: 2 }}>
@@ -1132,11 +1139,11 @@ function AppInner({ userId, userEmail }) {
               style={{ position: 'fixed', inset: 0, zIndex: -1 }}
               onClick={() => setShowAccount(false)}
             />
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: 0.5, textTransform: 'uppercase' }}>Account</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: 0.5, textTransform: 'uppercase' }}>{t('account')}</div>
             <div style={{ fontSize: 13, color: 'var(--text)', wordBreak: 'break-all' }}>{userEmail}</div>
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>
-                <span>Storage</span>
+                <span>{t('storage')}</span>
                 <span>{storageUsed !== null ? `${(storageUsed / 1024 / 1024).toFixed(1)} MB / 100 MB` : '…'}</span>
               </div>
               <div style={{ height: 6, borderRadius: 3, background: 'var(--border)', overflow: 'hidden' }}>
@@ -1148,10 +1155,17 @@ function AppInner({ userId, userEmail }) {
                 }} />
               </div>
             </div>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 6 }}>{t('lang')}</div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button onClick={() => setLang('it')} style={{ fontSize: 12, padding: '3px 10px', borderRadius: 4, border: '1px solid var(--border)', background: lang === 'it' ? 'var(--accent)' : 'var(--btn-bg)', color: lang === 'it' ? '#fff' : 'var(--btn-text)', cursor: 'pointer', fontFamily: 'inherit' }}>Italiano</button>
+                <button onClick={() => setLang('en')} style={{ fontSize: 12, padding: '3px 10px', borderRadius: 4, border: '1px solid var(--border)', background: lang === 'en' ? 'var(--accent)' : 'var(--btn-bg)', color: lang === 'en' ? '#fff' : 'var(--btn-text)', cursor: 'pointer', fontFamily: 'inherit' }}>English</button>
+              </div>
+            </div>
             <button
               onClick={() => supabase.auth.signOut()}
               style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 0', fontSize: 13, border: 'none', background: 'none', cursor: 'pointer', color: '#e53935', fontFamily: 'inherit' }}
-            ><LogOut size={13} /> Esci</button>
+            ><LogOut size={13} /> {t('signOut')}</button>
           </div>
         )}
 
@@ -1260,9 +1274,9 @@ function AppInner({ userId, userEmail }) {
                     cp1x = sx1; cp1y = sy1 + dir * off
                     cp2x = sx2; cp2y = sy2 - dir * off
                   }
-                  const t = 0.5
-                  const mx = (1-t)**3*sx1 + 3*(1-t)**2*t*cp1x + 3*(1-t)*t**2*cp2x + t**3*sx2
-                  const my = (1-t)**3*sy1 + 3*(1-t)**2*t*cp1y + 3*(1-t)*t**2*cp2y + t**3*sy2
+                  const bt = 0.5
+                  const mx = (1-bt)**3*sx1 + 3*(1-bt)**2*bt*cp1x + 3*(1-bt)*bt**2*cp2x + bt**3*sx2
+                  const my = (1-bt)**3*sy1 + 3*(1-bt)**2*bt*cp1y + 3*(1-bt)*bt**2*cp2y + bt**3*sy2
                   const d = `M${sx1},${sy1} C${cp1x},${cp1y} ${cp2x},${cp2y} ${sx2},${sy2}`
                   const stroke = isSel ? '#e53935' : '#378ADD'
                   const markerEnd = isSel ? 'url(#ah-sel)' : 'url(#ah)'
@@ -1560,15 +1574,15 @@ function AppInner({ userId, userEmail }) {
                   fontFamily: 'system-ui, sans-serif',
                 }}>
                   <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>
-                    {multiSelected.length} element{multiSelected.length === 1 ? 'o' : 'i'} selezionat{multiSelected.length === 1 ? 'o' : 'i'}
+                    {multiSelected.length === 1 ? t('selectedOne') : t('selectedMany', { n: multiSelected.length })}
                   </div>
                   <div style={{ maxHeight: 220, overflowY: 'auto', padding: '6px 0' }}>
                     {multiSelected.map(id => {
                       const card = cards.find(c => c.id === id)
                       const group = groups.find(g => g.id === id)
                       const label = labels.find(l => l.id === id)
-                      const name = card?.title || group?.title || label?.text || 'Senza titolo'
-                      const type = card ? (card.isFolder ? 'Cartella' : card.isLabel ? 'Testo' : 'Post-it') : group ? 'Gruppo' : 'Testo'
+                      const name = card?.title || group?.title || label?.text || t('untitled')
+                      const type = card ? (card.isFolder ? t('typeFolder') : card.isLabel ? t('typeLabel') : t('typePostIt')) : group ? t('typeGroup') : t('typeLabel')
                       return (
                         <label key={id} style={{ padding: '4px 10px 4px 10px', fontSize: 12, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
                           <input
@@ -1587,7 +1601,7 @@ function AppInner({ userId, userEmail }) {
                     <button
                       onClick={deleteMultiSelected}
                       style={{ width: '100%', padding: '7px 0', fontSize: 13, fontWeight: 600, border: 'none', borderRadius: 6, cursor: 'pointer', background: '#e53935', color: '#fff' }}
-                    >Elimina</button>
+                    >{t('delete')}</button>
                   </div>
                 </div>
               )}
@@ -1621,7 +1635,7 @@ function AppInner({ userId, userEmail }) {
                 <button
                   disabled={!canUndo}
                   onClick={canUndo ? undo : undefined}
-                  title="Annulla (Ctrl+Z)"
+                  title={t('undoTitle')}
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     width: 30, height: 30, borderRadius: 8,
@@ -1637,7 +1651,7 @@ function AppInner({ userId, userEmail }) {
                 <button
                   disabled={!canRedo}
                   onClick={canRedo ? redo : undefined}
-                  title="Ripeti (Ctrl+Shift+Z)"
+                  title={t('redoTitle')}
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     width: 30, height: 30, borderRadius: 8,
@@ -1685,20 +1699,20 @@ function AppInner({ userId, userEmail }) {
             /* ── List view ───────────────────────────────────────────────── */
             <div style={{ flex: 1, overflowY: 'auto', padding: 24, background: 'var(--bg)' }}>
               <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-                {[['az', 'A→Z'], ['za', 'Z→A'], ['date', 'Creazione']].map(([v, l]) => (
+                {[['az', t('sortAZ')], ['za', t('sortZA')], ['date', t('sortDate')]].map(([v, l]) => (
                   <button key={v} onClick={() => setListSort(v)} style={{ ...smallBtn, fontWeight: listSort === v ? 700 : 400, background: listSort === v ? 'var(--accent)' : 'var(--btn-bg)', color: listSort === v ? '#fff' : 'var(--btn-text)', border: '1px solid var(--border)' }}>{l}</button>
                 ))}
                 <button
                   onClick={() => { setListSelectMode(v => !v); if (listSelectMode) setMultiSelected([]) }}
                   style={{ ...smallBtn, marginLeft: 'auto', background: listSelectMode ? 'var(--accent)' : 'var(--btn-bg)', color: listSelectMode ? '#fff' : 'var(--btn-text)', border: '1px solid var(--border)' }}
-                >☑ Seleziona</button>
+                >{t('selectItems')}</button>
               </div>
-              {listItems.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Nessun elemento in questo canvas.</p>}
+              {listItems.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>{t('emptyCanvas')}</p>}
               {listItems.map(item => {
                 const badgeIcon = item.type === 'folder' ? <Folder size={12} /> : item.type === 'label' ? <span style={{fontSize:11}}>T</span> : <span style={{fontSize:11}}>✎</span>
-                const badgeLabel = item.type === 'folder' ? 'Cartella' : item.type === 'label' ? 'Testo' : 'Nota'
+                const badgeLabel = item.type === 'folder' ? t('typeFolder') : item.type === 'label' ? t('typeLabel') : t('typeNote')
                 const dateStr = item.createdAt
-                  ? new Date(item.createdAt).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                  ? new Date(item.createdAt).toLocaleDateString(lang === 'it' ? 'it-IT' : 'en-US', { day: '2-digit', month: '2-digit', year: 'numeric' })
                   : '—'
                 const isChecked = multiSelected.includes(item.id)
                 function handleClick() {
@@ -1755,7 +1769,7 @@ function AppInner({ userId, userEmail }) {
 
       {/* Theme toggle */}
       <button
-        onClick={() => setTheme(t => t === 'light' ? 'dark' : t === 'dark' ? 'high-contrast' : 'light')}
+        onClick={() => setTheme(prev => prev === 'light' ? 'dark' : prev === 'dark' ? 'high-contrast' : 'light')}
         style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 9999, background: 'var(--bg-panel)', border: '1px solid var(--border)', borderRadius: 20, padding: '6px 12px', fontSize: 13, boxShadow: '0 2px 8px rgba(0,0,0,0.15)', cursor: 'pointer', color: 'var(--text)' }}
       >{theme === 'light' ? <Sun size={14} /> : theme === 'dark' ? <Moon size={14} /> : <Monitor size={14} />}</button>
 
@@ -1777,6 +1791,7 @@ const HC_NOTE_COLOR_MAP = {
 }
 
 function NotePanel({ mode, noteForm, onChangeForm, onTitleChange, onBodyChange, onClose, onToggleMode, activeCard, onColorChange, theme, uploadImage }) {
+  const { t, lang } = useLang()
   const isFull = mode === 'full'
   const [titleFocused, setTitleFocused] = useState(false)
 
@@ -1787,17 +1802,17 @@ function NotePanel({ mode, noteForm, onChangeForm, onTitleChange, onBodyChange, 
   return (
     <div style={panelStyle}>
       <div style={{ height: 44, display: 'flex', alignItems: 'center', padding: '0 16px', gap: 8, borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-        <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: 1, textTransform: 'uppercase' }}>Note</span>
+        <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: 1, textTransform: 'uppercase' }}>{t('notes')}</span>
         <div style={{ flex: 1 }} />
-        <button style={iconBtn} title={isFull ? 'Vista affiancata' : 'Vista intera'} onClick={onToggleMode}>{isFull ? '⤡' : '⤢'}</button>
-        <button style={iconBtn} title="Chiudi" onClick={onClose}>×</button>
+        <button style={iconBtn} title={isFull ? t('sideView') : t('fullView')} onClick={onToggleMode}>{isFull ? '⤡' : '⤢'}</button>
+        <button style={iconBtn} title={t('close')} onClick={onClose}>×</button>
       </div>
       <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
         <div style={isFull ? { maxWidth: 800, width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', flex: 1 } : { display: 'flex', flexDirection: 'column', flex: 1 }}>
           <input
             value={noteForm.title}
             onChange={e => onTitleChange(e.target.value)}
-            placeholder="Titolo"
+            placeholder={t('titlePlaceholder')}
             onFocus={() => setTitleFocused(true)}
             onBlur={() => setTitleFocused(false)}
             style={{ width: '100%', border: 'none', outline: 'none', borderBottom: `2px solid ${titleFocused ? 'var(--accent)' : 'var(--border)'}`, padding: '12px 20px', fontSize: 16, fontWeight: 600, color: 'var(--text)', fontFamily: 'inherit', background: 'transparent' }}
@@ -1807,7 +1822,7 @@ function NotePanel({ mode, noteForm, onChangeForm, onTitleChange, onBodyChange, 
               {activeCard.createdAt && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                   <span style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1 }}>✦</span>
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Creata il {new Date(activeCard.createdAt).toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t('createdAt')} {new Date(activeCard.createdAt).toLocaleDateString(lang === 'it' ? 'it-IT' : 'en-US', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
                 </div>
               )}
               {activeCard.updatedAt && activeCard.updatedAt !== activeCard.createdAt && (
@@ -1815,7 +1830,7 @@ function NotePanel({ mode, noteForm, onChangeForm, onTitleChange, onBodyChange, 
                   <div style={{ height: 1, background: 'var(--border)', margin: '2px 0' }} />
                   <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                     <span style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1 }}>✎</span>
-                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Modificata il {new Date(activeCard.updatedAt).toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t('updatedAt')} {new Date(activeCard.updatedAt).toLocaleDateString(lang === 'it' ? 'it-IT' : 'en-US', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
                   </div>
                 </>
               )}
@@ -1823,7 +1838,7 @@ function NotePanel({ mode, noteForm, onChangeForm, onTitleChange, onBodyChange, 
           )}
           {activeCard && !activeCard.isFolder && onColorChange && (
             <div style={{ padding: '8px 20px', borderBottom: '1px solid var(--border)' }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 }}>Colore</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 }}>{t('colorLabel')}</div>
               <div style={{ display: 'flex', gap: 6 }}>
                 {Object.entries(NOTE_COLOR_MAP).map(([name]) => {
                   const circleColor = theme === 'high-contrast' ? HC_NOTE_COLOR_MAP[name] : NOTE_COLOR_MAP[name]

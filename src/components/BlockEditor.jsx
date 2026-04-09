@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { useLang } from '../contexts/LangContext'
 
 function uid() { return crypto.randomUUID() }
 
@@ -65,17 +66,31 @@ function serializeBlocks(blocks, domRefs) {
 }
 
 // ── block type menu items ─────────────────────────────────────────────────────
-const BLOCK_TYPES = [
-  { type: 'p',     icon: '📝',  label: 'Testo',          keywords: ['text', 'testo', 'p', 'paragraph'] },
-  { type: 'h1',    icon: 'H1',  label: 'Titolo 1',       keywords: ['h1', 'heading1', 'titolo1', 'title'] },
-  { type: 'h2',    icon: 'H2',  label: 'Titolo 2',       keywords: ['h2', 'heading2', 'titolo2'] },
-  { type: 'h3',    icon: 'H3',  label: 'Titolo 3',       keywords: ['h3', 'heading3', 'titolo3'] },
-  { type: 'ul',    icon: '•',   label: 'Lista',          keywords: ['ul', 'lista', 'list', 'bullet'] },
-  { type: 'ol',    icon: '1.',  label: 'Lista numerata', keywords: ['ol', 'numbered', 'numero', 'numerata'] },
-  { type: 'quote', icon: '"',   label: 'Citazione',      keywords: ['quote', 'citazione', 'blockquote'] },
-  { type: 'code',  icon: '</>',  label: 'Codice',        keywords: ['code', 'codice', 'mono'] },
-  { type: 'image', icon: '🖼',  label: 'Immagine',       keywords: ['image', 'immagine', 'img', 'foto', 'photo'] },
+// labelKey is resolved at render time via t() so the menu is always in the current language.
+const BLOCK_TYPE_DEFS = [
+  { type: 'p',     icon: '📝',  labelKey: 'blockTypeText',     keywords: ['text', 'testo', 'p', 'paragraph'] },
+  { type: 'h1',    icon: 'H1',  labelKey: 'blockTypeH1',       keywords: ['h1', 'heading1', 'titolo1', 'title'] },
+  { type: 'h2',    icon: 'H2',  labelKey: 'blockTypeH2',       keywords: ['h2', 'heading2', 'titolo2'] },
+  { type: 'h3',    icon: 'H3',  labelKey: 'blockTypeH3',       keywords: ['h3', 'heading3', 'titolo3'] },
+  { type: 'ul',    icon: '•',   labelKey: 'blockTypeList',     keywords: ['ul', 'lista', 'list', 'bullet'] },
+  { type: 'ol',    icon: '1.',  labelKey: 'blockTypeNumbered', keywords: ['ol', 'numbered', 'numero', 'numerata'] },
+  { type: 'quote', icon: '"',   labelKey: 'blockTypeQuote',    keywords: ['quote', 'citazione', 'blockquote'] },
+  { type: 'code',  icon: '</>',  labelKey: 'blockTypeCode',    keywords: ['code', 'codice', 'mono'] },
+  { type: 'image', icon: '🖼',  labelKey: 'blockTypeImage',    keywords: ['image', 'immagine', 'img', 'foto', 'photo'] },
 ]
+
+function getPlaceholders(t) {
+  return {
+    p:     t('placeholderP'),
+    h1:    t('placeholderH1'),
+    h2:    t('placeholderH2'),
+    h3:    t('placeholderH3'),
+    ul:    t('placeholderText'),
+    ol:    t('placeholderText'),
+    quote: t('placeholderQuote'),
+    code:  t('placeholderCode'),
+  }
+}
 
 // Prefixes that trigger block-type conversion on Space (checked in order — longest first)
 const SPACE_SHORTCUTS = [
@@ -109,12 +124,6 @@ function getBlockStyle(type) {
   }
 }
 
-const PLACEHOLDERS = {
-  p: "Scrivi qualcosa, o '/' per i comandi…",
-  h1: 'Titolo 1', h2: 'Titolo 2', h3: 'Titolo 3',
-  ul: 'Testo…', ol: 'Testo…',
-  quote: 'Citazione…', code: 'Codice…',
-}
 
 const URL_REGEX = /(https?:\/\/[^\s]+|www\.[^\s]+|[a-zA-Z0-9-]+\.(?:com|it|io|net|org|dev|app|co|ai|me|eu)[^\s]*)/g
 const IS_URL = /^(https?:\/\/|www\.|[a-zA-Z0-9-]+\.(?:com|it|io|net|org|dev|app|co|ai|me|eu))/
@@ -142,6 +151,7 @@ function parseTextWithLinks(text) {
 
 // ── ImageBlock ────────────────────────────────────────────────────────────────
 function ImageBlock({ block, onUpdate, onUpload }) {
+  const { t } = useLang()
   const [editing, setEditing] = useState(!block.url)
   const [urlInput, setUrlInput] = useState(block.url || '')
   const [hovered, setHovered] = useState(false)
@@ -180,7 +190,7 @@ function ImageBlock({ block, onUpdate, onUpload }) {
         <input
           autoFocus={!uploading}
           style={{ border: 'none', outline: 'none', background: 'transparent', fontSize: 14, color: 'var(--text-muted)', flex: 1, fontFamily: 'inherit' }}
-          placeholder="Incolla URL immagine..."
+          placeholder={t('imageUrlPlaceholder')}
           value={urlInput}
           onChange={e => setUrlInput(e.target.value)}
           onKeyDown={e => {
@@ -203,7 +213,7 @@ function ImageBlock({ block, onUpdate, onUpload }) {
               style={{ flexShrink: 0, border: '1px solid #ddd', borderRadius: 4, padding: '2px 8px', fontSize: 12, cursor: uploading ? 'wait' : 'pointer', background: '#fff', color: '#555', whiteSpace: 'nowrap' }}
               onMouseDown={e => e.preventDefault()}
               onClick={() => !uploading && fileInputRef.current?.click()}
-            >{uploading ? '…' : 'Carica'}</button>
+            >{uploading ? '…' : t('uploadImage')}</button>
           </>
         )}
       </div>
@@ -224,7 +234,7 @@ function ImageBlock({ block, onUpdate, onUpload }) {
       />
       <input
         style={{ fontSize: 12, color: 'var(--text-muted)', border: 'none', outline: 'none', background: 'transparent', width: '100%', padding: '4px 0', fontFamily: 'inherit' }}
-        placeholder="Didascalia..."
+        placeholder={t('imageCaptionPlaceholder')}
         value={block.caption || ''}
         onChange={e => onUpdate(block.id, { caption: e.target.value })}
         onKeyDown={e => e.stopPropagation()}
@@ -241,6 +251,8 @@ function ImageBlock({ block, onUpdate, onUpload }) {
 
 // ── BlockItem ─────────────────────────────────────────────────────────────────
 function BlockItem({ block, olIndex, onKeyDown, onInput, onBlur, registerRef, onUpdate, onUpload, isOnlyBlock }) {
+  const { t } = useLang()
+  const placeholders = getPlaceholders(t)
   const elRef = useRef(null)
   const [focused, setFocused] = useState(false)
 
@@ -267,7 +279,7 @@ function BlockItem({ block, olIndex, onKeyDown, onInput, onBlur, registerRef, on
       ref={el => { elRef.current = el; registerRef(block.id, el) }}
       contentEditable
       suppressContentEditableWarning
-      data-placeholder={PLACEHOLDERS[block.type] || PLACEHOLDERS.p}
+      data-placeholder={placeholders[block.type] || placeholders.p}
       style={getBlockStyle(block.type)}
       className="block-editor-block"
       onFocus={() => setFocused(true)}
@@ -297,7 +309,7 @@ function BlockItem({ block, olIndex, onKeyDown, onInput, onBlur, registerRef, on
             {block.content
               ? parseTextWithLinks(block.content)
               : isOnlyBlock
-                ? <span style={{ color: '#bbb', pointerEvents: 'none' }}>{PLACEHOLDERS.p}</span>
+                ? <span style={{ color: '#bbb', pointerEvents: 'none' }}>{placeholders.p}</span>
                 : null
             }
           </p>
@@ -330,6 +342,8 @@ function BlockItem({ block, olIndex, onKeyDown, onInput, onBlur, registerRef, on
 
 // ── BlockEditor ───────────────────────────────────────────────────────────────
 export default function BlockEditor({ value, onChange, uploadImage }) {
+  const { t } = useLang()
+  const BLOCK_TYPES = BLOCK_TYPE_DEFS.map(d => ({ ...d, label: t(d.labelKey) }))
   const [blocks, setBlocks] = useState(() => parseMarkdown(value))
   const [slashMenu, setSlashMenu] = useState(null) // { blockId, query, x, y }
   const [slashMenuIdx, setSlashMenuIdx] = useState(0)
@@ -611,13 +625,13 @@ export default function BlockEditor({ value, onChange, uploadImage }) {
   }
 
   const menuItems = slashMenu
-    ? BLOCK_TYPES.filter(t => {
+    ? BLOCK_TYPES.filter(bt => {
         if (!slashMenu.query) return true
         const q = slashMenu.query.toLowerCase()
         return (
-          t.label.toLowerCase().includes(q) ||
-          t.type.startsWith(q) ||
-          t.keywords.some(k => k.startsWith(q))
+          bt.label.toLowerCase().includes(q) ||
+          bt.type.startsWith(q) ||
+          bt.keywords.some(k => k.startsWith(q))
         )
       })
     : []

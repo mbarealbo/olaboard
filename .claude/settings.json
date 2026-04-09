@@ -2,7 +2,14 @@
   "permissions": {
     "allow": [
       "Bash(git commit -m ':*)",
-      "Bash(git restore:*)"
+      "Bash(git restore:*)",
+      "Bash(git -C /Users/albo/progetti/olaboard diff --stat)",
+      "Bash(git -C /Users/albo/progetti/olaboard log --oneline -5)",
+      "Bash(git -C /Users/albo/progetti/olaboard commit -m ':*)",
+      "Bash(git commit -m 'feat: React Router — landing, demo mode, auth routes:*)",
+      "Bash(git commit -m 'feat: email+password auth, replace magic link:*)",
+      "Bash(git commit -m 'feat: landing page with features, screenshots placeholders, inline login:*)",
+      "Bash(git revert:*)"
     ]
   }
 }

@@ -1,5 +1,6 @@
 import { useRef, useEffect } from 'react'
 import { Folder, FileText, Type } from 'lucide-react'
+import { useLang } from '../contexts/LangContext'
 
 const COLOR_MAP = {
   yellow: '#FAC775', orange: '#EF9F27', green: '#b8e986',
@@ -23,6 +24,7 @@ const HC_COLOR_MAP = {
 }
 
 export default function PostIt({ card, selected, onMouseDown, onClick, onDblClick, onRename, onNoteOpen, onToggleFolder, onConvertToLabel, onConnectDot, initialEditing, onEditStarted, cardColor, theme }) {
+  const { t } = useLang()
   const titleRef = useRef(null)
   const isHC = theme === 'high-contrast'
 
@@ -53,8 +55,8 @@ export default function PostIt({ card, selected, onMouseDown, onClick, onDblClic
   function commitEdit() {
     const el = titleRef.current
     el.contentEditable = 'false'
-    const t = el.textContent.trim() || 'Nuova idea'
-    if (t !== card.title) onRename(t)
+    const title = el.textContent.trim() || t('newIdea')
+    if (title !== card.title) onRename(title)
   }
 
   return (
@@ -90,9 +92,9 @@ export default function PostIt({ card, selected, onMouseDown, onClick, onDblClic
       ) : null}
 
       <div className="postit-actions">
-        <button className="paction" title="Apri note" onMouseDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onNoteOpen() }}><FileText size={12} /></button>
-        <button className="paction" title={card.isFolder ? 'Rimuovi cartella' : 'Converti in cartella'} onMouseDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onToggleFolder() }}><Folder size={12} /></button>
-        <button className="paction" title="Converti in etichetta" onMouseDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onConvertToLabel() }}><Type size={12} /></button>
+        <button className="paction" title={t('openNote')} onMouseDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onNoteOpen() }}><FileText size={12} /></button>
+        <button className="paction" title={card.isFolder ? t('removeFolder') : t('convertToFolder')} onMouseDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onToggleFolder() }}><Folder size={12} /></button>
+        <button className="paction" title={t('convertToLabel')} onMouseDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onConvertToLabel() }}><Type size={12} /></button>
       </div>
 
       <div className="connect-dot connect-dot-top"    onMouseDown={e => onConnectDot(e, 'top')} />

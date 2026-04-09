@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect } from 'react'
 import { Folder } from 'lucide-react'
+import { useLang } from '../contexts/LangContext'
 
 const URL_REGEX = /(https?:\/\/[^\s]+|www\.[^\s]+|[a-zA-Z0-9-]+\.(?:com|it|io|net|org|dev|app|co|ai|me|eu)[^\s]*)/g
 const IS_URL = /^(https?:\/\/|www\.|[a-zA-Z0-9-]+\.(?:com|it|io|net|org|dev|app|co|ai|me|eu))/
@@ -38,6 +39,7 @@ const RESIZE_HANDLES = [
 ]
 
 export function Group({ group, onTitleBarMouseDown, onResizeHandleMouseDown, onDelete, onTitleChange, initialEditing, isSelected, onSelect }) {
+  const { t } = useLang()
   const titleRef = useRef(null)
 
   useEffect(() => {
@@ -80,7 +82,7 @@ export function Group({ group, onTitleBarMouseDown, onResizeHandleMouseDown, onD
           suppressContentEditableWarning
           style={{ fontSize: 11, fontWeight: 600, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5, outline: 'none', background: 'transparent', cursor: 'text', minWidth: 20 }}
           onMouseDown={e => e.stopPropagation()}
-          onBlur={e => onTitleChange(e.target.textContent.trim() || 'Gruppo')}
+          onBlur={e => onTitleChange(e.target.textContent.trim() || t('defaultGroupTitle'))}
           onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); e.target.blur() } }}
         >{group.title}</span>
         <button
@@ -103,6 +105,7 @@ export function Group({ group, onTitleBarMouseDown, onResizeHandleMouseDown, onD
 }
 
 export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit, onEndEdit, onTextChange, onDelete, onConnectDot, onConvertToPostIt, onConvertToFolder }) {
+  const { t } = useLang()
   const elRef = useRef(null)
   const [hovered, setHovered] = useState(false)
 
@@ -176,7 +179,7 @@ export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit
             onMouseDown={e => e.stopPropagation()}
             onClick={e => { e.stopPropagation(); onConvertToPostIt?.() }}
             style={{ background: '#fff', border: '1px solid #d0d0d0', borderRadius: 4, padding: '3px 8px', fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap', boxShadow: '0 1px 4px rgba(0,0,0,0.1)' }}
-          >🗒 post-it</button>
+          >{t('convertToPostIt')}</button>
           <button
             onMouseDown={e => e.stopPropagation()}
             onClick={e => { e.stopPropagation(); onConvertToFolder?.() }}

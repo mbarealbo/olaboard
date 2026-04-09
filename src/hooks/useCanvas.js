@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { uid, anchorPoint } from '../utils'
+import { useLang } from '../contexts/LangContext'
 
 export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnectionFn, setActiveNoteId, view, activeTool, setActiveTool, selectMode, setMultiSelected, setSelectionRect, onGroupCreated, pushCommand }) {
+  const { t } = useLang()
   const [offset, setOffset] = useState({ x: 0, y: 0 })
   const [scale, setScale] = useState(1)
   const [connectLine, setConnectLine] = useState(null)
@@ -223,7 +225,7 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
             const cardIds = canvas.cards
               .filter(c => { const cx = c.x + 65, cy = c.y + 37; return cx >= rx && cx <= rx + rw && cy >= ry && cy <= ry + rh })
               .map(c => c.id)
-            const newGroup = { id: uid(), title: 'Gruppo', x: rx, y: ry, width: Math.max(120, rw), height: Math.max(80, rh), cardIds }
+            const newGroup = { id: uid(), title: t('defaultGroupTitle'), x: rx, y: ry, width: Math.max(120, rw), height: Math.max(80, rh), cardIds }
             if (onGroupCreated) setTimeout(() => onGroupCreated(newGroup.id), 0)
             pushCommandRef.current({
               undo: () => setDb(prev => {
@@ -767,7 +769,7 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
   function nextCardTitle() {
     const n = (parseInt(localStorage.getItem('olaboard_card_counter') || '0', 10) || 0) + 1
     localStorage.setItem('olaboard_card_counter', String(n))
-    return `Nuova idea #${n}`
+    return `${t('newIdea')} #${n}`
   }
 
   function createCard(wx, wy) {
