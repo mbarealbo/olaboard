@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { Trash2, Moon, Sun, Monitor, Zap, Folder, LogOut, Maximize2, Undo2, Redo2, User } from 'lucide-react'
 import BlockEditor from './components/BlockEditor'
 import PostIt from './components/PostIt'
@@ -119,10 +120,36 @@ function LoadingOverlay({ loading }) {
   )
 }
 
-// ─── App ─────────────────────────────────────────────────────────────────────
-export default function App() {
-  const [session, setSession] = useState(undefined) // undefined = loading, null = not logged in
+// ─── LandingPage ─────────────────────────────────────────────────────────────
+function LandingPage() {
+  const navigate = useNavigate()
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', gap: 16, background: 'var(--bg, #fff)', fontFamily: 'system-ui, sans-serif' }}>
+      <h1 style={{ fontSize: 36, fontWeight: 700, letterSpacing: '-1px', margin: 0 }}>Olaboard</h1>
+      <p style={{ fontSize: 14, color: '#888', margin: 0 }}>Visual thinking, without the noise.</p>
+      <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+        <button onClick={() => navigate('/app')} style={{ padding: '10px 24px', fontSize: 14, fontWeight: 600, background: '#111', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer' }}>Try demo</button>
+        <button onClick={() => navigate('/login')} style={{ padding: '10px 24px', fontSize: 14, fontWeight: 600, background: '#fff', color: '#111', border: '1.5px solid #e0e0e0', borderRadius: 8, cursor: 'pointer' }}>Sign in</button>
+      </div>
+    </div>
+  )
+}
 
+// ─── LoginRoute ───────────────────────────────────────────────────────────────
+function LoginRoute() {
+  const navigate = useNavigate()
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) navigate('/board', { replace: true })
+    })
+    return () => subscription.unsubscribe()
+  }, [navigate])
+  return <AuthPage />
+}
+
+// ─── BoardRoute ───────────────────────────────────────────────────────────────
+function BoardRoute() {
+  const [session, setSession] = useState(undefined)
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session ?? null))
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -130,11 +157,21 @@ export default function App() {
     })
     return () => subscription.unsubscribe()
   }, [])
-
-  if (session === undefined) return null // loading
-  if (session === null) return <AuthPage />
-
+  if (session === undefined) return null
+  if (session === null) return <Navigate to="/login" replace />
   return <AppInner userId={session.user.id} userEmail={session.user.email} />
+}
+
+// ─── App ─────────────────────────────────────────────────────────────────────
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/app" element={<AppInner userId="local" userEmail="" />} />
+      <Route path="/login" element={<LoginRoute />} />
+      <Route path="/board" element={<BoardRoute />} />
+    </Routes>
+  )
 }
 
 function AppInner({ userId, userEmail }) {
@@ -193,6 +230,7 @@ function AppInner({ userId, userEmail }) {
 
   // ── image upload helpers ───────────────────────────────────────────────────
   async function handleUploadImage(file) {
+    if (userId === 'local') throw new Error('Upload non disponibile in modalità demo')
     return uploadImageDB(file, userId)
   }
 
@@ -207,6 +245,7 @@ function AppInner({ userId, userEmail }) {
 
   // ── load canvas data from Supabase into db state ──────────────────────────
   const loadCanvasData = useCallback(async (canvasId, boardId, folderName) => {
+    if (userId === 'local') return  // local mode: db is already in state
     try {
       let canvasData = await fetchCanvasDB(canvasId).catch(() => null)
       if (!canvasData) {
@@ -237,8 +276,38 @@ function AppInner({ userId, userEmail }) {
     }
   }, [userId]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── local storage helpers for demo mode ──────────────────────────────────
+  const LOCAL_DB_KEY = 'olaboard_local_db'
+  const LOCAL_BOARD_ID = 'local-root'
+
+  function loadLocalDb() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(LOCAL_DB_KEY))
+      if (raw && typeof raw === 'object') return raw
+    } catch {}
+    return null
+  }
+
+  function saveLocalDb(dbState) {
+    try { localStorage.setItem(LOCAL_DB_KEY, JSON.stringify(dbState)) } catch {}
+  }
+
   // ── initial load: boards + first canvas ───────────────────────────────────
   useEffect(() => {
+    if (userId === 'local') {
+      const boardName = 'La mia lavagna'
+      const board = { id: LOCAL_BOARD_ID, name: boardName }
+      const savedDb = loadLocalDb()
+      const rootCanvas = savedDb?.[LOCAL_BOARD_ID] || { id: LOCAL_BOARD_ID, name: boardName, cards: [], connections: [], groups: [], labels: [] }
+      const fullDb = savedDb || { [LOCAL_BOARD_ID]: rootCanvas }
+      setBoards([board])
+      setDb(fullDb)
+      setDisplayName(boardName)
+      setStack([LOCAL_BOARD_ID])
+      loadedRef.current.add(LOCAL_BOARD_ID)
+      setLoading(false)
+      return
+    }
     ;(async () => {
       try {
         let boardsData = await fetchBoardsDB(userId)
@@ -324,7 +393,11 @@ function AppInner({ userId, userEmail }) {
     const canvas = dbRef.current[currentId]
     if (!canvas) return
     clearTimeout(syncTimerRef.current)
-    syncTimerRef.current = setTimeout(() => syncCanvas(currentId, canvas), 500)
+    if (userId === 'local') {
+      syncTimerRef.current = setTimeout(() => saveLocalDb(dbRef.current), 500)
+    } else {
+      syncTimerRef.current = setTimeout(() => syncCanvas(currentId, canvas), 500)
+    }
   }) // runs after every render — intentional, checks db[currentId]
 
   useEffect(() => { currentIdRef.current = currentId }, [currentId])
@@ -1035,7 +1108,7 @@ function AppInner({ userId, userEmail }) {
             title="Account"
             onClick={async () => {
               setShowAccount(v => {
-                if (!v) getUserStorageUsed(userId).then(setStorageUsed).catch(() => {})
+                if (!v && userId !== 'local') getUserStorageUsed(userId).then(setStorageUsed).catch(() => {})
                 return !v
               })
             }}
