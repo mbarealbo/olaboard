@@ -2,7 +2,7 @@
 
 A visual thinking tool for capturing and connecting ideas on an infinite canvas.
 
-![Olaboard](https://img.shields.io/badge/version-0.6.0-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![React](https://img.shields.io/badge/React-19-61dafb) ![Vite](https://img.shields.io/badge/Vite-8-646cff)
+![Olaboard](https://img.shields.io/badge/version-0.7.0-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![React](https://img.shields.io/badge/React-19-61dafb) ![Vite](https://img.shields.io/badge/Vite-8-646cff)
 
 Made by [olab.quest](https://olab.quest)
 
@@ -12,7 +12,7 @@ Made by [olab.quest](https://olab.quest)
 
 Olaboard is a personal idea management tool built around a visual canvas. Think of it as the missing middle ground between Miro (too collaborative, too expensive) and Notion (great for text, weak on visuals). It's opinionated, fast, and designed for solo thinkers.
 
-Sync across devices via Supabase. Sign in with a magic link — no password required.
+Sync across devices via Supabase. Sign in with email and password — or try the demo instantly at `/app`, no account needed.
 
 ---
 
@@ -92,7 +92,8 @@ Sync across devices via Supabase. Sign in with a magic link — no password requ
 ## Stack
 
 - **React 19** + **Vite 8**
-- **Supabase** — auth (magic link) + Postgres + Storage
+- **React Router v6** — `/` landing, `/app` demo (localStorage), `/login` auth, `/board` canvas
+- **Supabase** — auth (email + password) + Postgres + Storage
 - Pure CSS (no Tailwind)
 - No canvas libraries — all SVG + DOM
 - Lucide React for icons
