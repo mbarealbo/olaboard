@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useLang } from './contexts/LangContext'
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
-import { Trash2, Moon, Sun, Monitor, Zap, Folder, LogOut, Maximize2, Undo2, Redo2, User } from 'lucide-react'
+import { Trash2, Moon, Sun, Monitor, Zap, Folder, LogOut, Maximize2, Undo2, Redo2, User, MousePointerClick } from 'lucide-react'
 import BlockEditor from './components/BlockEditor'
 import PostIt from './components/PostIt'
 import ImageCard from './components/ImageCard'
@@ -459,6 +459,7 @@ function AppInner({ userId, userEmail }) {
     onImageResizeMouseDown,
     onLabelMouseDown, zoomBy,
     activeAutoCreateRef, activeToolRef, multiSelectedRef,
+    snapGuides,
   } = useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnectionFn, setActiveNoteId, view, activeTool, setActiveTool, selectMode, setMultiSelected, setSelectionRect, onGroupCreated: id => setEditingGroupId(id), pushCommand })
 
   useEffect(() => { activeAutoCreateRef.current = autoCreate }, [autoCreate, activeAutoCreateRef])
@@ -1308,6 +1309,15 @@ function AppInner({ userId, userEmail }) {
                 {connectLine && (
                   <line x1={connectLine.x1} y1={connectLine.y1} x2={connectLine.x2} y2={connectLine.y2} stroke="#378ADD" strokeWidth={2} strokeDasharray="5,4" />
                 )}
+                {snapGuides.map((g, i) => {
+                  if (g.axis === 'v') {
+                    const sx = g.w * scale + offset.x
+                    return <line key={i} x1={sx} y1={-9999} x2={sx} y2={9999} stroke="var(--accent)" strokeWidth={1} strokeDasharray="4,3" opacity={0.7} />
+                  } else {
+                    const sy = g.w * scale + offset.y
+                    return <line key={i} x1={-9999} y1={sy} x2={9999} y2={sy} stroke="var(--accent)" strokeWidth={1} strokeDasharray="4,3" opacity={0.7} />
+                  }
+                })}
               </svg>
 
               {/* Selection lasso rect */}
@@ -1665,6 +1675,21 @@ function AppInner({ userId, userEmail }) {
                   }}
                 ><Redo2 size={14} /></button>
               </div>
+
+              {/* Empty canvas hint */}
+              {cards.length === 0 && groups.length === 0 && labels.length === 0 && (
+                <div style={{
+                  position: 'absolute', top: '50%', left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  pointerEvents: 'none', userSelect: 'none', zIndex: 10,
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+                }}>
+                  <MousePointerClick size={28} style={{ opacity: 0.3, color: 'var(--text-muted)' }} />
+                  <span style={{ fontSize: 13, color: 'var(--text-muted)', opacity: 0.5, fontFamily: 'system-ui, sans-serif', letterSpacing: 0.1 }}>
+                    {t('emptyCanvasHint')}
+                  </span>
+                </div>
+              )}
 
               {/* Breadcrumb overlay */}
               {stack.length > 1 && (

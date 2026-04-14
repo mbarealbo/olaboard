@@ -12,6 +12,8 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
   const [editingLabelId, setEditingLabelId] = useState(null)
   const [selected, setSelected] = useState(null)
   const [editingCardId, setEditingCardId] = useState(null)
+  const [snapGuides, setSnapGuides] = useState([])
+  const [isPanning, setIsPanning] = useState(false)
 
   const offsetRef = useRef({ x: 0, y: 0 })
   const scaleRef = useRef(1)
@@ -97,8 +99,46 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
         const o = offsetRef.current, s = scaleRef.current
         const wx = (e.clientX - r.left - o.x) / s
         const wy = (e.clientY - r.top  - o.y) / s
-        const nx = d.origX + (wx - d.startWX)
-        const ny = d.origY + (wy - d.startWY)
+        let nx = d.origX + (wx - d.startWX)
+        let ny = d.origY + (wy - d.startWY)
+
+        // ── snap-to-alignment guides ────────────────────────────────────────
+        const SNAP_PX = 8
+        const threshold = SNAP_PX / s
+        const canvas = dbRef.current[currentIdRef.current]
+        const others = (canvas?.cards || []).filter(c => c.id !== d.cardId && !c.isLabel)
+        const guides = []
+        let bestSnapX = null, bestSnapXDist = threshold
+        let bestSnapY = null, bestSnapYDist = threshold
+        for (const c of others) {
+          const dragRefs = [nx, nx + 65, nx + 130]
+          const otherRefs = [c.x, c.x + 65, c.x + 130]
+          for (const dr of dragRefs) {
+            for (const or of otherRefs) {
+              const dist = Math.abs(dr - or)
+              if (dist < bestSnapXDist) {
+                bestSnapXDist = dist
+                bestSnapX = { snapNX: nx + (or - dr), worldX: or }
+              }
+            }
+          }
+          const dragRefsY = [ny, ny + 37, ny + 74]
+          const otherRefsY = [c.y, c.y + 37, c.y + 74]
+          for (const dr of dragRefsY) {
+            for (const or of otherRefsY) {
+              const dist = Math.abs(dr - or)
+              if (dist < bestSnapYDist) {
+                bestSnapYDist = dist
+                bestSnapY = { snapNY: ny + (or - dr), worldY: or }
+              }
+            }
+          }
+        }
+        if (bestSnapX) { nx = bestSnapX.snapNX; guides.push({ axis: 'v', w: bestSnapX.worldX }) }
+        if (bestSnapY) { ny = bestSnapY.snapNY; guides.push({ axis: 'h', w: bestSnapY.worldY }) }
+        setSnapGuides(guides)
+        // ───────────────────────────────────────────────────────────────────
+
         d.finalX = nx; d.finalY = ny
         updateCardFn(d.cardId, { x: nx, y: ny })
       } else if (d.type === 'multi') {
@@ -507,6 +547,8 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
         }
       }
 
+      if (dragging.current?.type === 'pan') setIsPanning(false)
+      setSnapGuides([])
       dragging.current = null
     }
 
@@ -629,16 +671,6 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
   function onBoardMouseDown(e) {
     if (e.target.closest('.postit')) return
 
-    if (selectMode) {
-      const r = boardRef.current.getBoundingClientRect()
-      const o = offsetRef.current, s = scaleRef.current
-      const wx = (e.clientX - r.left - o.x) / s
-      const wy = (e.clientY - r.top  - o.y) / s
-      setMultiSelected([])
-      dragging.current = { type: 'select', startWX: wx, startWY: wy }
-      return
-    }
-
     if (activeTool === 'group') {
       const r = boardRef.current.getBoundingClientRect()
       const o = offsetRef.current, s = scaleRef.current
@@ -648,8 +680,22 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
       return
     }
 
+    // Middle mouse button → pan
+    if (e.button === 1) {
+      e.preventDefault()
+      setIsPanning(true)
+      dragging.current = { type: 'pan', sx: e.clientX, sy: e.clientY, ox: offset.x, oy: offset.y }
+      return
+    }
+
+    // Left click on empty canvas → lasso select (also deselects any existing selection)
+    const r = boardRef.current.getBoundingClientRect()
+    const o = offsetRef.current, s = scaleRef.current
+    const wx = (e.clientX - r.left - o.x) / s
+    const wy = (e.clientY - r.top  - o.y) / s
     setSelected(null); setSelectedLabel(null)
-    dragging.current = { type: 'pan', sx: e.clientX, sy: e.clientY, ox: offset.x, oy: offset.y }
+    setMultiSelected([])
+    dragging.current = { type: 'select', startWX: wx, startWY: wy }
   }
 
   function onBoardDblClick(e) {
@@ -828,7 +874,7 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
     })
   }
 
-  const boardCursor = selectMode ? 'crosshair' : activeTool === 'text' ? 'text' : activeTool === 'group' ? 'crosshair' : 'grab'
+  const boardCursor = isPanning ? 'grabbing' : activeTool === 'text' ? 'text' : activeTool === 'group' ? 'crosshair' : 'crosshair'
 
   return {
     offset, setOffset,
@@ -850,5 +896,6 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
     onLabelMouseDown, zoomBy,
     createLabel, updateLabel,
     activeAutoCreateRef, activeToolRef, multiSelectedRef,
+    snapGuides,
   }
 }

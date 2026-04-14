@@ -70,6 +70,9 @@ export const translations = {
     createdAt: 'Creata il',
     updatedAt: 'Modificata il',
 
+    // Empty canvas hint
+    emptyCanvasHint: 'Doppio click per creare un post-it',
+
     // List view
     sortAZ: 'A→Z',
     sortZA: 'Z→A',
@@ -183,6 +186,9 @@ export const translations = {
     colorLabel: 'Color',
     createdAt: 'Created on',
     updatedAt: 'Modified on',
+
+    // Empty canvas hint
+    emptyCanvasHint: 'Double click to create a post-it',
 
     // List view
     sortAZ: 'A→Z',
