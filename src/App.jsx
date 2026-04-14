@@ -1214,10 +1214,10 @@ function AppInner({ userId, userEmail }) {
               {/* SVG overlay – arrows in screen-space */}
               <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
                 <defs>
-                  <marker id="ah" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto" markerUnits="userSpaceOnUse">
+                  <marker id="ah" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto" markerUnits="userSpaceOnUse">
                     <polygon points="0 0, 10 3.5, 0 7" fill="#378ADD" />
                   </marker>
-                  <marker id="ah-sel" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto" markerUnits="userSpaceOnUse">
+                  <marker id="ah-sel" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto" markerUnits="userSpaceOnUse">
                     <polygon points="0 0, 10 3.5, 0 7" fill="#e53935" />
                   </marker>
                 </defs>
@@ -1248,7 +1248,7 @@ function AppInner({ userId, userEmail }) {
                   function exitPoint(entity, isLbl, goingRight, goingDown, isHoriz, isSource, ew, eh) {
                     const w = ew
                     const h = eh
-                    const P = isSource ? 0 : (isLbl ? 20 : 36)
+                    const P = isSource ? 0 : (isLbl ? 10 : 10)
                     const cx = entity.x + w / 2
                     const cy = entity.y + h / 2
                     if (isHoriz) {

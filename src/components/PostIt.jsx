@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useState } from 'react'
 import { Folder, FileText, Type } from 'lucide-react'
 import { useLang } from '../contexts/LangContext'
 
@@ -23,9 +23,17 @@ const HC_COLOR_MAP = {
   white: '#000099', red: '#ff0000',
 }
 
+const EDGE_STRIPS = [
+  { anchor: 'top',    style: { top: -12,    left: -12, right: -12,  height: 12 } },
+  { anchor: 'right',  style: { top: 0,      right: -12, bottom: 0,  width: 12 } },
+  { anchor: 'bottom', style: { bottom: -12, left: -12, right: -12,  height: 12 } },
+  { anchor: 'left',   style: { top: 0,      left: -12,  bottom: 0,  width: 12 } },
+]
+
 export default function PostIt({ card, selected, onMouseDown, onClick, onDblClick, onRename, onNoteOpen, onToggleFolder, onConvertToLabel, onConnectDot, initialEditing, onEditStarted, cardColor, theme }) {
   const { t } = useLang()
   const titleRef = useRef(null)
+  const [hovered, setHovered] = useState(false)
   const isHC = theme === 'high-contrast'
 
   const bg = card.isFolder
@@ -67,7 +75,29 @@ export default function PostIt({ card, selected, onMouseDown, onClick, onDblClic
       onMouseDown={onMouseDown}
       onClick={onClick}
       onDoubleClick={onDblClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
+      {/* connection aura – visual ring, no pointer events */}
+      {hovered && onConnectDot && (
+        <div style={{
+          position: 'absolute', inset: -10,
+          borderRadius: 8,
+          border: '1.5px dashed rgba(55,138,221,0.35)',
+          pointerEvents: 'none',
+          zIndex: 9,
+        }} />
+      )}
+
+      {/* edge hit strips – start a connection from anywhere along each side */}
+      {hovered && onConnectDot && EDGE_STRIPS.map(({ anchor, style }) => (
+        <div
+          key={anchor}
+          style={{ position: 'absolute', cursor: 'crosshair', zIndex: 10, ...style }}
+          onMouseDown={e => { e.stopPropagation(); onConnectDot(e, anchor) }}
+        />
+      ))}
+
       <div
         ref={titleRef}
         className="postit-title"

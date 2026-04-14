@@ -303,8 +303,8 @@ function BlockItem({ block, olIndex, onKeyDown, onInput, onBlur, registerRef, on
         </div>
         {!focused && (
           <p
-            style={{ ...getBlockStyle('p'), margin: 0, cursor: 'text', position: 'relative' }}
-            onClick={() => elRef.current?.focus()}
+            style={{ ...getBlockStyle('p'), margin: 0, cursor: 'text', position: 'relative', userSelect: 'text' }}
+            onMouseUp={() => { if (!window.getSelection()?.toString()) elRef.current?.focus() }}
           >
             {block.content
               ? parseTextWithLinks(block.content)
@@ -649,7 +649,7 @@ export default function BlockEditor({ value, onChange, uploadImage }) {
 
   return (
     <div
-      style={{ flex: 1, padding: '8px 20px 16px', overflowY: 'auto', position: 'relative' }}
+      style={{ flex: 1, padding: '8px 20px 16px', overflowY: 'auto', position: 'relative', userSelect: 'text' }}
       onClick={e => {
         if (e.target === e.currentTarget) {
           const last = blocksRef.current[blocksRef.current.length - 1]
