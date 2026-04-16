@@ -4,7 +4,7 @@ A visual thinking tool for capturing and connecting ideas on an infinite canvas.
 
 ![version](https://img.shields.io/badge/version-0.8.0-blue) ![license](https://img.shields.io/badge/license-MIT-green) ![React](https://img.shields.io/badge/React-19-61dafb) ![Vite](https://img.shields.io/badge/Vite-8-646cff)
 
-**[olab.quest](https://olab.quest)** — try the live demo, no account needed.
+**[olaboard.netlify.app](https://olaboard.netlify.app.)** — try the live demo, no account needed.
 
 ---
 
