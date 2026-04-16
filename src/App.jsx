@@ -1030,7 +1030,7 @@ function AppInner({ userId, userEmail }) {
                 Made by{' '}
                 <a href="https://olab.quest" target="_blank" rel="noopener noreferrer" style={{ color: '#378ADD', textDecoration: 'none' }}>olab.quest</a>
               </div>
-              <div style={{ fontSize: 10, color: '#bbb', marginTop: 2 }}>v0.5.0</div>
+              <div style={{ fontSize: 10, color: '#bbb', marginTop: 2 }}>v0.8.0</div>
             </div>
           </div>
         </div>

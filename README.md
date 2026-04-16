@@ -2,9 +2,9 @@
 
 A visual thinking tool for capturing and connecting ideas on an infinite canvas.
 
-![Olaboard](https://img.shields.io/badge/version-0.7.0-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![React](https://img.shields.io/badge/React-19-61dafb) ![Vite](https://img.shields.io/badge/Vite-8-646cff)
+![Olaboard](https://img.shields.io/badge/version-0.8.0-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![React](https://img.shields.io/badge/React-19-61dafb) ![Vite](https://img.shields.io/badge/Vite-8-646cff)
 
-Made by [olab.quest](https://olab.quest)
+Made by [olab.quest](https://olab.quest) · [mbarealbo/olaboard](https://github.com/mbarealbo/olaboard)
 
 ---
 
@@ -21,14 +21,17 @@ Sync across devices via Supabase. Sign in with email and password — or try the
 ### Canvas
 - Infinite canvas with pan and zoom
 - **Center button** — fits all elements in view with one click (or press nothing, it centers automatically on navigation)
+- **Snap-to-alignment guides** — magnetic alignment lines appear while dragging, snapping cards to edges and centers of other cards
 - **Post-it notes** with body preview, custom colors, and rich notes
 - **Image cards** — drag & drop images onto the canvas, resize with aspect-ratio lock, connect with arrows
-- **Folders** (nested canvases) — double click to enter, breadcrumb to go back
+- **Folders** (nested canvases) — infinite depth, double click to enter, breadcrumb to go back
 - **Free text labels** — transparent, draggable, connectable
 - **Group boxes** — resizable containers that move cards inside them
 - **Arrows** with smart bezier routing, labels, and color on selection
 - **Quick Connect** — drag an arrow to empty space to auto-create a connected card
+- **Easy arrow start** — hover any card edge to grab a connection from anywhere along the side, not just the 4 cardinal dots
 - **Multi-select** — lasso tool on canvas, or checkbox mode in list view
+- Middle mouse button to pan; left click on empty canvas for immediate lasso select
 - Dot grid background (toggleable)
 
 ### Undo / Redo
@@ -39,13 +42,12 @@ Sync across devices via Supabase. Sign in with email and password — or try the
 ### Notes
 - Full-width or side panel mode
 - **Block editor** inspired by Notion — slash commands, markdown shortcuts
-- Block types: paragraph, H1/H2/H3, bullet list, numbered list, quote, code, **image**
+- Block types: paragraph, H1/H2/H3, bullet list, numbered list, quote, code, image
 - Auto-detect lists: type `- ` or `1. ` to convert
-
-### Notes
 - Auto-save on every keystroke — no save button
 - Creation date and last-modified date shown below the title
 - Block editor with list continuation (Enter adds next item, double Enter exits)
+- Text fully selectable by mouse drag in read mode
 - Cmd+A then Delete clears all content
 
 ### Storage
@@ -55,11 +57,16 @@ Sync across devices via Supabase. Sign in with email and password — or try the
 
 ### Organization
 - **Multiple boards** with rename and delete
-- **Nested folders** — infinite depth
+- **Nested folders** — infinite depth, each folder is its own canvas
 - **Collapsible sidebar tree** — state persisted across sessions
 - **Breadcrumb** navigation anchored to canvas bottom-left
 - **List view** — all elements with type badge, creation date, and bulk-select mode
 - **Export to Markdown** — current canvas exported as .md file
+
+### Themes
+- Light (default)
+- Dark
+- High Contrast — Commodore 64 palette
 
 ### Keyboard Shortcuts
 
@@ -82,19 +89,14 @@ Sync across devices via Supabase. Sign in with email and password — or try the
 | Double click (post-it) | Open note panel |
 | Double click (folder) | Enter folder |
 
-### Themes
-- Light (default)
-- Dark
-- High Contrast — Commodore 64 palette
-
 ---
 
 ## Stack
 
 - **React 19** + **Vite 8**
-- **React Router v6** — `/` landing, `/app` demo (localStorage), `/login` auth, `/board` canvas
+- **React Router v6** — `/landing`, `/app` demo (localStorage), `/login` auth, `/board` canvas
 - **Supabase** — auth (email + password) + Postgres + Storage
-- Pure CSS (no Tailwind)
+- Pure CSS + inline styles (no Tailwind)
 - No canvas libraries — all SVG + DOM
 - Lucide React for icons
 
@@ -103,7 +105,7 @@ Sync across devices via Supabase. Sign in with email and password — or try the
 ## Getting Started
 
 ```bash
-git clone https://github.com/yourusername/olaboard.git
+git clone https://github.com/mbarealbo/olaboard.git
 cd olaboard
 npm install
 ```
@@ -118,7 +120,38 @@ VITE_SUPABASE_ANON_KEY=your-anon-key
 npm run dev
 ```
 
-Open `http://localhost:5173`, enter your email to receive a magic link.
+Open `http://localhost:5173` — the landing page is at `/landing`, the demo canvas at `/app`.
+
+---
+
+## Changelog
+
+### 0.8.0
+- Landing page — Mobbin-style with animated mockups, feature sections, infinite canvas demo, note mockup, folder drill-down
+- Snap-to-alignment guides with magnetic snapping while dragging cards
+- Inverted pan/select: middle mouse = fast pan (grabbing cursor), left click on empty canvas = immediate lasso + deselect
+- Easier arrow connections — wide invisible edge strips let you start a connection from anywhere along a card's side
+- Arrowhead positioned flush with the card edge (matching the hover ring distance)
+- Text in note panel is fully selectable by mouse drag
+- Nested canvas section in landing showing infinite board depth
+
+### 0.7.0
+- i18n support with language context
+- Auto-centering on canvas navigation
+- Sidebar UUID flash fix
+
+### 0.6.0
+- Email + password auth, replacing magic link
+- React Router — landing, demo mode, auth routes
+
+### 0.5.0
+- Note auto-save, card creation dates, block editor fixes
+- Incremental card titles
+
+### 0.4.0
+- Undo/redo history
+- Image cards on canvas
+- Sidebar branding
 
 ---
 
