@@ -50,8 +50,7 @@
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: system-ui, sans-serif; background: var(--bg); height: 100vh; overflow: hidden; }
-#root { height: 100vh; }
+body { font-family: system-ui, sans-serif; background: var(--bg); }
 
 .postit {
   position: absolute;

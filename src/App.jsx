@@ -11,6 +11,7 @@ import { useHistory } from './hooks/useHistory'
 import { CARD_W, CARD_H_HALF, uid } from './utils'
 import { supabase } from './lib/supabase'
 import AuthPage from './components/AuthPage'
+import LandingPage from './components/LandingPage'
 import {
   fetchBoards as fetchBoardsDB,
   createBoard as createBoardDB,
@@ -121,20 +122,6 @@ function LoadingOverlay({ loading }) {
   )
 }
 
-// ─── LandingPage ─────────────────────────────────────────────────────────────
-function LandingPage() {
-  const navigate = useNavigate()
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', gap: 16, background: 'var(--bg, #fff)', fontFamily: 'system-ui, sans-serif' }}>
-      <h1 style={{ fontSize: 36, fontWeight: 700, letterSpacing: '-1px', margin: 0 }}>Olaboard</h1>
-      <p style={{ fontSize: 14, color: '#888', margin: 0 }}>Visual thinking, without the noise.</p>
-      <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-        <button onClick={() => navigate('/app')} style={{ padding: '10px 24px', fontSize: 14, fontWeight: 600, background: '#111', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer' }}>Try demo</button>
-        <button onClick={() => navigate('/login')} style={{ padding: '10px 24px', fontSize: 14, fontWeight: 600, background: '#fff', color: '#111', border: '1.5px solid #e0e0e0', borderRadius: 8, cursor: 'pointer' }}>Sign in</button>
-      </div>
-    </div>
-  )
-}
 
 // ─── LoginRoute ───────────────────────────────────────────────────────────────
 function LoginRoute() {
@@ -167,7 +154,8 @@ function BoardRoute() {
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<LandingPage />} />
+      <Route path="/" element={<Navigate to="/landing" replace />} />
+      <Route path="/landing" element={<LandingPage />} />
       <Route path="/app" element={<AppInner userId="local" userEmail="" />} />
       <Route path="/login" element={<LoginRoute />} />
       <Route path="/board" element={<BoardRoute />} />
