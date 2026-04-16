@@ -18,7 +18,7 @@ Sync across devices via Supabase. Sign in with email and password — or open `/
 
 ## Screenshots
 
-> Full interactive mockups at **[olab.quest/landing](https://olab.quest/landing)**
+> Full interactive mockups at **[olab.quest/landing](https://olaboard.netlify.app/landing)**
 
 ### Canvas
 
