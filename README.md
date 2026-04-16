@@ -34,7 +34,6 @@ Every post-it hides a full block editor. Rich content (headings, lists, quotes, 
 
 Light, dark, and a Commodore 64-inspired high-contrast mode.
 
-> **To add screenshots:** drop `screenshot-canvas.png`, `screenshot-notes.png`, `screenshot-themes.png` into a `docs/` folder at the root of the repo.
 
 ---
 
