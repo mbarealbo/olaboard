@@ -90,6 +90,11 @@ export const translations = {
     convertToLabel: 'Converti in etichetta',
     newIdea: 'Nuova idea',
 
+    // Mobile block
+    mobileBlockTitle: 'Olaboard è pensato per schermi grandi.',
+    mobileBlockBody: 'Aprilo dal tuo computer per usarlo al meglio.',
+    mobileBlockContinue: 'Continua comunque →',
+
     // GroupBox
     defaultGroupTitle: 'Gruppo',
     convertToPostIt: '🗒 post-it',
@@ -206,6 +211,11 @@ export const translations = {
     convertToFolder: 'Convert to folder',
     convertToLabel: 'Convert to label',
     newIdea: 'New idea',
+
+    // Mobile block
+    mobileBlockTitle: 'Olaboard is designed for larger screens.',
+    mobileBlockBody: 'Open it on your computer for the best experience.',
+    mobileBlockContinue: 'Continue anyway →',
 
     // GroupBox
     defaultGroupTitle: 'Group',

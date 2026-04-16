@@ -12,6 +12,7 @@ import { CARD_W, CARD_H_HALF, uid } from './utils'
 import { supabase } from './lib/supabase'
 import AuthPage from './components/AuthPage'
 import LandingPage from './components/LandingPage'
+import MobileBlock from './components/MobileBlock'
 import {
   fetchBoards as fetchBoardsDB,
   createBoard as createBoardDB,
@@ -151,7 +152,25 @@ function BoardRoute() {
 }
 
 // ─── App ─────────────────────────────────────────────────────────────────────
+function useMobilePhone() {
+  const check = () => window.innerWidth < 640 && window.matchMedia('(pointer: coarse)').matches
+  const [is, setIs] = useState(check)
+  useEffect(() => {
+    const h = () => setIs(check())
+    window.addEventListener('resize', h)
+    return () => window.removeEventListener('resize', h)
+  }, [])
+  return is
+}
+
 export default function App() {
+  const isMobilePhone = useMobilePhone()
+  const [dismissed, setDismissed] = useState(false)
+
+  if (isMobilePhone && !dismissed) {
+    return <MobileBlock onDismiss={() => setDismissed(true)} />
+  }
+
   return (
     <Routes>
       <Route path="/" element={<Navigate to="/landing" replace />} />
