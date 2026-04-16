@@ -22,19 +22,15 @@ Sync across devices via Supabase. Sign in with email and password — or open `/
 
 ### Canvas
 
-![Canvas view — post-its, arrows, alignment guides](docs/screenshot-canvas.png)
-
 Post-its, curved arrows, magnetic snap-to-alignment guides, nested folders, group boxes, and free text labels on an infinite dot-grid canvas.
 
 ### Notes
 
-![Note panel — block editor open alongside a card](docs/screenshot-notes.png)
 
 Every post-it hides a full block editor. Rich content (headings, lists, quotes, code, images) lives right next to the idea it belongs to.
 
 ### Themes
 
-![Three themes: light, dark, high-contrast](docs/screenshot-themes.png)
 
 Light, dark, and a Commodore 64-inspired high-contrast mode.
 
