@@ -165,19 +165,16 @@ function useMobilePhone() {
 
 export default function App() {
   const isMobilePhone = useMobilePhone()
-  const [dismissed, setDismissed] = useState(false)
 
-  if (isMobilePhone && !dismissed) {
-    return <MobileBlock onDismiss={() => setDismissed(true)} />
-  }
+  const gate = (el) => isMobilePhone ? <MobileBlock /> : el
 
   return (
     <Routes>
       <Route path="/" element={<Navigate to="/landing" replace />} />
       <Route path="/landing" element={<LandingPage />} />
-      <Route path="/app" element={<AppInner userId="local" userEmail="" />} />
-      <Route path="/login" element={<LoginRoute />} />
-      <Route path="/board" element={<BoardRoute />} />
+      <Route path="/app" element={gate(<AppInner userId="local" userEmail="" />)} />
+      <Route path="/login" element={gate(<LoginRoute />)} />
+      <Route path="/board" element={gate(<BoardRoute />)} />
     </Routes>
   )
 }
