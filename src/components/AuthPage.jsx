@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useLang } from '../contexts/LangContext'
@@ -18,15 +18,23 @@ export default function AuthPage() {
   const [params] = useSearchParams()
   const intentPro = params.get('intent') === 'pro'
 
-  const [mode, setMode] = useState('login') // 'login' | 'signup' | 'reset'
+  const [mode, setMode] = useState('login') // 'login' | 'signup' | 'reset' | 'newpassword'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  const [done, setDone] = useState(null) // success message
+  const [done, setDone] = useState(null)
 
   const isIT = lang === 'it'
+
+  // Intercept PASSWORD_RECOVERY event from Supabase email link
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') setMode('newpassword')
+    })
+    return () => subscription.unsubscribe()
+  }, [])
 
   async function handleLogin(e) {
     e.preventDefault()
@@ -62,11 +70,28 @@ export default function AuthPage() {
     if (!email.trim()) { setError(t('emailRequired')); return }
     setLoading(true); setError(null)
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: `${window.location.origin}/board`,
+      redirectTo: `${window.location.origin}/login`,
     })
     setLoading(false)
     if (error) setError(error.message)
     else setDone('reset')
+  }
+
+  async function handleNewPassword(e) {
+    e.preventDefault()
+    if (password !== confirmPassword) {
+      setError(isIT ? 'Le password non coincidono.' : 'Passwords do not match.')
+      return
+    }
+    if (password.length < 6) {
+      setError(isIT ? 'Minimo 6 caratteri.' : 'At least 6 characters required.')
+      return
+    }
+    setLoading(true); setError(null)
+    const { error } = await supabase.auth.updateUser({ password })
+    setLoading(false)
+    if (error) setError(error.message)
+    else setDone('newpassword')
   }
 
   function switchMode(m) {
@@ -76,30 +101,64 @@ export default function AuthPage() {
   // ── Success screens ──────────────────────────────────────────────────────────
   if (done) {
     const isSignup = done === 'signup'
+    const isNewPwd = done === 'newpassword'
     return (
       <Page>
         <Card>
           <div style={{ textAlign: 'center', padding: '8px 0 4px' }}>
-            <div style={{ fontSize: 40, marginBottom: 16 }}>{isSignup ? '🎉' : '📬'}</div>
+            <div style={{ fontSize: 40, marginBottom: 16 }}>{isSignup ? '🎉' : isNewPwd ? '✅' : '📬'}</div>
             <div style={{ fontSize: 18, fontWeight: 750, letterSpacing: '-0.5px', marginBottom: 10 }}>
               {isSignup
                 ? (isIT ? 'Account creato!' : 'Account created!')
-                : (isIT ? 'Email inviata!' : 'Email sent!')}
+                : isNewPwd
+                  ? (isIT ? 'Password aggiornata!' : 'Password updated!')
+                  : (isIT ? 'Email inviata!' : 'Email sent!')}
             </div>
             <p style={{ fontSize: 14, color: '#666', lineHeight: 1.6, margin: '0 0 20px' }}>
               {isSignup
                 ? (isIT
                     ? <>Controlla la tua casella email e clicca il link di conferma per attivare l'account.<br /><br />Dopo la conferma potrai accedere.</>
                     : <>Check your inbox and click the confirmation link to activate your account.<br /><br />You can sign in after confirming.</>)
-                : (isIT
-                    ? <>Abbiamo inviato un link di reset a <strong>{email}</strong>.</>
-                    : <>We sent a reset link to <strong>{email}</strong>.</>)}
+                : isNewPwd
+                  ? (isIT ? 'Puoi ora accedere con la nuova password.' : 'You can now sign in with your new password.')
+                  : (isIT
+                      ? <>Abbiamo inviato un link di reset a <strong>{email}</strong>.</>
+                      : <>We sent a reset link to <strong>{email}</strong>.</>)}
             </p>
-            <button
-              onClick={() => { setDone(null); switchMode('login') }}
-              style={{ background: 'none', border: 'none', color: '#378ADD', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}
-            >{t('backToLogin')}</button>
+            {isNewPwd
+              ? <button onClick={() => navigate('/board')} style={{ background: '#378ADD', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 700, padding: '9px 20px', borderRadius: 8 }}>
+                  {isIT ? 'Vai all\'app →' : 'Go to app →'}
+                </button>
+              : <button onClick={() => { setDone(null); switchMode('login') }} style={{ background: 'none', border: 'none', color: '#378ADD', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                  {t('backToLogin')}
+                </button>}
           </div>
+        </Card>
+      </Page>
+    )
+  }
+
+  // ── New password form (after clicking reset link) ────────────────────────────
+  if (mode === 'newpassword') {
+    return (
+      <Page>
+        <Card>
+          <div style={{ textAlign: 'center', marginBottom: 24 }}>
+            <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.8px', marginBottom: 6 }}>Olaboard</div>
+            <p style={{ fontSize: 13, color: '#888', margin: 0 }}>{isIT ? 'Imposta la nuova password.' : 'Set your new password.'}</p>
+          </div>
+          <form onSubmit={handleNewPassword}>
+            <FieldLabel>{isIT ? 'Nuova password' : 'New password'}</FieldLabel>
+            <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required style={inputStyle}
+              onFocus={e => { e.target.style.borderColor = '#378ADD' }} onBlur={e => { e.target.style.borderColor = '#e5e7eb' }} />
+            <FieldLabel style={{ marginTop: 14 }}>{isIT ? 'Conferma password' : 'Confirm password'}</FieldLabel>
+            <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="••••••••" required style={inputStyle}
+              onFocus={e => { e.target.style.borderColor = '#378ADD' }} onBlur={e => { e.target.style.borderColor = '#e5e7eb' }} />
+            {error && <div style={{ marginTop: 10, padding: '9px 12px', background: '#fff5f5', border: '1px solid #fecaca', borderRadius: 8, fontSize: 13, color: '#dc2626' }}>{error}</div>}
+            <button type="submit" disabled={loading} style={{ marginTop: 18, width: '100%', padding: '12px 0', background: loading ? '#a0c4e8' : '#378ADD', color: '#fff', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: loading ? 'default' : 'pointer', fontFamily: 'inherit' }}>
+              {loading ? '…' : (isIT ? 'Salva password →' : 'Save password →')}
+            </button>
+          </form>
         </Card>
       </Page>
     )
