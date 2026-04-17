@@ -16,7 +16,7 @@ Sync across devices via Supabase. Sign in with email and password — or open `/
 
 ---
 
-<video src="guide1.mp4" controls width="100%"></video>
+![Olaboard demo](guide1.gif)
 
 ---
 
