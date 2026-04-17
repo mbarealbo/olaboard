@@ -6,7 +6,8 @@ const LangContext = createContext(null)
 export function LangProvider({ children }) {
   const [lang, setLangState] = useState(() => {
     const saved = localStorage.getItem('olaboard_lang')
-    return saved === 'en' ? 'en' : 'it'
+    if (saved === 'en' || saved === 'it') return saved
+    return navigator.language?.startsWith('it') ? 'it' : 'en'
   })
 
   function setLang(newLang) {
