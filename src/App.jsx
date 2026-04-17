@@ -232,6 +232,25 @@ function AppInner({ userId, userEmail }) {
   })
   const [sidebarFocusId, setSidebarFocusId] = useState(null)
   const [showAccount, setShowAccount] = useState(false)
+  const [showUpgrade, setShowUpgrade] = useState(false)
+  const [upgradeYearly, setUpgradeYearly] = useState(false)
+  const [checkoutLoading, setCheckoutLoading] = useState(null)
+
+  async function startCheckout(priceKey) {
+    setCheckoutLoading(priceKey)
+    try {
+      const { data, error } = await supabase.functions.invoke('create-checkout', {
+        body: { priceKey, userId, userEmail, returnUrl: window.location.href }
+      })
+      if (error) throw error
+      if (data?.url) window.location.href = data.url
+    } catch (err) {
+      console.error('checkout error:', err)
+      showLimitToast('checkout')
+    } finally {
+      setCheckoutLoading(null)
+    }
+  }
   const [storageUsed, setStorageUsed] = useState(null) // bytes or null if not yet fetched
 
   const { push: pushCommand, undo, redo, canUndo, canRedo } = useHistory()
@@ -1177,9 +1196,9 @@ function AppInner({ userId, userEmail }) {
             <div style={{ fontSize: 13, color: 'var(--text)', wordBreak: 'break-all' }}>{userEmail}</div>
 
             {/* Plan section */}
-            <div style={{ borderRadius: 8, border: '1px solid var(--border)', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: 0.5, textTransform: 'uppercase' }}>Piano</span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)' }}>
+              <div>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: 0.5, textTransform: 'uppercase', marginRight: 8 }}>Piano</span>
                 <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
                   background: plan === 'god' ? '#7b2fff' : plan === 'pro' ? '#378ADD' : 'var(--border)',
                   color: plan === 'free' ? 'var(--text-muted)' : '#fff',
@@ -1188,32 +1207,17 @@ function AppInner({ userId, userEmail }) {
                 </span>
               </div>
               {plan === 'free' && userId !== 'local' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                    {limits.boards} lavagne · {limits.cardsPerCanvas} card/canvas · {limits.storageMB} MB
-                  </div>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <button onClick={async () => {
-                      const { data } = await supabase.functions.invoke('create-checkout', { body: { priceKey: 'monthly', userId, userEmail, returnUrl: window.location.href } })
-                      if (data?.url) window.location.href = data.url
-                    }} style={{ flex: 1, fontSize: 11, fontWeight: 650, padding: '6px 0', borderRadius: 6, border: 'none', background: '#378ADD', color: '#fff', cursor: 'pointer' }}>
-                      €6/mese
-                    </button>
-                    <button onClick={async () => {
-                      const { data } = await supabase.functions.invoke('create-checkout', { body: { priceKey: 'yearly', userId, userEmail, returnUrl: window.location.href } })
-                      if (data?.url) window.location.href = data.url
-                    }} style={{ flex: 1, fontSize: 11, fontWeight: 650, padding: '6px 0', borderRadius: 6, border: '1px solid #378ADD', background: 'transparent', color: '#378ADD', cursor: 'pointer' }}>
-                      €45/anno
-                    </button>
-                  </div>
-                </div>
+                <button onClick={() => { setShowAccount(false); setShowUpgrade(true) }}
+                  style={{ fontSize: 11, fontWeight: 650, padding: '5px 10px', borderRadius: 6, border: 'none', background: '#378ADD', color: '#fff', cursor: 'pointer' }}>
+                  Upgrade →
+                </button>
               )}
               {plan === 'pro' && userId !== 'local' && (
                 <button onClick={async () => {
                   const { data } = await supabase.functions.invoke('create-portal', { body: { userId, returnUrl: window.location.href } })
                   if (data?.url) window.location.href = data.url
-                }} style={{ fontSize: 11, padding: '5px 0', borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                  Gestisci abbonamento →
+                }} style={{ fontSize: 11, padding: '4px 9px', borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                  Gestisci →
                 </button>
               )}
             </div>
@@ -1246,7 +1250,62 @@ function AppInner({ userId, userEmail }) {
           </div>
         )}
 
-        {/* ── Content ─────────────────────────────────────────────���────────── */}
+        {/* Upgrade modal */}
+        {showUpgrade && (
+          <div onMouseDown={() => setShowUpgrade(false)} style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+            <div onMouseDown={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 20, padding: '32px 28px 28px', width: '100%', maxWidth: 480, boxShadow: '0 24px 64px rgba(0,0,0,0.18)', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif', color: '#0a0a0a' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                <div style={{ fontSize: 18, fontWeight: 750, letterSpacing: '-0.5px' }}>Upgrade to Pro</div>
+                <button onClick={() => setShowUpgrade(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#aaa', fontSize: 20, lineHeight: 1, padding: 0 }}>×</button>
+              </div>
+
+              {/* Toggle */}
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 24 }}>
+                <div style={{ display: 'inline-flex', background: '#f5f5f5', borderRadius: 100, padding: 3, gap: 0 }}>
+                  <button onClick={() => setUpgradeYearly(false)} style={{ padding: '5px 16px', borderRadius: 100, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, background: !upgradeYearly ? '#fff' : 'transparent', color: !upgradeYearly ? '#111' : '#888', boxShadow: !upgradeYearly ? '0 1px 4px rgba(0,0,0,0.10)' : 'none', transition: 'all 0.15s' }}>Monthly</button>
+                  <button onClick={() => setUpgradeYearly(true)} style={{ padding: '5px 16px', borderRadius: 100, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, background: upgradeYearly ? '#fff' : 'transparent', color: upgradeYearly ? '#111' : '#888', boxShadow: upgradeYearly ? '0 1px 4px rgba(0,0,0,0.10)' : 'none', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    Yearly <span style={{ fontSize: 9, fontWeight: 700, background: '#e8f5e9', color: '#2e7d32', borderRadius: 20, padding: '1px 6px' }}>-37%</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Price */}
+              <div style={{ textAlign: 'center', marginBottom: 24 }}>
+                <span style={{ fontSize: 40, fontWeight: 800, letterSpacing: '-2px' }}>{upgradeYearly ? '€3.75' : '€6'}</span>
+                <span style={{ fontSize: 14, color: '#999', marginLeft: 4 }}>/month</span>
+                {upgradeYearly && <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>billed €45/year</div>}
+              </div>
+
+              {/* Features */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 28 }}>
+                {[
+                  ['Unlimited boards', '3 boards on Free'],
+                  ['Unlimited cards per canvas', '150 on Free'],
+                  ['Unlimited canvases', '30 on Free'],
+                  ['100 MB image storage', '20 MB on Free'],
+                  ['Priority support', ''],
+                ].map(([feat, note]) => (
+                  <div key={feat} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                    <span style={{ color: '#378ADD', fontWeight: 700, fontSize: 14, lineHeight: 1.5, flexShrink: 0 }}>✓</span>
+                    <span style={{ fontSize: 13, color: '#333', lineHeight: 1.5 }}>{feat}{note ? <span style={{ color: '#aaa', fontSize: 11, marginLeft: 6 }}>({note})</span> : null}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* CTA */}
+              <button
+                onClick={() => startCheckout(upgradeYearly ? 'yearly' : 'monthly')}
+                disabled={!!checkoutLoading}
+                style={{ width: '100%', padding: '13px 0', borderRadius: 10, border: 'none', background: '#378ADD', color: '#fff', fontSize: 15, fontWeight: 700, cursor: checkoutLoading ? 'not-allowed' : 'pointer', opacity: checkoutLoading ? 0.7 : 1, transition: 'opacity 0.15s' }}
+              >
+                {checkoutLoading ? 'Redirecting…' : `Get Pro — ${upgradeYearly ? '€45/year' : '€6/month'}`}
+              </button>
+              <p style={{ textAlign: 'center', fontSize: 11, color: '#bbb', marginTop: 10, marginBottom: 0 }}>Cancel any time · Secure payment via Stripe</p>
+            </div>
+          </div>
+        )}
+
+        {/* ── Content ──────────────────────────────────────────────────────── */}
         <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
 
           {view === 'canvas' ? (
