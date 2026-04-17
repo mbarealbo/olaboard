@@ -20,6 +20,26 @@ Sync across devices via Supabase. Sign in with email and password — or open `/
 
 ---
 
+## Pricing
+
+| | Free | Pro | Self-hosted |
+|---|---|---|---|
+| **Price** | Free forever | €6/month or €45/year | Free forever |
+| **Boards** | 3 | Unlimited | Unlimited |
+| **Cards per canvas** | 150 | Unlimited | Unlimited |
+| **Total canvases** | 30 | Unlimited | Unlimited |
+| **Storage** | 20 MB | 100 MB | Your own Supabase |
+| **Notes** | Unlimited | Unlimited | Unlimited |
+| **Sync across devices** | ✓ | ✓ | ✓ |
+
+**Demo mode** (`/app`) is always free and unlimited — no account needed, data stored locally in the browser.
+
+**Self-hosting is always free.** Clone the repo, connect your own Supabase project, and all limits are gone. The code is MIT — do whatever you want with it.
+
+Upgrade to Pro on [olab.quest](https://olab.quest) to support development and get unlimited everything on the hosted version.
+
+---
+
 ## Features
 
 ### Canvas

@@ -12,7 +12,10 @@ import { CARD_W, CARD_H_HALF, uid } from './utils'
 import { supabase } from './lib/supabase'
 import AuthPage from './components/AuthPage'
 import LandingPage from './components/LandingPage'
+import PricingPage from './components/PricingPage'
 import MobileBlock from './components/MobileBlock'
+import { PlanProvider, usePlan } from './contexts/PlanContext'
+import { countTotalCanvases } from './lib/plans'
 import {
   fetchBoards as fetchBoardsDB,
   createBoard as createBoardDB,
@@ -148,7 +151,7 @@ function BoardRoute() {
   }, [])
   if (session === undefined) return null
   if (session === null) return <Navigate to="/login" replace />
-  return <AppInner userId={session.user.id} userEmail={session.user.email} />
+  return <PlanProvider userId={session.user.id}><AppInner userId={session.user.id} userEmail={session.user.email} /></PlanProvider>
 }
 
 // ─── App ─────────────────────────────────────────────────────────────────────
@@ -172,7 +175,8 @@ export default function App() {
     <Routes>
       <Route path="/" element={<Navigate to="/landing" replace />} />
       <Route path="/landing" element={<LandingPage />} />
-      <Route path="/app" element={gate(<AppInner userId="local" userEmail="" />)} />
+      <Route path="/pricing" element={<PricingPage />} />
+      <Route path="/app" element={gate(<PlanProvider userId="local"><AppInner userId="local" userEmail="" /></PlanProvider>)} />
       <Route path="/login" element={gate(<LoginRoute />)} />
       <Route path="/board" element={gate(<BoardRoute />)} />
     </Routes>
@@ -181,6 +185,20 @@ export default function App() {
 
 function AppInner({ userId, userEmail }) {
   const { t, lang, setLang } = useLang()
+  const { plan, limits } = usePlan()
+  const [limitToast, setLimitToast] = useState(null)
+
+  function showLimitToast(type) {
+    const msgs = {
+      boards:         plan === 'free' ? `Limite raggiunto: max ${limits.boards} lavagne nel piano free.`         : 'Limite raggiunto.',
+      cardsPerCanvas: plan === 'free' ? `Limite raggiunto: max ${limits.cardsPerCanvas} elementi per canvas.`   : 'Limite raggiunto.',
+      totalCanvases:  plan === 'free' ? `Limite raggiunto: max ${limits.totalCanvases} canvas totali nel piano free.` : 'Limite raggiunto.',
+      storage:        plan === 'free' ? `Limite storage: max ${limits.storageMB} MB nel piano free.`            : 'Limite raggiunto.',
+    }
+    setLimitToast(msgs[type] || 'Limite del piano raggiunto.')
+    setTimeout(() => setLimitToast(null), 4000)
+  }
+
   const [db, setDb] = useState({})
   const [boards, setBoards] = useState([])
   const [loading, setLoading] = useState(true)
@@ -237,6 +255,10 @@ function AppInner({ userId, userEmail }) {
   // ── image upload helpers ───────────────────────────────────────────────────
   async function handleUploadImage(file) {
     if (userId === 'local') throw new Error(t('demoUploadError'))
+    if (limits.storageMB !== Infinity && storageUsed !== null && storageUsed >= limits.storageMB * 1024 * 1024) {
+      showLimitToast('storage')
+      throw new Error('storage_limit')
+    }
     return uploadImageDB(file, userId)
   }
 
@@ -464,7 +486,7 @@ function AppInner({ userId, userEmail }) {
     onLabelMouseDown, zoomBy,
     activeAutoCreateRef, activeToolRef, multiSelectedRef,
     snapGuides,
-  } = useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnectionFn, setActiveNoteId, view, activeTool, setActiveTool, selectMode, setMultiSelected, setSelectionRect, onGroupCreated: id => setEditingGroupId(id), pushCommand })
+  } = useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnectionFn, setActiveNoteId, view, activeTool, setActiveTool, selectMode, setMultiSelected, setSelectionRect, onGroupCreated: id => setEditingGroupId(id), pushCommand, maxCardsPerCanvas: limits.cardsPerCanvas, onLimitReached: showLimitToast })
 
   useEffect(() => { activeAutoCreateRef.current = autoCreate }, [autoCreate, activeAutoCreateRef])
   useEffect(() => { activeToolRef.current = activeTool }, [activeTool, activeToolRef])
@@ -928,6 +950,12 @@ function AppInner({ userId, userEmail }) {
   // ── render ────────────────────────────────────────────────────────────────
   return (
     <div data-theme={theme} style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: 'system-ui, sans-serif' }}>
+      {limitToast && (
+        <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 9999, background: '#1a1a1a', color: '#fff', padding: '10px 20px', borderRadius: 10, fontSize: 13, fontWeight: 500, boxShadow: '0 4px 20px rgba(0,0,0,0.25)', display: 'flex', alignItems: 'center', gap: 12, whiteSpace: 'nowrap' }}>
+          <span>🔒 {limitToast}</span>
+          <button onClick={() => setLimitToast(null)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 0 }}>×</button>
+        </div>
+      )}
 
       {/* Loading overlay */}
       <LoadingOverlay loading={loading} />
@@ -1018,6 +1046,7 @@ function AppInner({ userId, userEmail }) {
               onMouseEnter={e => { e.currentTarget.style.background = '#f5f5f5' }}
               onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
               onClick={async () => {
+                if (boards.length >= limits.boards) { showLimitToast('boards'); return }
                 const name = t('newBoardName')
                 try {
                   let id
@@ -1146,16 +1175,59 @@ function AppInner({ userId, userEmail }) {
             />
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: 0.5, textTransform: 'uppercase' }}>{t('account')}</div>
             <div style={{ fontSize: 13, color: 'var(--text)', wordBreak: 'break-all' }}>{userEmail}</div>
+
+            {/* Plan section */}
+            <div style={{ borderRadius: 8, border: '1px solid var(--border)', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: 0.5, textTransform: 'uppercase' }}>Piano</span>
+                <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+                  background: plan === 'god' ? '#7b2fff' : plan === 'pro' ? '#378ADD' : 'var(--border)',
+                  color: plan === 'free' ? 'var(--text-muted)' : '#fff',
+                }}>
+                  {plan === 'god' ? '⚡ God' : plan === 'pro' ? '★ Pro' : 'Free'}
+                </span>
+              </div>
+              {plan === 'free' && userId !== 'local' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                    {limits.boards} lavagne · {limits.cardsPerCanvas} card/canvas · {limits.storageMB} MB
+                  </div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button onClick={async () => {
+                      const { data } = await supabase.functions.invoke('create-checkout', { body: { priceKey: 'monthly', userId, userEmail, returnUrl: window.location.href } })
+                      if (data?.url) window.location.href = data.url
+                    }} style={{ flex: 1, fontSize: 11, fontWeight: 650, padding: '6px 0', borderRadius: 6, border: 'none', background: '#378ADD', color: '#fff', cursor: 'pointer' }}>
+                      €6/mese
+                    </button>
+                    <button onClick={async () => {
+                      const { data } = await supabase.functions.invoke('create-checkout', { body: { priceKey: 'yearly', userId, userEmail, returnUrl: window.location.href } })
+                      if (data?.url) window.location.href = data.url
+                    }} style={{ flex: 1, fontSize: 11, fontWeight: 650, padding: '6px 0', borderRadius: 6, border: '1px solid #378ADD', background: 'transparent', color: '#378ADD', cursor: 'pointer' }}>
+                      €45/anno
+                    </button>
+                  </div>
+                </div>
+              )}
+              {plan === 'pro' && userId !== 'local' && (
+                <button onClick={async () => {
+                  const { data } = await supabase.functions.invoke('create-portal', { body: { userId, returnUrl: window.location.href } })
+                  if (data?.url) window.location.href = data.url
+                }} style={{ fontSize: 11, padding: '5px 0', borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                  Gestisci abbonamento →
+                </button>
+              )}
+            </div>
+
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>
                 <span>{t('storage')}</span>
-                <span>{storageUsed !== null ? `${(storageUsed / 1024 / 1024).toFixed(1)} MB / 100 MB` : '…'}</span>
+                <span>{storageUsed !== null ? `${(storageUsed / 1024 / 1024).toFixed(1)} MB / ${limits.storageMB === Infinity ? '∞' : limits.storageMB + ' MB'}` : '…'}</span>
               </div>
               <div style={{ height: 6, borderRadius: 3, background: 'var(--border)', overflow: 'hidden' }}>
                 <div style={{
                   height: '100%', borderRadius: 3,
-                  background: storageUsed > 90 * 1024 * 1024 ? '#e53935' : 'var(--accent)',
-                  width: storageUsed !== null ? `${Math.min(100, (storageUsed / (100 * 1024 * 1024)) * 100).toFixed(1)}%` : '0%',
+                  background: storageUsed > (limits.storageMB * 0.9) * 1024 * 1024 ? '#e53935' : 'var(--accent)',
+                  width: storageUsed !== null && limits.storageMB !== Infinity ? `${Math.min(100, (storageUsed / (limits.storageMB * 1024 * 1024)) * 100).toFixed(1)}%` : storageUsed !== null ? '5%' : '0%',
                   transition: 'width 0.4s ease',
                 }} />
               </div>
@@ -1547,6 +1619,9 @@ function AppInner({ userId, userEmail }) {
                       onNoteOpen={() => openNote(card)}
                       onToggleFolder={() => {
                         const becomingFolder = !card.isFolder
+                        if (becomingFolder && countTotalCanvases(boards, db) >= limits.totalCanvases) {
+                          showLimitToast('totalCanvases'); return
+                        }
                         updateCardFn(card.id, { isFolder: becomingFolder })
                         if (becomingFolder) {
                           setDb(prev => prev[card.id] ? prev : {

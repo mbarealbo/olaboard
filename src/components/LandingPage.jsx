@@ -382,6 +382,11 @@ export default function LandingPage() {
       <nav style={{ position: 'fixed', top: 0, left: 0, right: 0, height: 54, zIndex: 100, display: 'flex', alignItems: 'center', padding: `0 ${px}`, background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(14px)', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
         <span style={{ fontSize: 15, fontWeight: 750, letterSpacing: '-0.5px' }}>Olaboard</span>
         <div style={{ flex: 1 }} />
+        {!isMobile && (
+          <button onClick={() => navigate('/pricing')} style={{ fontSize: 13, fontWeight: 600, background: 'transparent', color: '#555', border: 'none', borderRadius: 8, cursor: 'pointer', padding: '8px 14px', marginRight: 2, transition: 'color 0.15s' }}
+            onMouseEnter={e => e.currentTarget.style.color = '#111'} onMouseLeave={e => e.currentTarget.style.color = '#555'}
+          >Pricing</button>
+        )}
         <a href={GITHUB_URL} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 13px', fontSize: 13, fontWeight: 600, color: '#555', textDecoration: 'none', borderRadius: 8, border: '1px solid #e5e7eb', marginRight: 6, transition: 'color 0.15s, border-color 0.15s' }}
           onMouseEnter={e => { e.currentTarget.style.color = '#111'; e.currentTarget.style.borderColor = '#bbb' }}
           onMouseLeave={e => { e.currentTarget.style.color = '#555'; e.currentTarget.style.borderColor = '#e5e7eb' }}
@@ -585,6 +590,23 @@ export default function LandingPage() {
               </ScaledMockup>
             </FadeIn>
           )}
+        </div>
+      </section>
+
+      {/* ── Video ───────────────────────────────────────────────────────── */}
+      <section style={{ padding: `${isMobile ? '72px' : '100px'} ${px}` }}>
+        <div style={{ maxWidth: 920, margin: '0 auto' }}>
+          <FadeIn>
+            <div style={{ textAlign: 'center', marginBottom: isMobile ? 32 : 48 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#378ADD', letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 12 }}>See it in action</div>
+              <h2 style={{ fontSize: isMobile ? 26 : 'clamp(26px, 3vw, 38px)', fontWeight: 750, letterSpacing: '-1px', lineHeight: 1.1 }}>From idea to structure<br />in seconds.</h2>
+            </div>
+          </FadeIn>
+          <FadeIn delay={100}>
+            <div style={{ borderRadius: 16, overflow: 'hidden', border: '1px solid #e5e7eb', boxShadow: '0 2px 0 #e5e7eb, 0 20px 60px rgba(0,0,0,0.10)' }}>
+              <video src="/guide1.mp4" controls autoPlay muted loop playsInline style={{ width: '100%', display: 'block' }} />
+            </div>
+          </FadeIn>
         </div>
       </section>
 

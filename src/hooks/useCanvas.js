@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { uid, anchorPoint } from '../utils'
 import { useLang } from '../contexts/LangContext'
 
-export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnectionFn, setActiveNoteId, view, activeTool, setActiveTool, selectMode, setMultiSelected, setSelectionRect, onGroupCreated, pushCommand }) {
+export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnectionFn, setActiveNoteId, view, activeTool, setActiveTool, selectMode, setMultiSelected, setSelectionRect, onGroupCreated, pushCommand, maxCardsPerCanvas = Infinity, onLimitReached }) {
   const { t } = useLang()
   const [offset, setOffset] = useState({ x: 0, y: 0 })
   const [scale, setScale] = useState(1)
@@ -819,8 +819,13 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
   }
 
   function createCard(wx, wy) {
-    const card = { id: uid(), title: nextCardTitle(), body: '', x: wx, y: wy, isFolder: false }
     const cId = currentIdRef.current
+    const currentCards = db[cId]?.cards || []
+    if (currentCards.filter(c => !c.isLabel).length >= maxCardsPerCanvas) {
+      onLimitReached?.('cardsPerCanvas')
+      return null
+    }
+    const card = { id: uid(), title: nextCardTitle(), body: '', x: wx, y: wy, isFolder: false }
     setDb(prev => {
       const canvas = prev[cId]
       if (!canvas) return prev
