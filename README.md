@@ -16,6 +16,12 @@ Sync across devices via Supabase. Sign in with email and password — or open `/
 
 ---
 
+## Demo
+
+https://github.com/mbarealbo/olaboard/blob/main/guide1.mp4
+
+---
+
 ## Screenshots
 
 > Full interactive mockups at **[olab.quest/landing](https://olaboard.netlify.app/landing)**
