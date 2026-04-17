@@ -16,30 +16,7 @@ Sync across devices via Supabase. Sign in with email and password — or open `/
 
 ---
 
-## Demo
-
-https://github.com/mbarealbo/olaboard/blob/main/guide1.mp4
-
----
-
-## Screenshots
-
-> Full interactive mockups at **[olab.quest/landing](https://olaboard.netlify.app/landing)**
-
-### Canvas
-
-Post-its, curved arrows, magnetic snap-to-alignment guides, nested folders, group boxes, and free text labels on an infinite dot-grid canvas.
-
-### Notes
-
-
-Every post-it hides a full block editor. Rich content (headings, lists, quotes, code, images) lives right next to the idea it belongs to.
-
-### Themes
-
-
-Light, dark, and a Commodore 64-inspired high-contrast mode.
-
+<video src="guide1.mp4" controls width="100%"></video>
 
 ---
 
