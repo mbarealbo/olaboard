@@ -151,6 +151,7 @@ max_indexes = 5
 enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
 # in emails.
+# Self-hosters: replace with your own domain before running `supabase config push`
 site_url = "https://olaboard.netlify.app"
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
 additional_redirect_urls = ["https://olaboard.netlify.app/login", "https://olaboard.netlify.app/board", "http://localhost:5173/login", "http://localhost:5173/board"]
