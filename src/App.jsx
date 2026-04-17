@@ -246,7 +246,7 @@ function AppInner({ userId, userEmail }) {
       if (data?.url) window.location.href = data.url
     } catch (err) {
       console.error('checkout error:', err)
-      showLimitToast('checkout')
+      alert('Checkout error: ' + (err?.message || JSON.stringify(err)))
     } finally {
       setCheckoutLoading(null)
     }
