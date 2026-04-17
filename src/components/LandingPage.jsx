@@ -368,6 +368,7 @@ function Step({ n, title, body, delay }) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function LandingPage() {
+  useEffect(() => { document.title = 'Olaboard — Visual Thinking on an Infinite Canvas' }, [])
   const navigate = useNavigate()
   const width = useWindowWidth()
   const isMobile = width < 640

@@ -28,6 +28,8 @@ export default function AuthPage() {
 
   const isIT = lang === 'it'
 
+  useEffect(() => { document.title = 'Sign in — Olaboard' }, [])
+
   // Intercept PASSWORD_RECOVERY event from Supabase email link
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {

@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /landing
+Allow: /pricing
+
+# App routes — no SEO value, avoid indexing
+Disallow: /app
+Disallow: /board
+Disallow: /login
+
+Sitemap: https://olaboard.netlify.app/sitemap.xml

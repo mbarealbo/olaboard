@@ -52,6 +52,7 @@ const SELF_FEATURES = [
 ]
 
 export default function PricingPage() {
+  useEffect(() => { document.title = 'Pricing — Olaboard' }, [])
   const navigate = useNavigate()
   const width = useWindowWidth()
   const isMobile = width < 640
