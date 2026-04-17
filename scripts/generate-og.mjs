@@ -67,11 +67,25 @@ const svg = `<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http:/
   <polygon points="900,171 912,175 900,179" fill="#378ADD" opacity="0.6"/>
 
   <!-- Left panel — brand + text -->
-  <!-- Logo icon -->
-  <svg x="80" y="132" width="60" height="58" viewBox="0 0 48 46" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path fill="#863bff" d="M25.946 44.938c-.664.845-2.021.375-2.021-.698V33.937a2.26 2.26 0 0 0-2.262-2.262H10.287c-.92 0-1.456-1.04-.92-1.788l7.48-10.471c1.07-1.497 0-3.578-1.842-3.578H1.237c-.92 0-1.456-1.04-.92-1.788L10.013.474c.214-.297.556-.474.92-.474h28.894c.92 0 1.456 1.04.92 1.788l-7.48 10.471c-1.07 1.498 0 3.579 1.842 3.579h11.377c.943 0 1.473 1.088.89 1.83L25.947 44.94z"/>
-  </svg>
-  <text x="152" y="200" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="72" font-weight="800" fill="#0a0a0a" letter-spacing="-3">Olaboard</text>
+  <!-- Logo icon (inlined) -->
+  <g transform="translate(80, 130) scale(0.233)">
+    <circle cx="150" cy="150" r="150" fill="#ffffff"/>
+    <circle cx="150" cy="150" r="148" fill="none" stroke="#000000" stroke-width="4"/>
+    <path d="M 90 240 C 90 195, 115 160, 150 160 C 185 160, 210 195, 210 240 L 210 280 L 90 280 Z" fill="#000000"/>
+    <path d="M 95 130 C 95 90, 120 65, 150 65 C 180 65, 205 90, 205 130 L 205 190 C 205 220, 180 240, 150 240 C 120 240, 95 220, 95 190 Z" fill="#ffffff" stroke="#000000" stroke-width="4"/>
+    <path d="M 90 130 C 90 82, 120 55, 150 55 C 180 55, 210 82, 210 130 L 235 135 C 242 137, 244 141, 244 145 L 244 149 C 244 153, 240 155, 235 154 L 215 150 L 210 150 C 205 150, 95 150, 90 150 Z" fill="#000000"/>
+    <g transform="rotate(-8 135 125)">
+      <rect x="116" y="107" width="38" height="38" rx="2" fill="#ffffff" stroke="#000000" stroke-width="4"/>
+      <line x1="122" y1="119" x2="146" y2="119" stroke="#000000" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="122" y1="127" x2="146" y2="127" stroke="#000000" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="122" y1="135" x2="138" y2="135" stroke="#000000" stroke-width="2.5" stroke-linecap="round"/>
+    </g>
+    <circle cx="135" cy="175" r="5" fill="#000000"/>
+    <circle cx="175" cy="175" r="5" fill="#000000"/>
+    <path d="M 175 185 C 182 180, 190 183, 190 190 C 190 195, 185 200, 178 198" fill="none" stroke="#000000" stroke-width="3" stroke-linecap="round"/>
+    <path d="M 140 210 C 145 215, 160 215, 165 210" fill="none" stroke="#000000" stroke-width="3" stroke-linecap="round"/>
+  </g>
+  <text x="162" y="200" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="72" font-weight="800" fill="#0a0a0a" letter-spacing="-3">Olaboard</text>
 
   <text x="82" y="258" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="26" font-weight="400" fill="#555" letter-spacing="-0.5">Visual thinking on an infinite canvas.</text>
 

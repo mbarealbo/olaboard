@@ -1,8 +1,22 @@
 export default function OlaboardLogo({ size = 22, fontSize = 15, color = '#0a0a0a', gap = 7 }) {
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap }}>
-      <svg width={size} height={size * (46 / 48)} viewBox="0 0 48 46" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
-        <path fill="#863bff" d="M25.946 44.938c-.664.845-2.021.375-2.021-.698V33.937a2.26 2.26 0 0 0-2.262-2.262H10.287c-.92 0-1.456-1.04-.92-1.788l7.48-10.471c1.07-1.497 0-3.578-1.842-3.578H1.237c-.92 0-1.456-1.04-.92-1.788L10.013.474c.214-.297.556-.474.92-.474h28.894c.92 0 1.456 1.04.92 1.788l-7.48 10.471c-1.07 1.498 0 3.579 1.842 3.579h11.377c.943 0 1.473 1.088.89 1.83L25.947 44.94z"/>
+      <svg width={size} height={size} viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+        <circle cx="150" cy="150" r="150" fill="#ffffff"/>
+        <circle cx="150" cy="150" r="148" fill="none" stroke="#000000" strokeWidth="4"/>
+        <path d="M 90 240 C 90 195, 115 160, 150 160 C 185 160, 210 195, 210 240 L 210 280 L 90 280 Z" fill="#000000"/>
+        <path d="M 95 130 C 95 90, 120 65, 150 65 C 180 65, 205 90, 205 130 L 205 190 C 205 220, 180 240, 150 240 C 120 240, 95 220, 95 190 Z" fill="#ffffff" stroke="#000000" strokeWidth="4"/>
+        <path d="M 90 130 C 90 82, 120 55, 150 55 C 180 55, 210 82, 210 130 L 235 135 C 242 137, 244 141, 244 145 L 244 149 C 244 153, 240 155, 235 154 L 215 150 L 210 150 C 205 150, 95 150, 90 150 Z" fill="#000000"/>
+        <g transform="rotate(-8 135 125)">
+          <rect x="116" y="107" width="38" height="38" rx="2" fill="#ffffff" stroke="#000000" strokeWidth="4"/>
+          <line x1="122" y1="119" x2="146" y2="119" stroke="#000000" strokeWidth="2.5" strokeLinecap="round"/>
+          <line x1="122" y1="127" x2="146" y2="127" stroke="#000000" strokeWidth="2.5" strokeLinecap="round"/>
+          <line x1="122" y1="135" x2="138" y2="135" stroke="#000000" strokeWidth="2.5" strokeLinecap="round"/>
+        </g>
+        <circle cx="135" cy="175" r="5" fill="#000000"/>
+        <circle cx="175" cy="175" r="5" fill="#000000"/>
+        <path d="M 175 185 C 182 180, 190 183, 190 190 C 190 195, 185 200, 178 198" fill="none" stroke="#000000" strokeWidth="3" strokeLinecap="round"/>
+        <path d="M 140 210 C 145 215, 160 215, 165 210" fill="none" stroke="#000000" strokeWidth="3" strokeLinecap="round"/>
       </svg>
       <span style={{ fontSize, fontWeight: 750, letterSpacing: '-0.5px', color, lineHeight: 1 }}>
         Olaboard
