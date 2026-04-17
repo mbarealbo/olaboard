@@ -1268,65 +1268,96 @@ function AppInner({ userId, userEmail }) {
         {/* Upgrade modal */}
         {showUpgrade && (
           <div onMouseDown={() => setShowUpgrade(false)} style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-            <div onMouseDown={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 20, padding: '32px 28px 28px', width: '100%', maxWidth: 480, boxShadow: '0 24px 64px rgba(0,0,0,0.18)', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif', color: '#0a0a0a' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-                <div style={{ fontSize: 18, fontWeight: 750, letterSpacing: '-0.5px' }}>Upgrade to Pro</div>
+            <div onMouseDown={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 20, padding: '32px 28px 28px', width: '100%', maxWidth: 560, boxShadow: '0 24px 64px rgba(0,0,0,0.18)', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif', color: '#0a0a0a' }}>
+
+              {/* Header */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <div style={{ fontSize: 18, fontWeight: 750, letterSpacing: '-0.5px' }}>
+                  {userId === 'local'
+                    ? (lang === 'it' ? 'Registrati per salvare i tuoi dati' : 'Sign up to save your data')
+                    : 'Upgrade to Pro'}
+                </div>
                 <button onClick={() => setShowUpgrade(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#aaa', fontSize: 20, lineHeight: 1, padding: 0 }}>×</button>
               </div>
+              {userId === 'local' && (
+                <p style={{ fontSize: 13, color: '#888', marginBottom: 20, marginTop: 0 }}>
+                  {lang === 'it'
+                    ? 'La demo salva i dati solo in questo browser. Con un account gratuito li tieni al sicuro e sincronizzati.'
+                    : 'The demo saves data in this browser only. With a free account your data is safe and synced across devices.'}
+                </p>
+              )}
 
-              {/* Toggle */}
-              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 24 }}>
-                <div style={{ display: 'inline-flex', background: '#f5f5f5', borderRadius: 100, padding: 3, gap: 0 }}>
-                  <button onClick={() => setUpgradeYearly(false)} style={{ padding: '5px 16px', borderRadius: 100, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, background: !upgradeYearly ? '#fff' : 'transparent', color: !upgradeYearly ? '#111' : '#888', boxShadow: !upgradeYearly ? '0 1px 4px rgba(0,0,0,0.10)' : 'none', transition: 'all 0.15s' }}>Monthly</button>
+              {/* Toggle (only relevant for non-demo) */}
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
+                <div style={{ display: 'inline-flex', background: '#f5f5f5', borderRadius: 100, padding: 3 }}>
+                  <button onClick={() => setUpgradeYearly(false)} style={{ padding: '5px 16px', borderRadius: 100, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, background: !upgradeYearly ? '#fff' : 'transparent', color: !upgradeYearly ? '#111' : '#888', boxShadow: !upgradeYearly ? '0 1px 4px rgba(0,0,0,0.10)' : 'none', transition: 'all 0.15s' }}>
+                    {lang === 'it' ? 'Mensile' : 'Monthly'}
+                  </button>
                   <button onClick={() => setUpgradeYearly(true)} style={{ padding: '5px 16px', borderRadius: 100, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, background: upgradeYearly ? '#fff' : 'transparent', color: upgradeYearly ? '#111' : '#888', boxShadow: upgradeYearly ? '0 1px 4px rgba(0,0,0,0.10)' : 'none', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 6 }}>
-                    Yearly <span style={{ fontSize: 9, fontWeight: 700, background: '#e8f5e9', color: '#2e7d32', borderRadius: 20, padding: '1px 6px' }}>-37%</span>
+                    {lang === 'it' ? 'Annuale' : 'Yearly'} <span style={{ fontSize: 9, fontWeight: 700, background: '#e8f5e9', color: '#2e7d32', borderRadius: 20, padding: '1px 6px' }}>-37%</span>
                   </button>
                 </div>
               </div>
 
-              {/* Price */}
-              <div style={{ textAlign: 'center', marginBottom: 24 }}>
-                <span style={{ fontSize: 40, fontWeight: 800, letterSpacing: '-2px' }}>{upgradeYearly ? '€3.75' : '€6'}</span>
-                <span style={{ fontSize: 14, color: '#999', marginLeft: 4 }}>/month</span>
-                {upgradeYearly && <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>billed €45/year</div>}
-              </div>
+              {/* Two plan cards */}
+              <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
 
-              {/* Features */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 28 }}>
-                {[
-                  ['Unlimited boards', '3 boards on Free'],
-                  ['Unlimited cards per canvas', '150 on Free'],
-                  ['Unlimited canvases', '30 on Free'],
-                  ['100 MB image storage', '20 MB on Free'],
-                  ['Priority support', ''],
-                ].map(([feat, note]) => (
-                  <div key={feat} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                    <span style={{ color: '#378ADD', fontWeight: 700, fontSize: 14, lineHeight: 1.5, flexShrink: 0 }}>✓</span>
-                    <span style={{ fontSize: 13, color: '#333', lineHeight: 1.5 }}>{feat}{note ? <span style={{ color: '#aaa', fontSize: 11, marginLeft: 6 }}>({note})</span> : null}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* CTA */}
-              {userId === 'local' ? (
-                <>
+                {/* Free */}
+                <div style={{ flex: 1, border: '1px solid #e5e7eb', borderRadius: 14, padding: '20px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#888', letterSpacing: 1, textTransform: 'uppercase' }}>{lang === 'it' ? 'Gratuito' : 'Free'}</div>
+                  <div><span style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-1.5px' }}>€0</span><span style={{ fontSize: 12, color: '#999', marginLeft: 3 }}>forever</span></div>
+                  {['3 boards', '150 cards/canvas', '30 canvases', '20 MB storage'].map(f => (
+                    <div key={f} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <span style={{ color: '#ccc', fontSize: 13 }}>✓</span>
+                      <span style={{ fontSize: 12, color: '#666' }}>{f}</span>
+                    </div>
+                  ))}
                   <button
                     onClick={() => { setShowUpgrade(false); navigate('/login') }}
-                    style={{ width: '100%', padding: '13px 0', borderRadius: 10, border: 'none', background: '#378ADD', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}
-                  >{lang === 'it' ? 'Crea account gratuito →' : 'Create free account →'}</button>
-                  <p style={{ textAlign: 'center', fontSize: 12, color: '#aaa', marginTop: 10, marginBottom: 0 }}>{lang === 'it' ? 'Poi potrai passare a Pro in qualsiasi momento.' : 'Then upgrade to Pro whenever you want.'}</p>
-                </>
-              ) : (
-                <>
-                  <button
-                    onClick={() => startCheckout(upgradeYearly ? 'yearly' : 'monthly')}
-                    disabled={!!checkoutLoading}
-                    style={{ width: '100%', padding: '13px 0', borderRadius: 10, border: 'none', background: '#378ADD', color: '#fff', fontSize: 15, fontWeight: 700, cursor: checkoutLoading ? 'not-allowed' : 'pointer', opacity: checkoutLoading ? 0.7 : 1, transition: 'opacity 0.15s' }}
-                  >
-                    {checkoutLoading ? 'Redirecting…' : `Get Pro — ${upgradeYearly ? '€45/year' : '€6/month'}`}
-                  </button>
-                  <p style={{ textAlign: 'center', fontSize: 11, color: '#bbb', marginTop: 10, marginBottom: 0 }}>Cancel any time · Secure payment via Stripe</p>
-                </>
+                    style={{ marginTop: 'auto', padding: '9px 0', borderRadius: 8, border: '1.5px solid #e0e0e0', background: '#fff', fontSize: 13, fontWeight: 650, cursor: 'pointer', color: '#111' }}
+                  >{lang === 'it' ? 'Registrati gratis' : 'Sign up free'}</button>
+                </div>
+
+                {/* Pro */}
+                <div style={{ flex: 1, border: '2px solid #378ADD', borderRadius: 14, padding: '20px 18px', display: 'flex', flexDirection: 'column', gap: 10, position: 'relative', boxShadow: '0 4px 20px rgba(55,138,221,0.12)' }}>
+                  <div style={{ position: 'absolute', top: -11, left: '50%', transform: 'translateX(-50%)', background: '#378ADD', color: '#fff', fontSize: 9, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', padding: '2px 10px', borderRadius: 20, whiteSpace: 'nowrap' }}>
+                    {lang === 'it' ? 'Più popolare' : 'Most popular'}
+                  </div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#378ADD', letterSpacing: 1, textTransform: 'uppercase' }}>Pro</div>
+                  <div>
+                    <span style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-1.5px' }}>{upgradeYearly ? '€3.75' : '€6'}</span>
+                    <span style={{ fontSize: 12, color: '#999', marginLeft: 3 }}>/mo</span>
+                    {upgradeYearly && <div style={{ fontSize: 11, color: '#888' }}>billed €45/year</div>}
+                  </div>
+                  {[
+                    lang === 'it' ? 'Lavagne illimitate' : 'Unlimited boards',
+                    lang === 'it' ? 'Card illimitate' : 'Unlimited cards',
+                    lang === 'it' ? 'Canvas illimitati' : 'Unlimited canvases',
+                    '100 MB storage',
+                    lang === 'it' ? 'Supporto prioritario' : 'Priority support',
+                  ].map(f => (
+                    <div key={f} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <span style={{ color: '#378ADD', fontSize: 13 }}>✓</span>
+                      <span style={{ fontSize: 12, color: '#333' }}>{f}</span>
+                    </div>
+                  ))}
+                  {userId === 'local' ? (
+                    <button
+                      onClick={() => { setShowUpgrade(false); navigate('/login?intent=pro') }}
+                      style={{ marginTop: 'auto', padding: '9px 0', borderRadius: 8, border: 'none', background: '#378ADD', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+                    >{lang === 'it' ? 'Registrati e vai a Pro →' : 'Sign up and go Pro →'}</button>
+                  ) : (
+                    <button
+                      onClick={() => startCheckout(upgradeYearly ? 'yearly' : 'monthly')}
+                      disabled={!!checkoutLoading}
+                      style={{ marginTop: 'auto', padding: '9px 0', borderRadius: 8, border: 'none', background: '#378ADD', color: '#fff', fontSize: 13, fontWeight: 700, cursor: checkoutLoading ? 'not-allowed' : 'pointer', opacity: checkoutLoading ? 0.7 : 1, transition: 'opacity 0.15s' }}
+                    >{checkoutLoading ? 'Redirecting…' : `Get Pro — ${upgradeYearly ? '€45/yr' : '€6/mo'}`}</button>
+                  )}
+                </div>
+              </div>
+
+              {userId !== 'local' && (
+                <p style={{ textAlign: 'center', fontSize: 11, color: '#ccc', margin: 0 }}>Cancel any time · Secure payment via Stripe</p>
               )}
             </div>
           </div>
