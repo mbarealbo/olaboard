@@ -246,7 +246,8 @@ function AppInner({ userId, userEmail }) {
       if (data?.url) window.location.href = data.url
     } catch (err) {
       console.error('checkout error:', err)
-      alert('Checkout error: ' + (err?.message || JSON.stringify(err)))
+      const detail = err?.context ? await err.context.text().catch(() => '') : ''
+      alert('Checkout error: ' + (err?.message || JSON.stringify(err)) + (detail ? '\n\n' + detail : ''))
     } finally {
       setCheckoutLoading(null)
     }
