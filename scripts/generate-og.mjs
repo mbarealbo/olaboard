@@ -67,12 +67,16 @@ const svg = `<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http:/
   <polygon points="900,171 912,175 900,179" fill="#378ADD" opacity="0.6"/>
 
   <!-- Left panel — brand + text -->
-  <text x="80" y="200" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="72" font-weight="800" fill="#0a0a0a" letter-spacing="-3">Olaboard</text>
+  <!-- Logo icon -->
+  <svg x="80" y="132" width="60" height="58" viewBox="0 0 48 46" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path fill="#863bff" d="M25.946 44.938c-.664.845-2.021.375-2.021-.698V33.937a2.26 2.26 0 0 0-2.262-2.262H10.287c-.92 0-1.456-1.04-.92-1.788l7.48-10.471c1.07-1.497 0-3.578-1.842-3.578H1.237c-.92 0-1.456-1.04-.92-1.788L10.013.474c.214-.297.556-.474.92-.474h28.894c.92 0 1.456 1.04.92 1.788l-7.48 10.471c-1.07 1.498 0 3.579 1.842 3.579h11.377c.943 0 1.473 1.088.89 1.83L25.947 44.94z"/>
+  </svg>
+  <text x="152" y="200" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="72" font-weight="800" fill="#0a0a0a" letter-spacing="-3">Olaboard</text>
 
   <text x="82" y="258" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="26" font-weight="400" fill="#555" letter-spacing="-0.5">Visual thinking on an infinite canvas.</text>
 
   <!-- Feature pills -->
-  <g transform="translate(82, 300)">
+  <g transform="translate(82, 308)">
     <!-- Pill 1 -->
     <rect width="130" height="34" rx="17" fill="#f0f7ff" stroke="#d0e6ff" stroke-width="1"/>
     <text x="18" y="22" font-family="-apple-system, sans-serif" font-size="14" font-weight="600" fill="#378ADD">Post-its</text>

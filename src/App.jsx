@@ -11,6 +11,7 @@ import { useHistory } from './hooks/useHistory'
 import { CARD_W, CARD_H_HALF, uid } from './utils'
 import { supabase } from './lib/supabase'
 import AuthPage from './components/AuthPage'
+import OlaboardLogo from './components/OlaboardLogo'
 import LandingPage from './components/LandingPage'
 import PricingPage from './components/PricingPage'
 import MobileBlock from './components/MobileBlock'
@@ -999,7 +1000,7 @@ function AppInner({ userId, userEmail }) {
         <div style={{ width: 210, flexShrink: 0, background: 'var(--sidebar-bg)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           {/* Top scrollable section */}
           <div style={{ flex: 1, overflowY: 'auto' }}>
-            <div style={{ padding: '14px 12px 10px', fontSize: 18, fontWeight: 700, letterSpacing: '-0.5px', color: 'var(--text)', fontFamily: 'system-ui, sans-serif' }}>Olaboard</div>
+            <div style={{ padding: '14px 12px 10px' }}><OlaboardLogo size={20} fontSize={16} gap={7} color='var(--text)' /></div>
             <div style={{ padding: '0 12px 4px', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: 1, textTransform: 'uppercase' }}>{t('boards')}</div>
             {boards.map(board => {
               const isActive = stack[0] === board.id
@@ -1104,7 +1105,7 @@ function AppInner({ userId, userEmail }) {
               }}
             >{t('newBoard')}</button>
             <div style={{ padding: '10px 12px 12px', borderTop: '1px solid #eee', marginTop: 4 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#222', lineHeight: 1.4 }}>Olaboard</div>
+              <OlaboardLogo size={14} fontSize={12} gap={5} color='#222' />
               <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>
                 Made by{' '}
                 <a href="https://olab.quest" target="_blank" rel="noopener noreferrer" style={{ color: '#378ADD', textDecoration: 'none' }}>olab.quest</a>

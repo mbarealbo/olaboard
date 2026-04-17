@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { ArrowRight, Check } from 'lucide-react'
+import OlaboardLogo from './OlaboardLogo'
 
 const GITHUB_URL = 'https://github.com/mbarealbo/olaboard'
 
@@ -64,7 +65,7 @@ export default function PricingPage() {
 
       {/* Nav */}
       <nav style={{ position: 'fixed', top: 0, left: 0, right: 0, height: 54, zIndex: 100, display: 'flex', alignItems: 'center', padding: `0 ${px}`, background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(14px)', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
-        <button onClick={() => navigate('/landing')} style={{ fontSize: 15, fontWeight: 750, letterSpacing: '-0.5px', background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#0a0a0a' }}>Olaboard</button>
+        <button onClick={() => navigate('/landing')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}><OlaboardLogo size={20} fontSize={15} /></button>
         <div style={{ flex: 1 }} />
         <button onClick={() => navigate('/landing')} style={{ fontSize: 13, fontWeight: 600, background: 'transparent', color: '#555', border: 'none', borderRadius: 8, cursor: 'pointer', padding: '8px 14px', marginRight: 4 }}
           onMouseEnter={e => e.currentTarget.style.color = '#111'} onMouseLeave={e => e.currentTarget.style.color = '#555'}
@@ -173,7 +174,7 @@ export default function PricingPage() {
 
       {/* Footer */}
       <footer style={{ padding: `22px ${px}`, display: 'flex', alignItems: 'center', gap: 16, borderTop: '1px solid #f0f0f0' }}>
-        <span style={{ fontSize: 13, fontWeight: 750, letterSpacing: '-0.3px' }}>Olaboard</span>
+        <OlaboardLogo size={16} fontSize={13} />
         <div style={{ flex: 1 }} />
         <span style={{ fontSize: 12, color: '#ccc' }}>Made with ♥ by Albo — <a href="https://olab.quest" target="_blank" rel="noreferrer" style={{ color: '#ccc', textDecoration: 'none' }}>olab.quest</a></span>
         <a href={GITHUB_URL} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#999', textDecoration: 'none', transition: 'color 0.15s' }}

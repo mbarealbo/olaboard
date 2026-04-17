@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowRight, Zap, GitBranch, FileText, Layers, ChevronRight } from 'lucide-react'
+import OlaboardLogo from './OlaboardLogo'
 
 function GithubIcon({ size = 16 }) {
   return (
@@ -381,7 +382,7 @@ export default function LandingPage() {
 
       {/* ── Nav ─────────────────────────────────────────────────────────── */}
       <nav style={{ position: 'fixed', top: 0, left: 0, right: 0, height: 54, zIndex: 100, display: 'flex', alignItems: 'center', padding: `0 ${px}`, background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(14px)', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
-        <span style={{ fontSize: 15, fontWeight: 750, letterSpacing: '-0.5px' }}>Olaboard</span>
+        <OlaboardLogo size={20} fontSize={15} />
         <div style={{ flex: 1 }} />
         {!isMobile && (
           <button onClick={() => navigate('/pricing')} style={{ fontSize: 13, fontWeight: 600, background: 'transparent', color: '#555', border: 'none', borderRadius: 8, cursor: 'pointer', padding: '8px 14px', marginRight: 2, transition: 'color 0.15s' }}

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useLang } from '../contexts/LangContext'
+import OlaboardLogo from './OlaboardLogo'
 
 const inputStyle = {
   width: '100%', boxSizing: 'border-box',
@@ -146,7 +147,7 @@ export default function AuthPage() {
       <Page>
         <Card>
           <div style={{ textAlign: 'center', marginBottom: 24 }}>
-            <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.8px', marginBottom: 6 }}>Olaboard</div>
+            <div style={{ marginBottom: 6, display: 'flex', justifyContent: 'center' }}><OlaboardLogo size={24} fontSize={22} gap={9} /></div>
             <p style={{ fontSize: 13, color: '#888', margin: 0 }}>{isIT ? 'Imposta la nuova password.' : 'Set your new password.'}</p>
           </div>
           <form onSubmit={handleNewPassword}>
@@ -171,7 +172,7 @@ export default function AuthPage() {
     <Page>
       {/* Nav */}
       <nav style={{ position: 'fixed', top: 0, left: 0, right: 0, height: 54, zIndex: 100, display: 'flex', alignItems: 'center', padding: '0 28px', background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(14px)', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
-        <button onClick={() => navigate('/landing')} style={{ fontSize: 15, fontWeight: 750, letterSpacing: '-0.5px', background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#0a0a0a' }}>Olaboard</button>
+        <button onClick={() => navigate('/landing')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}><OlaboardLogo size={20} fontSize={15} /></button>
         <div style={{ flex: 1 }} />
         <button onClick={() => navigate('/app')} style={{ fontSize: 13, color: '#555', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
           onMouseEnter={e => e.currentTarget.style.color = '#111'} onMouseLeave={e => e.currentTarget.style.color = '#555'}
