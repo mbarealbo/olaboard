@@ -90,6 +90,10 @@ export const translations = {
     convertToLabel: 'Converti in etichetta',
     newIdea: 'Nuova idea',
 
+    // Demo banner
+    demoBannerText: 'Stai usando la demo — i dati sono salvati solo in questo browser.',
+    demoBannerCta: 'Passa a Pro per salvare in cloud →',
+
     // Mobile block
     mobileBlockTitle: 'Olaboard è pensato per schermi grandi.',
     mobileBlockBody: 'Aprilo dal tuo computer per usarlo al meglio.',
@@ -211,6 +215,10 @@ export const translations = {
     convertToFolder: 'Convert to folder',
     convertToLabel: 'Convert to label',
     newIdea: 'New idea',
+
+    // Demo banner
+    demoBannerText: 'You\'re using the demo — data is saved in this browser only.',
+    demoBannerCta: 'Switch to Pro to save in the cloud →',
 
     // Mobile block
     mobileBlockTitle: 'Olaboard is designed for larger screens.',

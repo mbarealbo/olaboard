@@ -186,6 +186,7 @@ export default function App() {
 function AppInner({ userId, userEmail }) {
   const { t, lang, setLang } = useLang()
   const { plan, limits } = usePlan()
+  const navigate = useNavigate()
   const [limitToast, setLimitToast] = useState(null)
 
   function showLimitToast(type) {
@@ -233,6 +234,7 @@ function AppInner({ userId, userEmail }) {
   const [sidebarFocusId, setSidebarFocusId] = useState(null)
   const [showAccount, setShowAccount] = useState(false)
   const [showUpgrade, setShowUpgrade] = useState(false)
+  const [demoBannerDismissed, setDemoBannerDismissed] = useState(false)
   const [upgradeYearly, setUpgradeYearly] = useState(false)
   const [checkoutLoading, setCheckoutLoading] = useState(null)
 
@@ -969,7 +971,19 @@ function AppInner({ userId, userEmail }) {
 
   // ── render ────────────────────────────────────────────────────────────────
   return (
-    <div data-theme={theme} style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: 'system-ui, sans-serif' }}>
+    <div data-theme={theme} style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: 'system-ui, sans-serif', paddingTop: userId === 'local' && !demoBannerDismissed ? 38 : 0 }}>
+      {/* Demo banner */}
+      {userId === 'local' && !demoBannerDismissed && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 10001, background: '#1a1a1a', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, padding: '9px 16px', fontSize: 13 }}>
+          <span style={{ color: 'rgba(255,255,255,0.7)' }}>{t('demoBannerText')}</span>
+          <button
+            onClick={() => { setShowUpgrade(true) }}
+            style={{ fontSize: 12, fontWeight: 700, background: '#378ADD', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 12px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+          >{t('demoBannerCta')}</button>
+          <button onClick={() => setDemoBannerDismissed(true)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 0, marginLeft: 4 }}>×</button>
+        </div>
+      )}
+
       {limitToast && (
         <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 9999, background: '#1a1a1a', color: '#fff', padding: '10px 20px', borderRadius: 10, fontSize: 13, fontWeight: 500, boxShadow: '0 4px 20px rgba(0,0,0,0.25)', display: 'flex', alignItems: 'center', gap: 12, whiteSpace: 'nowrap' }}>
           <span>🔒 {limitToast}</span>
@@ -1294,14 +1308,26 @@ function AppInner({ userId, userEmail }) {
               </div>
 
               {/* CTA */}
-              <button
-                onClick={() => startCheckout(upgradeYearly ? 'yearly' : 'monthly')}
-                disabled={!!checkoutLoading}
-                style={{ width: '100%', padding: '13px 0', borderRadius: 10, border: 'none', background: '#378ADD', color: '#fff', fontSize: 15, fontWeight: 700, cursor: checkoutLoading ? 'not-allowed' : 'pointer', opacity: checkoutLoading ? 0.7 : 1, transition: 'opacity 0.15s' }}
-              >
-                {checkoutLoading ? 'Redirecting…' : `Get Pro — ${upgradeYearly ? '€45/year' : '€6/month'}`}
-              </button>
-              <p style={{ textAlign: 'center', fontSize: 11, color: '#bbb', marginTop: 10, marginBottom: 0 }}>Cancel any time · Secure payment via Stripe</p>
+              {userId === 'local' ? (
+                <>
+                  <button
+                    onClick={() => { setShowUpgrade(false); navigate('/login') }}
+                    style={{ width: '100%', padding: '13px 0', borderRadius: 10, border: 'none', background: '#378ADD', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}
+                  >{lang === 'it' ? 'Crea account gratuito →' : 'Create free account →'}</button>
+                  <p style={{ textAlign: 'center', fontSize: 12, color: '#aaa', marginTop: 10, marginBottom: 0 }}>{lang === 'it' ? 'Poi potrai passare a Pro in qualsiasi momento.' : 'Then upgrade to Pro whenever you want.'}</p>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => startCheckout(upgradeYearly ? 'yearly' : 'monthly')}
+                    disabled={!!checkoutLoading}
+                    style={{ width: '100%', padding: '13px 0', borderRadius: 10, border: 'none', background: '#378ADD', color: '#fff', fontSize: 15, fontWeight: 700, cursor: checkoutLoading ? 'not-allowed' : 'pointer', opacity: checkoutLoading ? 0.7 : 1, transition: 'opacity 0.15s' }}
+                  >
+                    {checkoutLoading ? 'Redirecting…' : `Get Pro — ${upgradeYearly ? '€45/year' : '€6/month'}`}
+                  </button>
+                  <p style={{ textAlign: 'center', fontSize: 11, color: '#bbb', marginTop: 10, marginBottom: 0 }}>Cancel any time · Secure payment via Stripe</p>
+                </>
+              )}
             </div>
           </div>
         )}
