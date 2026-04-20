@@ -239,6 +239,7 @@ function AppInner({ userId, userEmail }) {
   const [sidebarFocusId, setSidebarFocusId] = useState(null)
   const [showAccount, setShowAccount] = useState(false)
   const [showUpgrade, setShowUpgrade] = useState(false)
+  const [showManagePlan, setShowManagePlan] = useState(false)
   const [demoBannerDismissed, setDemoBannerDismissed] = useState(false)
   const [upgradeYearly, setUpgradeYearly] = useState(false)
   const [checkoutLoading, setCheckoutLoading] = useState(null)
@@ -1233,10 +1234,8 @@ function AppInner({ userId, userEmail }) {
                 </button>
               )}
               {plan === 'pro' && userId !== 'local' && (
-                <button onClick={async () => {
-                  const { data } = await supabase.functions.invoke('create-portal', { body: { userId, returnUrl: window.location.href } })
-                  if (data?.url) window.location.href = data.url
-                }} style={{ fontSize: 11, padding: '4px 9px', borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                <button onClick={() => { setShowAccount(false); setShowManagePlan(true) }}
+                  style={{ fontSize: 11, padding: '4px 9px', borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer' }}>
                   Gestisci →
                 </button>
               )}
@@ -1271,6 +1270,56 @@ function AppInner({ userId, userEmail }) {
         )}
 
         {/* Upgrade modal */}
+        {showManagePlan && (
+          <div onMouseDown={() => setShowManagePlan(false)} style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+            <div onMouseDown={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 20, padding: '32px 28px 28px', width: '100%', maxWidth: 420, boxShadow: '0 24px 64px rgba(0,0,0,0.18)', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif', color: '#0a0a0a' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                <div style={{ fontSize: 18, fontWeight: 750, letterSpacing: '-0.5px' }}>Gestisci piano</div>
+                <button onClick={() => setShowManagePlan(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: '#aaa', lineHeight: 1 }}>×</button>
+              </div>
+
+              <div style={{ background: '#f8f8f8', borderRadius: 12, padding: '14px 16px', marginBottom: 24, display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, padding: '2px 10px', borderRadius: 20, background: '#378ADD', color: '#fff' }}>★ Pro</span>
+                <span style={{ fontSize: 13, color: '#555' }}>Piano attivo</span>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <button
+                  onClick={async () => {
+                    if (!window.confirm('Passare al piano Free? Perderai l\'accesso alle funzionalità Pro al termine del periodo attuale.')) return
+                    const { error } = await supabase.from('profiles').update({ plan: 'free' }).eq('id', userId)
+                    if (!error) { setShowManagePlan(false); window.location.reload() }
+                  }}
+                  style={{ width: '100%', padding: '12px 16px', borderRadius: 10, border: '1.5px solid #e5e7eb', background: '#fff', fontSize: 14, fontWeight: 600, color: '#333', cursor: 'pointer', textAlign: 'left' }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = '#aaa'}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = '#e5e7eb'}
+                >
+                  <div>Passa al piano Free</div>
+                  <div style={{ fontSize: 12, color: '#aaa', fontWeight: 400, marginTop: 2 }}>Effettua il downgrade e perdi le funzionalità Pro</div>
+                </button>
+
+                <button
+                  onClick={async () => {
+                    if (!window.confirm('Sei sicuro di voler cancellare l\'abbonamento? Il tuo account passerà al piano Free.')) return
+                    const { error } = await supabase.from('profiles').update({ plan: 'free', stripe_customer_id: null }).eq('id', userId)
+                    if (!error) { setShowManagePlan(false); window.location.reload() }
+                  }}
+                  style={{ width: '100%', padding: '12px 16px', borderRadius: 10, border: '1.5px solid #fecaca', background: '#fff5f5', fontSize: 14, fontWeight: 600, color: '#dc2626', cursor: 'pointer', textAlign: 'left' }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#fee2e2'}
+                  onMouseLeave={e => e.currentTarget.style.background = '#fff5f5'}
+                >
+                  <div>Cancella abbonamento</div>
+                  <div style={{ fontSize: 12, color: '#f87171', fontWeight: 400, marginTop: 2 }}>L'account tornerà al piano Free</div>
+                </button>
+              </div>
+
+              <p style={{ fontSize: 11, color: '#bbb', marginTop: 20, lineHeight: 1.5 }}>
+                Per problemi con la fatturazione scrivi a <a href="mailto:privacy@olab.quest" style={{ color: '#bbb' }}>privacy@olab.quest</a>
+              </p>
+            </div>
+          </div>
+        )}
+
         {showUpgrade && (
           <div onMouseDown={() => setShowUpgrade(false)} style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
             <div onMouseDown={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 20, padding: '32px 28px 28px', width: '100%', maxWidth: 560, boxShadow: '0 24px 64px rgba(0,0,0,0.18)', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif', color: '#0a0a0a' }}>
