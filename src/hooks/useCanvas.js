@@ -21,6 +21,8 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
   const dragging = useRef(null)
   const connecting = useRef(null)
   const groupDrawing = useRef(null)
+  const textDrawing = useRef(null)
+  const [textDrawPreview, setTextDrawPreview] = useState(null)
   const dbRef = useRef(db)
   const activeAutoCreateRef = useRef(false)
   const activeToolRef = useRef('note')
@@ -50,6 +52,19 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
         const wy = (e.clientY - r.top  - o.y) / s
         const { startWX, startWY } = groupDrawing.current
         setGroupDrawPreview({
+          x: Math.min(wx, startWX), y: Math.min(wy, startWY),
+          w: Math.abs(wx - startWX), h: Math.abs(wy - startWY),
+        })
+        return
+      }
+
+      if (textDrawing.current) {
+        const r = getBoardRect()
+        const o = offsetRef.current, s = scaleRef.current
+        const wx = (e.clientX - r.left - o.x) / s
+        const wy = (e.clientY - r.top  - o.y) / s
+        const { startWX, startWY } = textDrawing.current
+        setTextDrawPreview({
           x: Math.min(wx, startWX), y: Math.min(wy, startWY),
           w: Math.abs(wx - startWX), h: Math.abs(wy - startWY),
         })
@@ -223,6 +238,20 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
           x: Math.min(wx, d.startWX), y: Math.min(wy, d.startWY),
           w: Math.abs(wx - d.startWX), h: Math.abs(wy - d.startWY),
         })
+      } else if (d.type === 'label-resize') {
+        const r = getBoardRect()
+        const o = offsetRef.current, s = scaleRef.current
+        const wx = (e.clientX - r.left - o.x) / s
+        const newW = Math.max(80, d.origW + (wx - d.startWX))
+        d.finalW = newW
+        setDb(prev => {
+          const cId = currentIdRef.current
+          const canvas = prev[cId]
+          if (!canvas) return prev
+          return { ...prev, [cId]: { ...canvas, labels: (canvas.labels||[]).map(l =>
+            l.id === d.labelId ? { ...l, width: newW } : l
+          )}}
+        })
       } else if (d.type === 'label') {
         const r = getBoardRect()
         const o = offsetRef.current, s = scaleRef.current
@@ -284,6 +313,23 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
         }
         groupDrawing.current = null
         setGroupDrawPreview(null)
+        setActiveTool('note')
+        return
+      }
+
+      if (textDrawing.current) {
+        const r = getBoardRect()
+        const o = offsetRef.current, s = scaleRef.current
+        const wx = (e.clientX - r.left - o.x) / s
+        const wy = (e.clientY - r.top  - o.y) / s
+        const { startWX, startWY } = textDrawing.current
+        const rx = Math.min(wx, startWX), ry = Math.min(wy, startWY)
+        const rw = Math.abs(wx - startWX)
+        textDrawing.current = null
+        setTextDrawPreview(null)
+        const labelId = createLabel(rx, ry, rw >= 40 ? Math.max(120, rw) : undefined)
+        setSelectedLabel(labelId)
+        setEditingLabelId(labelId)
         setActiveTool('note')
         return
       }
@@ -670,6 +716,16 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
   // ── board event handlers ──────────────────────────────────────────────────
   function onBoardMouseDown(e) {
     if (e.target.closest('.postit')) return
+    if (e.target.closest('.canvas-label')) return
+
+    if (activeTool === 'text') {
+      const r = boardRef.current.getBoundingClientRect()
+      const o = offsetRef.current, s = scaleRef.current
+      const wx = (e.clientX - r.left - o.x) / s
+      const wy = (e.clientY - r.top  - o.y) / s
+      textDrawing.current = { startWX: wx, startWY: wy }
+      return
+    }
 
     if (activeTool === 'group') {
       const r = boardRef.current.getBoundingClientRect()
@@ -704,13 +760,6 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
     const r = boardRef.current.getBoundingClientRect()
     const wx = (e.clientX - r.left - offset.x) / scale
     const wy = (e.clientY - r.top  - offset.y) / scale
-    if (activeTool === 'text') {
-      const labelId = createLabel(wx, wy)
-      setActiveTool('note')
-      setSelectedLabel(labelId)
-      setEditingLabelId(labelId)
-      return
-    }
     const id = createCard(wx, wy)
     setSelected(id); setEditingCardId(id)
   }
@@ -847,8 +896,8 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
   }
 
   // ── label creation & update ───────────────────────────────────────────────
-  function createLabel(wx, wy) {
-    const label = { id: uid(), x: wx, y: wy, text: '', fontSize: 16, fontFamily: 'sans' }
+  function createLabel(wx, wy, width) {
+    const label = { id: uid(), x: wx, y: wy, text: '', fontSize: 16, fontFamily: 'sans', ...(width ? { width } : {}) }
     const cId = currentIdRef.current
     setDb(prev => {
       const canvas = prev[cId]
@@ -879,7 +928,15 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
     })
   }
 
-  const boardCursor = isPanning ? 'grabbing' : activeTool === 'text' ? 'text' : activeTool === 'group' ? 'crosshair' : 'crosshair'
+  function onLabelResizeMouseDown(e, label) {
+    e.stopPropagation()
+    const r = boardRef.current.getBoundingClientRect()
+    const o = offsetRef.current, s = scaleRef.current
+    const wx = (e.clientX - r.left - o.x) / s
+    dragging.current = { type: 'label-resize', labelId: label.id, origW: label.width || 200, startWX: wx }
+  }
+
+  const boardCursor = isPanning ? 'grabbing' : 'crosshair'
 
   return {
     offset, setOffset,
@@ -898,8 +955,9 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
     onCardMouseDown, onConnectDotMouseDown,
     onGroupTitleBarMouseDown, onGroupResizeHandleMouseDown,
     onImageResizeMouseDown,
-    onLabelMouseDown, zoomBy,
+    onLabelMouseDown, onLabelResizeMouseDown, zoomBy,
     createLabel, updateLabel,
+    textDrawPreview,
     activeAutoCreateRef, activeToolRef, multiSelectedRef,
     snapGuides,
   }

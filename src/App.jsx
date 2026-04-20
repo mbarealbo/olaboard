@@ -584,9 +584,10 @@ function AppInner({ userId, userEmail }) {
     onCardMouseDown, onConnectDotMouseDown,
     onGroupTitleBarMouseDown, onGroupResizeHandleMouseDown,
     onImageResizeMouseDown,
-    onLabelMouseDown, zoomBy,
+    onLabelMouseDown, onLabelResizeMouseDown, zoomBy,
     activeAutoCreateRef, activeToolRef, multiSelectedRef,
     snapGuides,
+    textDrawPreview,
   } = useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnectionFn, setActiveNoteId, view, activeTool, setActiveTool, selectMode, setMultiSelected, setSelectionRect, onGroupCreated: id => setEditingGroupId(id), pushCommand, maxCardsPerCanvas: limits.cardsPerCanvas, onLimitReached: showLimitToast })
 
   useEffect(() => { activeAutoCreateRef.current = autoCreate }, [autoCreate, activeAutoCreateRef])
@@ -1982,6 +1983,17 @@ function AppInner({ userId, userEmail }) {
                   }} />
                 )}
 
+                {/* Text draw preview */}
+                {textDrawPreview && (
+                  <div style={{
+                    position: 'absolute',
+                    left: textDrawPreview.x, top: textDrawPreview.y,
+                    width: textDrawPreview.w, height: Math.max(textDrawPreview.h, 32),
+                    border: '2px dashed #888', background: 'rgba(0,0,0,0.03)',
+                    borderRadius: 3, pointerEvents: 'none', zIndex: 0,
+                  }} />
+                )}
+
                 {/* Labels */}
                 {labels.map(label => (
                   <CanvasLabel
@@ -2040,6 +2052,7 @@ function AppInner({ userId, userEmail }) {
                         return { ...prev, [cId]: { ...cv, labels: (cv.labels||[]).map(l => l.id === label.id ? { ...l, fontSize: Math.max(10, Math.min(72, (l.fontSize || 16) + delta)) } : l) } }
                       })
                     }}
+                    onResizeMouseDown={e => onLabelResizeMouseDown(e, label)}
                   />
                 ))}
 

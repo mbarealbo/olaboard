@@ -111,7 +111,7 @@ const LABEL_FONTS = [
   { key: 'serif', label: 'Serif',  family: "'Lora', serif" },
 ]
 
-export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit, onEndEdit, onTextChange, onDelete, onConnectDot, onConvertToPostIt, onConvertToFolder, onFontChange, onSizeChange }) {
+export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit, onEndEdit, onTextChange, onDelete, onConnectDot, onConvertToPostIt, onConvertToFolder, onFontChange, onSizeChange, onResizeMouseDown }) {
   const { t } = useLang()
   const elRef = useRef(null)
   const [hovered, setHovered] = useState(false)
@@ -145,6 +145,7 @@ export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit
         padding: '8px 16px', cursor: editing ? 'text' : 'move', zIndex: 1,
         border: selected || hovered ? '1px dashed #ccc' : '1px dashed transparent',
         borderRadius: 2, userSelect: 'none',
+        width: label.width || 'auto',
       }}
       onMouseDown={e => { if (editing) return; e.stopPropagation(); onMouseDown(e) }}
       onDoubleClick={e => { e.stopPropagation(); onStartEdit() }}
@@ -181,6 +182,17 @@ export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit
           <div className="connect-dot connect-dot-bottom" onMouseDown={e => { e.stopPropagation(); e.preventDefault(); onConnectDot(e, 'bottom') }} />
           <div className="connect-dot connect-dot-left"   onMouseDown={e => { e.stopPropagation(); e.preventDefault(); onConnectDot(e, 'left') }} />
         </>
+      )}
+      {(selected || hovered) && !editing && onResizeMouseDown && (
+        <div
+          style={{
+            position: 'absolute', bottom: -5, right: -5,
+            width: 10, height: 10, background: '#fff',
+            border: '1.5px solid #378ADD', borderRadius: 2,
+            cursor: 'se-resize', zIndex: 10,
+          }}
+          onMouseDown={e => { e.stopPropagation(); onResizeMouseDown(e) }}
+        />
       )}
       {(selected || hovered) && !editing && (
         <div
