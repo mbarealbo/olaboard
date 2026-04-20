@@ -10,7 +10,13 @@ export function PlanProvider({ userId, children }) {
   useEffect(() => {
     if (!userId || userId === 'local') return
     supabase.from('profiles').select('plan').eq('id', userId).single()
-      .then(({ data }) => { if (data?.plan) setPlan(data.plan) })
+      .then(({ data, error }) => {
+        if (data?.plan) {
+          setPlan(data.plan)
+        } else if (error?.code === 'PGRST116') {
+          supabase.from('profiles').insert({ id: userId, plan: 'free' }).then(() => {})
+        }
+      })
   }, [userId])
 
   return (
