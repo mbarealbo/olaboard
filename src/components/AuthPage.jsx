@@ -26,6 +26,7 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [done, setDone] = useState(null)
+  const [termsAccepted, setTermsAccepted] = useState(false)
 
   const isIT = lang === 'it'
 
@@ -107,7 +108,7 @@ export default function AuthPage() {
   }
 
   function switchMode(m) {
-    setMode(m); setError(null); setPassword(''); setConfirmPassword('')
+    setMode(m); setError(null); setPassword(''); setConfirmPassword(''); setTermsAccepted(false)
   }
 
   // ── Success screens ──────────────────────────────────────────────────────────
@@ -254,6 +255,22 @@ export default function AuthPage() {
             </>
           )}
 
+          {mode === 'signup' && (
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 9, marginTop: 16, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={termsAccepted}
+                onChange={e => setTermsAccepted(e.target.checked)}
+                style={{ marginTop: 2, flexShrink: 0, accentColor: '#378ADD', width: 14, height: 14 }}
+              />
+              <span style={{ fontSize: 12, color: '#666', lineHeight: 1.5 }}>
+                {isIT
+                  ? <>Ho letto e accetto i <a href="/terms" target="_blank" style={{ color: '#378ADD' }}>Termini e Condizioni</a> e la <a href="/privacy" target="_blank" style={{ color: '#378ADD' }}>Privacy Policy</a></>
+                  : <>I have read and accept the <a href="/terms" target="_blank" style={{ color: '#378ADD' }}>Terms and Conditions</a> and the <a href="/privacy" target="_blank" style={{ color: '#378ADD' }}>Privacy Policy</a></>}
+              </span>
+            </label>
+          )}
+
           {error && (
             <div style={{ marginTop: 10, padding: '9px 12px', background: '#fff5f5', border: '1px solid #fecaca', borderRadius: 8, fontSize: 13, color: '#dc2626' }}>
               {error}
@@ -261,8 +278,8 @@ export default function AuthPage() {
           )}
 
           <button
-            type="submit" disabled={loading}
-            style={{ marginTop: 18, width: '100%', padding: '12px 0', background: loading ? '#a0c4e8' : '#378ADD', color: '#fff', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: loading ? 'default' : 'pointer', fontFamily: 'inherit', transition: 'opacity 0.15s', letterSpacing: '-0.2px' }}
+            type="submit" disabled={loading || (mode === 'signup' && !termsAccepted)}
+            style={{ marginTop: 18, width: '100%', padding: '12px 0', background: loading || (mode === 'signup' && !termsAccepted) ? '#a0c4e8' : '#378ADD', color: '#fff', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: loading || (mode === 'signup' && !termsAccepted) ? 'default' : 'pointer', fontFamily: 'inherit', transition: 'opacity 0.15s', letterSpacing: '-0.2px' }}
             onMouseEnter={e => { if (!loading) e.currentTarget.style.opacity = '0.88' }}
             onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
           >
@@ -285,7 +302,7 @@ export default function AuthPage() {
             <button
               type="button"
               onClick={handleGoogleLogin}
-              disabled={loading}
+              disabled={loading || (mode === 'signup' && !termsAccepted)}
               style={{ width: '100%', padding: '11px 0', background: '#fff', border: '1.5px solid #e5e7eb', borderRadius: 10, fontSize: 14, fontWeight: 600, color: '#333', cursor: loading ? 'default' : 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, transition: 'border-color 0.15s' }}
               onMouseEnter={e => { if (!loading) e.currentTarget.style.borderColor = '#bbb' }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = '#e5e7eb' }}
