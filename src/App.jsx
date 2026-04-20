@@ -5,6 +5,8 @@ import { Trash2, Moon, Sun, Monitor, Zap, Folder, LogOut, Maximize2, Undo2, Redo
 import BlockEditor from './components/BlockEditor'
 import PostIt from './components/PostIt'
 import ImageCard from './components/ImageCard'
+import IconCard from './components/IconCard'
+import IconPicker from './components/IconPicker'
 import { Group, CanvasLabel } from './components/GroupBox'
 import { useCanvas } from './hooks/useCanvas'
 import { useHistory } from './hooks/useHistory'
@@ -221,6 +223,7 @@ function AppInner({ userId, userEmail }) {
   const [showGrid, setShowGrid] = useState(true)
   const [theme, setTheme] = useState('light')
   const [activeTool, setActiveTool] = useState('note')
+  const [showIconPicker, setShowIconPicker] = useState(false)
   const [autoCreate, setAutoCreate] = useState(true)
   const [selectMode, setSelectMode] = useState(false)
   const [multiSelected, setMultiSelected] = useState([])
@@ -288,7 +291,7 @@ function AppInner({ userId, userEmail }) {
 
   // ── map Supabase rows → app shape ─────────────────────────────────────────
   function mapCard(row) {
-    return { id: row.id, title: row.title || '', body: row.body || '', x: row.x, y: row.y, isFolder: row.is_folder || false, isLabel: row.is_label || false, color: row.color || 'yellow', createdAt: row.created_at, updatedAt: row.updated_at || row.created_at, url: row.url || null, width: row.width || null, height: row.height || null, isImage: !!(row.url) }
+    return { id: row.id, title: row.title || '', body: row.body || '', x: row.x, y: row.y, isFolder: row.is_folder || false, isLabel: row.is_label || false, color: row.color || 'yellow', createdAt: row.created_at, updatedAt: row.updated_at || row.created_at, url: row.url || null, width: row.width || null, height: row.height || null, isImage: !!(row.url) && row.node_type !== 'icon', nodeType: row.node_type || 'postit', isIcon: row.node_type === 'icon' }
   }
 
   // ── image upload helpers ───────────────────────────────────────────────────
@@ -305,6 +308,29 @@ function AppInner({ userId, userEmail }) {
     const marker = '/storage/v1/object/public/images/'
     const idx = url?.indexOf(marker)
     return idx >= 0 ? url.slice(idx + marker.length) : null
+  }
+
+  function handlePlaceIcon(iconName, iconColor) {
+    const cId = currentIdRef.current
+    const currentCards = db[cId]?.cards || []
+    if (currentCards.filter(c => !c.isLabel).length >= limits.cardsPerCanvas) {
+      showLimitToast('cardsPerCanvas')
+      return
+    }
+    const r = boardRef.current?.getBoundingClientRect() || { width: 800, height: 600 }
+    const x = Math.round((r.width / 2 - offset.x) / scale - 40)
+    const y = Math.round((r.height / 2 - offset.y) / scale - 40)
+    const newCard = { id: uid(), nodeType: 'icon', isIcon: true, body: iconName, title: '', color: iconColor, x, y, isFolder: false, isLabel: false, isImage: false, url: null, width: 80, height: 80 }
+    setDb(prev => {
+      const cv = prev[cId]
+      if (!cv) return prev
+      return { ...prev, [cId]: { ...cv, cards: [...cv.cards, newCard] } }
+    })
+    pushCommand({
+      undo: () => setDb(prev => { const cv = prev[cId]; if (!cv) return prev; return { ...prev, [cId]: { ...cv, cards: cv.cards.filter(c => c.id !== newCard.id) } } }),
+      redo: () => setDb(prev => { const cv = prev[cId]; if (!cv) return prev; return { ...prev, [cId]: { ...cv, cards: [...cv.cards, newCard] } } }),
+    })
+    setShowIconPicker(false)
   }
   function mapConn(row) {
     return { id: row.id, from: row.from_card_id, to: row.to_card_id, label: row.label || '', fromAnchor: row.from_anchor || 'right', toAnchor: row.to_anchor || 'left' }
@@ -1219,6 +1245,12 @@ function AppInner({ userId, userEmail }) {
                 onClick={view === 'canvas' ? () => { setSelectMode(v => !v); setActiveTool('note'); setAutoCreate(false) } : undefined}
                 title={t('selectTitle')}
               >⬚ Select</button>
+              <button
+                disabled={view !== 'canvas'}
+                style={{ ...smallBtn, ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }}
+                onClick={view === 'canvas' ? () => setShowIconPicker(true) : undefined}
+                title="Add icon card"
+              >⬡ Icons</button>
             </div>
             <div style={{ display: 'flex', gap: 2 }}>
               <button disabled={view !== 'canvas'} style={{ ...smallBtn, ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }} onClick={view === 'canvas' ? () => zoomBy(1.2) : undefined}>+</button>
@@ -1382,6 +1414,10 @@ function AppInner({ userId, userEmail }) {
               </p>
             </div>
           </div>
+        )}
+
+        {showIconPicker && (
+          <IconPicker onSelect={handlePlaceIcon} onClose={() => setShowIconPicker(false)} />
         )}
 
         {showSearch && (
@@ -1710,10 +1746,10 @@ function AppInner({ userId, userEmail }) {
                   const toRes   = resolveEntity(conn.to)
                   if (!fromRes || !toRes) return null
                   const fe = fromRes.entity, te = toRes.entity
-                  const feW = fromRes.isLabel ? 100 : (fe.isImage ? (fe.width || 200) : CARD_W)
-                  const feH = fromRes.isLabel ? 30  : (fe.isImage ? (fe.height || 200) : CARD_H_HALF * 2)
-                  const teW = toRes.isLabel   ? 100 : (te.isImage ? (te.width || 200) : CARD_W)
-                  const teH = toRes.isLabel   ? 30  : (te.isImage ? (te.height || 200) : CARD_H_HALF * 2)
+                  const feW = fromRes.isLabel ? 100 : (fe.isImage ? (fe.width || 200) : (fe.isIcon ? 80 : CARD_W))
+                  const feH = fromRes.isLabel ? 30  : (fe.isImage ? (fe.height || 200) : (fe.isIcon ? 80 : CARD_H_HALF * 2))
+                  const teW = toRes.isLabel   ? 100 : (te.isImage ? (te.width || 200) : (te.isIcon ? 80 : CARD_W))
+                  const teH = toRes.isLabel   ? 30  : (te.isImage ? (te.height || 200) : (te.isIcon ? 80 : CARD_H_HALF * 2))
                   const fCX = fe.x + feW / 2
                   const fCY = fe.y + feH / 2
                   const tCX = te.x + teW / 2
@@ -1948,6 +1984,25 @@ function AppInner({ userId, userEmail }) {
                           })
                         }}
                         onResizeMouseDown={e => onImageResizeMouseDown(e, card)}
+                        onConnectDot={(e, anchor) => onConnectDotMouseDown(e, card, anchor)}
+                      />
+                    )
+                  }
+                  if (card.isIcon) {
+                    return (
+                      <IconCard
+                        key={card.id}
+                        card={card}
+                        selected={selected === card.id || multiSelected.includes(card.id)}
+                        onMouseDown={e => onCardMouseDown(e, card)}
+                        onDelete={() => {
+                          const cId = currentIdRef.current
+                          setDb(prev => {
+                            const cv = prev[cId]
+                            if (!cv) return prev
+                            return { ...prev, [cId]: { ...cv, cards: cv.cards.filter(c => c.id !== card.id), connections: cv.connections.filter(c => c.from !== card.id && c.to !== card.id) } }
+                          })
+                        }}
                         onConnectDot={(e, anchor) => onConnectDotMouseDown(e, card, anchor)}
                       />
                     )
