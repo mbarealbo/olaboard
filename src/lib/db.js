@@ -122,10 +122,10 @@ export async function fetchConnections(canvasId) {
   return data
 }
 
-export async function createConnection({ canvasId, fromCardId, toCardId, label, fromAnchor, toAnchor, color }) {
+export async function createConnection({ canvasId, fromCardId, toCardId, label, fromAnchor, toAnchor }) {
   const { data, error } = await supabase
     .from('connections')
-    .insert({ canvas_id: canvasId, from_card_id: fromCardId, to_card_id: toCardId, label: label || '', from_anchor: fromAnchor || 'right', to_anchor: toAnchor || 'left', color: color || '#378ADD' })
+    .insert({ canvas_id: canvasId, from_card_id: fromCardId, to_card_id: toCardId, label: label || '', from_anchor: fromAnchor || 'right', to_anchor: toAnchor || 'left' })
     .select().single()
   if (error) throw error
   return data
@@ -240,7 +240,6 @@ export async function upsertConnections(connections, canvasId) {
     label: c.label || '',
     from_anchor: c.fromAnchor || 'right',
     to_anchor: c.toAnchor || 'left',
-    color: c.color || '#378ADD',
   }))
   const { error } = await supabase.from('connections').upsert(rows, { onConflict: 'id' })
   if (error) throw error
