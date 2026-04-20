@@ -1,0 +1,1 @@
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS node_type text NOT NULL DEFAULT 'postit';
