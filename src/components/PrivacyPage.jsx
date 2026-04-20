@@ -36,7 +36,7 @@ const content = {
       },
       {
         title: '6. Conservazione dei dati',
-        body: `I tuoi dati sono conservati per tutta la durata del tuo account. Puoi richiedere la cancellazione in qualsiasi momento scrivendo a ${CONTACT_EMAIL}. In caso di cancellazione account, i dati vengono eliminati entro 30 giorni, salvo obblighi di legge.`,
+        body: `I tuoi dati sono conservati per tutta la durata del tuo account.\n\nPuoi eliminare il tuo account direttamente dall'app (Impostazioni → Elimina account): la cancellazione è immediata e rimuove istantaneamente tutti i dati personali, canvas, note e immagini. In alternativa puoi scrivere a ${CONTACT_EMAIL}.\n\nAlcuni dati di fatturazione possono essere conservati da Stripe per obblighi di legge anche dopo la cancellazione dell'account.`,
       },
       {
         title: '7. I tuoi diritti (GDPR)',
@@ -82,7 +82,7 @@ const content = {
       },
       {
         title: '6. Data Retention',
-        body: `Your data is retained for the duration of your account. You may request deletion at any time by writing to ${CONTACT_EMAIL}. Upon account deletion, data is removed within 30 days, unless required by law.`,
+        body: `Your data is retained for the duration of your account.\n\nYou can delete your account directly from the app (Settings → Delete account): deletion is immediate and instantly removes all personal data, canvases, notes and images. Alternatively, write to ${CONTACT_EMAIL}.\n\nSome billing data may be retained by Stripe for legal compliance even after account deletion.`,
       },
       {
         title: '7. Your Rights (GDPR)',

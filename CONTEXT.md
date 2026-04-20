@@ -3,26 +3,40 @@
 ## Stack
 - React + Vite (no TypeScript)
 - CSS puro
-- Supabase per auth (magic link) e persistenza cloud
+- Supabase per auth (email+password, Google OAuth) e persistenza cloud
+- Stripe per pagamenti e subscription management
+- Resend per email transazionali (welcome, notifiche pagamento)
+- Netlify per hosting
 - No React Flow, no librerie canvas esterne
 
 ## Struttura file
-- `src/App.jsx` – App (auth gate), AppInner (stato top-level), FolderTree, LoadingOverlay, NotePanel, render SVG frecce
+- `src/App.jsx` – App (auth gate), AppInner (stato top-level), FolderTree, LoadingOverlay, NotePanel, render SVG frecce, modali (upgrade, manage plan, delete account, confirm generico)
 - `src/hooks/useCanvas.js` – tutto lo stato canvas: offset, scale, dragging, connecting, keyboard, exitPoint
 - `src/components/PostIt.jsx` – componente PostIt con 4 connect dots cardinali, Lucide icons
 - `src/components/GroupBox.jsx` – Group (box ridimensionabile) e CanvasLabel (testo libero, link cliccabili)
 - `src/components/BlockEditor.jsx` – editor blocchi stile Notion con slash commands, blocchi immagine, link cliccabili nei blocchi `p`
-- `src/components/AuthPage.jsx` – magic link login page
+- `src/components/AuthPage.jsx` – login/signup (email+password, Google OAuth), reset password, new password
+- `src/components/LandingPage.jsx` – landing pubblica con mockup animati e footer legale
+- `src/components/PricingPage.jsx` – pagina prezzi
+- `src/components/PrivacyPage.jsx` – Privacy Policy GDPR bilingue IT/EN (route: /privacy)
+- `src/components/TermsPage.jsx` – Termini e Condizioni bilingue IT/EN (route: /terms)
 - `src/lib/supabase.js` – createClient export
 - `src/lib/db.js` – tutte le funzioni CRUD Supabase (boards, canvases, cards, connections, bulk upsert/delete)
+- `src/lib/plans.js` – limiti per piano (free/pro/god), countTotalCanvases
+- `src/contexts/PlanContext.jsx` – piano utente da Supabase profiles
 - `src/utils.js` – costanti CARD_W=130, CARD_H_HALF=37, uid() (crypto.randomUUID), buildPath()
+- `supabase/functions/delete-account/` – Edge Function: cancella storage, annulla sub Stripe, elimina auth user (cascade DB)
+- `supabase/functions/create-checkout/` – Edge Function: crea sessione checkout Stripe
+- `supabase/functions/stripe-webhook/` – Edge Function: webhook Stripe con template email
+- `supabase/functions/send-welcome-email/` – Edge Function: welcome email su nuovo utente
 
 ## Auth
-- `App` component: `session` state (undefined=loading, null=not logged in, object=logged in)
-- `supabase.auth.getSession()` + `onAuthStateChange` per mantenere sessione aggiornata
-- `session === undefined` → null (spinner rimosso, usa LoadingOverlay)
-- `session === null` → `<AuthPage />` (magic link via signInWithOtp)
-- `session` presente → `<AppInner userId={session.user.id} />`
+- `LoginRoute`: `onAuthStateChange` → naviga a `/board` quando sessione presente
+- `BoardRoute`: `getSession()` + `onAuthStateChange` → redirect a `/login` se null
+- Metodi supportati: email+password (`signInWithPassword`), Google OAuth (`signInWithOAuth`)
+- Google OAuth: `redirectTo` punta a `/login` (non `/board`) per evitare race condition con PKCE code exchange
+- Trigger DB: `on_auth_user_created` → inserisce in `profiles` (con exception handler per non bloccare la registrazione)
+- Trigger DB: `on_profile_created_send_welcome` → chiama Edge Function `send-welcome-email` via pg_net (con exception handler)
 
 ## Struttura dati (Supabase)
 
@@ -192,8 +206,15 @@ function exitPoint(entity, isLbl, goingRight, goingDown, isHoriz, isSource) {
 }
 ```
 
+## Modali in AppInner
+- `showAccount` – pannello account (piano, storage, lingua, logout, elimina account)
+- `showUpgrade` – upgrade a Pro con checkout Stripe
+- `showManagePlan` – gestione piano Pro (downgrade a Free, cancella abbonamento)
+- `showDeleteAccount` – eliminazione account con conferma testuale ("ELIMINA"/"DELETE")
+- `confirmModal` – modale generica riutilizzabile `{ title, message, confirmLabel, danger, onConfirm }` — usata per elimina lavagna, downgrade, cancella abbonamento
+
 ## Prossimi step
-1. Immagini nel canvas (non solo nelle note)
-2. Export PDF / screenshot canvas
-3. Ricerca full-text tra le idee
-4. Collaborazione real-time (Supabase Realtime)
+1. Export PDF / screenshot canvas
+2. Ricerca full-text tra le idee
+3. Collaborazione real-time (Supabase Realtime)
+4. Mobile & touch support

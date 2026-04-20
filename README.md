@@ -12,7 +12,7 @@ A visual thinking tool for capturing and connecting ideas on an infinite canvas.
 
 Olaboard is a personal idea management tool built around a visual canvas. Think of it as the missing middle ground between Miro (too collaborative, too expensive) and Notion (great for text, weak on visuals). It's opinionated, fast, and designed for solo thinkers.
 
-Sync across devices via Supabase. Sign in with email and password — or open `/app` for an instant demo with no account.
+Sync across devices via Supabase. Sign in with **email and password** or **Google** — or open `/app` for an instant demo with no account.
 
 ---
 
@@ -137,7 +137,9 @@ Follow progress on [GitHub](https://github.com/mbarealbo/olaboard) or at [olab.q
 
 - **React 19** + **Vite 8**
 - **React Router v6** — `/landing`, `/app` (demo), `/login`, `/board`
-- **Supabase** — auth (email + password) + Postgres + Storage
+- **Supabase** — auth (email + password, Google OAuth) + Postgres + Storage + Edge Functions
+- **Stripe** — subscription payments
+- **Resend** — transactional email
 - Pure CSS + inline styles (no Tailwind)
 - No canvas libraries — all SVG + DOM
 - Lucide React for icons
@@ -167,7 +169,23 @@ Open `http://localhost:5173` — landing at `/landing`, demo canvas at `/app`.
 
 ---
 
+## Legal
+
+- [Privacy Policy](https://olaboard.netlify.app/privacy) — GDPR compliant, IT/EN
+- [Terms and Conditions](https://olaboard.netlify.app/terms) — IT/EN
+
+---
+
 ## Changelog
+
+### 0.9.0
+- Google OAuth login ("Continue with Google" button on auth page)
+- Account deletion flow — immediate, irreversible, removes all data + cancels Stripe subscription
+- Manage plan modal for Pro users — downgrade to Free or cancel subscription
+- Privacy Policy and Terms & Conditions pages (IT/EN, GDPR compliant)
+- Native confirm modals replacing all `window.confirm()` dialogs
+- Welcome email on signup via Resend + Supabase Edge Function
+- Stripe webhook email templates with logo
 
 ### 0.8.0
 - Landing page — animated mockups, feature sections, nested canvas demo, note mockup

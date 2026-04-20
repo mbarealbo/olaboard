@@ -10,11 +10,11 @@ const LAST_UPDATED = '20 aprile 2026'
 const LAST_UPDATED_EN = 'April 20, 2026'
 
 // ─── Sub-processors (keep in sync with PrivacyPage.jsx when adding services) ──
-// Supabase — auth, database, storage
-// Stripe   — payments
+// Supabase — auth (email+password, Google OAuth), database, storage
+// Stripe   — payments and subscription management
 // Netlify  — hosting
-// Google   — OAuth login
-// Resend   — transactional email
+// Google   — OAuth social login
+// Resend   — transactional email (welcome, payment notifications)
 
 const content = {
   it: {
@@ -31,7 +31,7 @@ const content = {
       },
       {
         title: '3. Registrazione e account',
-        body: `Per utilizzare Olaboard è necessario creare un account tramite email e password o tramite il proprio account Google.\n\nSei responsabile della riservatezza delle credenziali del tuo account e di tutte le attività che avvengono sotto il tuo account. Ci impegniamo a notificarti in caso di utilizzo non autorizzato di cui venissimo a conoscenza.`,
+        body: `Per utilizzare Olaboard è necessario creare un account tramite:\n\n• **Email e password** — registrazione diretta con conferma via email.\n• **Google OAuth** — accesso rapido tramite il tuo account Google. Raccogliamo solo nome, email e foto profilo.\n\nSei responsabile della riservatezza delle credenziali del tuo account e di tutte le attività che avvengono sotto di esso. Ci impegniamo a notificarti in caso di utilizzo non autorizzato di cui venissimo a conoscenza.`,
       },
       {
         title: '4. Piano Free',
@@ -54,8 +54,8 @@ const content = {
         body: `Olaboard è fornito "così com'è" (as-is). Nella misura massima consentita dalla legge, ${COMPANY} non è responsabile per danni indiretti, incidentali o consequenziali derivanti dall'uso o dall'impossibilità di usare il servizio.\n\nLa nostra responsabilità complessiva nei tuoi confronti non supererà l'importo pagato negli ultimi 12 mesi per il servizio, o €10 se non hai effettuato pagamenti.`,
       },
       {
-        title: '9. Sospensione e cancellazione account',
-        body: `Puoi cancellare il tuo account in qualsiasi momento scrivendo a ${CONTACT_EMAIL}. I tuoi dati saranno eliminati entro 30 giorni dalla richiesta.\n\nCi riserviamo il diritto di sospendere o cancellare account che violino i presenti Termini, con comunicazione preventiva salvo nei casi di violazioni gravi.`,
+        title: '9. Gestione e cancellazione account',
+        body: `**Downgrade e cancellazione abbonamento**: dal pannello impostazioni puoi in qualsiasi momento:\n• Passare dal piano Pro al piano Free.\n• Cancellare l'abbonamento Stripe attivo.\n\n**Eliminazione account**: puoi eliminare definitivamente il tuo account dalla sezione impostazioni dell'app. La cancellazione è immediata e irreversibile: tutti i canvas, note, immagini e dati personali vengono eliminati istantaneamente. L'abbonamento Stripe attivo viene annullato automaticamente.\n\nCi riserviamo il diritto di sospendere o cancellare account che violino i presenti Termini, con comunicazione preventiva salvo nei casi di violazioni gravi.`,
       },
       {
         title: '10. Modifiche al servizio e ai Termini',
@@ -85,7 +85,7 @@ const content = {
       },
       {
         title: '3. Registration and Account',
-        body: `To use Olaboard you must create an account via email and password or via your Google account.\n\nYou are responsible for keeping your account credentials confidential and for all activities that occur under your account. We will notify you of any unauthorized use we become aware of.`,
+        body: `To use Olaboard you must create an account via:\n\n• **Email and password** — direct registration with email confirmation.\n• **Google OAuth** — quick access via your Google account. We only collect your name, email and profile picture.\n\nYou are responsible for keeping your account credentials confidential and for all activities that occur under your account. We will notify you of any unauthorized use we become aware of.`,
       },
       {
         title: '4. Free Plan',
@@ -108,8 +108,8 @@ const content = {
         body: `Olaboard is provided "as-is". To the maximum extent permitted by law, ${COMPANY} is not liable for indirect, incidental or consequential damages arising from the use or inability to use the service.\n\nOur total liability to you shall not exceed the amount paid in the last 12 months for the service, or €10 if you have made no payments.`,
       },
       {
-        title: '9. Account Suspension and Deletion',
-        body: `You may delete your account at any time by writing to ${CONTACT_EMAIL}. Your data will be deleted within 30 days of the request.\n\nWe reserve the right to suspend or delete accounts that violate these Terms, with prior notice except in cases of serious violations.`,
+        title: '9. Account Management and Deletion',
+        body: `**Downgrade and subscription cancellation**: from the settings panel you can at any time:\n• Switch from the Pro plan to the Free plan.\n• Cancel your active Stripe subscription.\n\n**Account deletion**: you can permanently delete your account from the app's settings section. Deletion is immediate and irreversible: all canvases, notes, images and personal data are deleted instantly. Any active Stripe subscription is automatically cancelled.\n\nWe reserve the right to suspend or delete accounts that violate these Terms, with prior notice except in cases of serious violations.`,
       },
       {
         title: '10. Changes to Service and Terms',
