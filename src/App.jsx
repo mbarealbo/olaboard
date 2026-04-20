@@ -2004,6 +2004,7 @@ function AppInner({ userId, userEmail }) {
                           })
                         }}
                         onConnectDot={(e, anchor) => onConnectDotMouseDown(e, card, anchor)}
+                        onColorChange={color => updateCardFn(card.id, { color })}
                       />
                     )
                   }

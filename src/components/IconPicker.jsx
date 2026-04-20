@@ -1,10 +1,16 @@
 import { useState } from 'react'
 import { ICON_MAP, ICON_CATEGORIES, ICON_COLORS } from '../lib/icons'
 
-const COLOR_MAP = {
+const SWATCH_BG = {
   yellow: '#FAC775', orange: '#EF9F27', green: '#b8e986',
   blue: '#89cff0', pink: '#ffb3c6', purple: '#d4a8ff',
-  white: '#f5f5f5', red: '#ff8a80',
+  white: '#e5e7eb', red: '#ff8a80',
+}
+
+const ICON_STROKE = {
+  yellow: '#d97706', orange: '#ea580c', green: '#16a34a',
+  blue: '#2563eb', pink: '#db2777', purple: '#9333ea',
+  white: '#6b7280', red: '#dc2626',
 }
 
 export default function IconPicker({ onSelect, onClose }) {
@@ -98,7 +104,7 @@ export default function IconPicker({ onSelect, onClose }) {
               onClick={() => setActiveColor(c)}
               style={{
                 width: 20, height: 20, borderRadius: '50%',
-                background: COLOR_MAP[c],
+                background: SWATCH_BG[c],
                 border: activeColor === c ? '2.5px solid #378ADD' : '1.5px solid rgba(0,0,0,0.15)',
                 cursor: 'pointer', padding: 0, flexShrink: 0,
                 transition: 'border 0.1s',
@@ -115,6 +121,7 @@ function IconBtn({ name, color, onSelect }) {
   const [hovered, setHovered] = useState(false)
   const IconComp = ICON_MAP[name]
   if (!IconComp) return null
+  const strokeColor = ICON_STROKE[color] || ICON_STROKE.blue
   return (
     <button
       title={name}
@@ -129,10 +136,9 @@ function IconBtn({ name, color, onSelect }) {
         padding: '7px 0',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         transition: 'background 0.1s',
-        color: 'var(--text)',
       }}
     >
-      <IconComp size={20} strokeWidth={1.5} style={{ display: 'block' }} />
+      <IconComp size={20} strokeWidth={1.5} color={strokeColor} style={{ display: 'block' }} />
     </button>
   )
 }
