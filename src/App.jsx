@@ -7,6 +7,7 @@ import PostIt from './components/PostIt'
 import ImageCard from './components/ImageCard'
 import IconCard from './components/IconCard'
 import IconPicker from './components/IconPicker'
+import { ICON_MAP, ICON_STROKE_COLORS } from './lib/icons'
 import { Group, CanvasLabel } from './components/GroupBox'
 import { useCanvas } from './hooks/useCanvas'
 import { useHistory } from './hooks/useHistory'
@@ -224,6 +225,9 @@ function AppInner({ userId, userEmail }) {
   const [theme, setTheme] = useState('light')
   const [activeTool, setActiveTool] = useState('note')
   const [showIconPicker, setShowIconPicker] = useState(false)
+  const [isDraggingIcon, setIsDraggingIcon] = useState(false)
+  const [iconDragPos, setIconDragPos] = useState({ x: 0, y: 0 })
+  const iconDragRef = useRef(null) // { iconName, color } while dragging
   const [autoCreate, setAutoCreate] = useState(true)
   const [selectMode, setSelectMode] = useState(false)
   const [multiSelected, setMultiSelected] = useState([])
@@ -310,16 +314,13 @@ function AppInner({ userId, userEmail }) {
     return idx >= 0 ? url.slice(idx + marker.length) : null
   }
 
-  function handlePlaceIcon(iconName, iconColor) {
+  function placeIconCard(iconName, iconColor, x, y) {
     const cId = currentIdRef.current
     const currentCards = db[cId]?.cards || []
     if (currentCards.filter(c => !c.isLabel).length >= limits.cardsPerCanvas) {
       showLimitToast('cardsPerCanvas')
       return
     }
-    const r = boardRef.current?.getBoundingClientRect() || { width: 800, height: 600 }
-    const x = Math.round((r.width / 2 - offset.x) / scale - 40)
-    const y = Math.round((r.height / 2 - offset.y) / scale - 40)
     const newCard = { id: uid(), nodeType: 'icon', isIcon: true, body: iconName, title: '', color: iconColor, x, y, isFolder: false, isLabel: false, isImage: false, url: null, width: 80, height: 80 }
     setDb(prev => {
       const cv = prev[cId]
@@ -330,8 +331,43 @@ function AppInner({ userId, userEmail }) {
       undo: () => setDb(prev => { const cv = prev[cId]; if (!cv) return prev; return { ...prev, [cId]: { ...cv, cards: cv.cards.filter(c => c.id !== newCard.id) } } }),
       redo: () => setDb(prev => { const cv = prev[cId]; if (!cv) return prev; return { ...prev, [cId]: { ...cv, cards: [...cv.cards, newCard] } } }),
     })
-    setShowIconPicker(false)
   }
+
+  function handleIconDragStart(iconName, color, clientX, clientY) {
+    iconDragRef.current = { iconName, color }
+    setIconDragPos({ x: clientX, y: clientY })
+    setIsDraggingIcon(true)
+    setShowIconPicker(false)
+    document.body.style.cursor = 'grabbing'
+  }
+
+  useEffect(() => {
+    if (!isDraggingIcon) return
+    function onMouseMove(e) {
+      setIconDragPos({ x: e.clientX, y: e.clientY })
+    }
+    function onMouseUp(e) {
+      const drag = iconDragRef.current
+      iconDragRef.current = null
+      document.body.style.cursor = ''
+      setIsDraggingIcon(false)
+      if (!drag) return
+      const r = boardRef.current?.getBoundingClientRect()
+      if (r && e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
+        const o = iconDragOffsetRef.current
+        const s = iconDragScaleRef.current
+        const x = Math.round((e.clientX - r.left - o.x) / s - 40)
+        const y = Math.round((e.clientY - r.top  - o.y) / s - 40)
+        placeIconCard(drag.iconName, drag.color, x, y)
+      }
+    }
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', onMouseUp)
+    }
+  }, [isDraggingIcon]) // eslint-disable-line react-hooks/exhaustive-deps
   function mapConn(row) {
     return { id: row.id, from: row.from_card_id, to: row.to_card_id, label: row.label || '', fromAnchor: row.from_anchor || 'right', toAnchor: row.to_anchor || 'left' }
   }
@@ -556,6 +592,12 @@ function AppInner({ userId, userEmail }) {
   useEffect(() => { activeAutoCreateRef.current = autoCreate }, [autoCreate, activeAutoCreateRef])
   useEffect(() => { activeToolRef.current = activeTool }, [activeTool, activeToolRef])
   useEffect(() => { multiSelectedRef.current = multiSelected }, [multiSelected, multiSelectedRef])
+
+  // refs so drag handlers always see current offset/scale without stale closures
+  const iconDragOffsetRef = useRef({ x: 0, y: 0 })
+  const iconDragScaleRef = useRef(1)
+  useEffect(() => { iconDragOffsetRef.current = offset }, [offset])
+  useEffect(() => { iconDragScaleRef.current = scale }, [scale])
 
   // ── navigation ───────────────────────────────────────────────────────────
   function centerCanvas(canvasId, canvasOverride) {
@@ -1419,8 +1461,26 @@ function AppInner({ userId, userEmail }) {
         )}
 
         {showIconPicker && (
-          <IconPicker onSelect={handlePlaceIcon} onClose={() => setShowIconPicker(false)} />
+          <IconPicker onDragStart={handleIconDragStart} onClose={() => setShowIconPicker(false)} />
         )}
+
+        {isDraggingIcon && iconDragRef.current && (() => {
+          const GhostIcon = ICON_MAP[iconDragRef.current.iconName]
+          const strokeColor = ICON_STROKE_COLORS[iconDragRef.current.color] || ICON_STROKE_COLORS.blue
+          return (
+            <div style={{
+              position: 'fixed',
+              left: iconDragPos.x - 20, top: iconDragPos.y - 20,
+              width: 40, height: 40,
+              pointerEvents: 'none', zIndex: 99999,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              opacity: 0.75,
+              filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.25))',
+            }}>
+              {GhostIcon && <GhostIcon size={32} color={strokeColor} strokeWidth={1.8} />}
+            </div>
+          )
+})()}
 
         {showSearch && (
           <div onMouseDown={() => setShowSearch(false)} style={{ position: 'fixed', inset: 0, zIndex: 10002, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '80px 16px 16px' }}>

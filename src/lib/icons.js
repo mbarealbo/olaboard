@@ -38,3 +38,15 @@ export const ICON_CATEGORIES = [
 ]
 
 export const ICON_COLORS = ['yellow', 'orange', 'green', 'blue', 'pink', 'purple', 'white', 'red']
+
+export const ICON_STROKE_COLORS = {
+  yellow: '#d97706', orange: '#ea580c', green: '#16a34a',
+  blue: '#2563eb', pink: '#db2777', purple: '#9333ea',
+  white: '#6b7280', red: '#dc2626',
+}
+
+export const ICON_SWATCH_BG = {
+  yellow: '#FAC775', orange: '#EF9F27', green: '#b8e986',
+  blue: '#89cff0', pink: '#ffb3c6', purple: '#d4a8ff',
+  white: '#e5e7eb', red: '#ff8a80',
+}

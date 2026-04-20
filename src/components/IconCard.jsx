@@ -1,36 +1,12 @@
 import { useState } from 'react'
-import { ICON_MAP } from '../lib/icons'
+import { ICON_MAP, ICON_STROKE_COLORS, ICON_SWATCH_BG, ICON_COLORS } from '../lib/icons'
 
 export const ICON_CARD_SIZE = 80
-
-const ICON_STROKE = {
-  yellow: '#d97706',
-  orange: '#ea580c',
-  green: '#16a34a',
-  blue: '#2563eb',
-  pink: '#db2777',
-  purple: '#9333ea',
-  white: '#6b7280',
-  red: '#dc2626',
-}
-
-const SWATCH_BG = {
-  yellow: '#FAC775',
-  orange: '#EF9F27',
-  green: '#b8e986',
-  blue: '#89cff0',
-  pink: '#ffb3c6',
-  purple: '#d4a8ff',
-  white: '#e5e7eb',
-  red: '#ff8a80',
-}
-
-const COLORS = ['yellow', 'orange', 'green', 'blue', 'pink', 'purple', 'white', 'red']
 
 export default function IconCard({ card, selected, onMouseDown, onDelete, onConnectDot, onColorChange }) {
   const [hovered, setHovered] = useState(false)
   const IconComp = ICON_MAP[card.body] || ICON_MAP.Star
-  const strokeColor = ICON_STROKE[card.color] || ICON_STROKE.blue
+  const strokeColor = ICON_STROKE_COLORS[card.color] || ICON_STROKE_COLORS.blue
 
   return (
     <div
@@ -94,14 +70,14 @@ export default function IconCard({ card, selected, onMouseDown, onDelete, onConn
           }}
           onMouseDown={e => e.stopPropagation()}
         >
-          {COLORS.map(c => (
+          {ICON_COLORS.map(c => (
             <button
               key={c}
               title={c}
               onClick={e => { e.stopPropagation(); onColorChange(c) }}
               style={{
                 width: 16, height: 16, borderRadius: '50%',
-                background: SWATCH_BG[c],
+                background: ICON_SWATCH_BG[c],
                 border: card.color === c ? '2px solid #378ADD' : '1.5px solid rgba(0,0,0,0.15)',
                 cursor: 'pointer', padding: 0, flexShrink: 0,
               }}
