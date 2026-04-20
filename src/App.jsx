@@ -369,7 +369,7 @@ function AppInner({ userId, userEmail }) {
     }
   }, [isDraggingIcon]) // eslint-disable-line react-hooks/exhaustive-deps
   function mapConn(row) {
-    return { id: row.id, from: row.from_card_id, to: row.to_card_id, label: row.label || '', fromAnchor: row.from_anchor || 'right', toAnchor: row.to_anchor || 'left' }
+    return { id: row.id, from: row.from_card_id, to: row.to_card_id, label: row.label || '', fromAnchor: row.from_anchor || 'right', toAnchor: row.to_anchor || 'left', color: row.color || '#378ADD' }
   }
 
   // ── load canvas data from Supabase into db state ──────────────────────────
@@ -563,7 +563,7 @@ function AppInner({ userId, userEmail }) {
       const cId = currentIdRef.current
       const canvas = prev[cId]
       if (!canvas) return prev
-      return { ...prev, [cId]: { ...canvas, connections: [...canvas.connections, { id: uid(), from, to, fromAnchor: fromAnchor || 'right', toAnchor: toAnchor || 'left', label: '' }] } }
+      return { ...prev, [cId]: { ...canvas, connections: [...canvas.connections, { id: uid(), from, to, fromAnchor: fromAnchor || 'right', toAnchor: toAnchor || 'left', label: '', color: '#378ADD' }] } }
     })
   }, [])
 
@@ -1788,10 +1788,7 @@ function AppInner({ userId, userEmail }) {
               <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
                 <defs>
                   <marker id="ah" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto" markerUnits="userSpaceOnUse">
-                    <polygon points="0 0, 10 3.5, 0 7" fill="#378ADD" />
-                  </marker>
-                  <marker id="ah-sel" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto" markerUnits="userSpaceOnUse">
-                    <polygon points="0 0, 10 3.5, 0 7" fill="#e53935" />
+                    <polygon points="0 0, 10 3.5, 0 7" fill="context-stroke" />
                   </marker>
                 </defs>
                 {connections.map(conn => {
@@ -1852,14 +1849,16 @@ function AppInner({ userId, userEmail }) {
                   const mx = (1-bt)**3*sx1 + 3*(1-bt)**2*bt*cp1x + 3*(1-bt)*bt**2*cp2x + bt**3*sx2
                   const my = (1-bt)**3*sy1 + 3*(1-bt)**2*bt*cp1y + 3*(1-bt)*bt**2*cp2y + bt**3*sy2
                   const d = `M${sx1},${sy1} C${cp1x},${cp1y} ${cp2x},${cp2y} ${sx2},${sy2}`
-                  const stroke = isSel ? '#e53935' : '#378ADD'
-                  const markerEnd = isSel ? 'url(#ah-sel)' : 'url(#ah)'
+                  const connColor = conn.color || '#378ADD'
+                  const stroke = isSel ? connColor : connColor
+                  const strokeW = isSel ? 3 : 2
+                  const CONN_COLORS = ['#378ADD','#e53935','#16a34a','#d97706','#9333ea','#db2777','#6b7280','#1f2937']
                   return (
                     <g key={conn.id} style={{ pointerEvents: 'all' }} onClick={e => { e.stopPropagation(); setSelectedConn(isSel ? null : conn.id) }}>
                       <path d={d} fill="none" stroke="transparent" strokeWidth={12} style={{ cursor: 'pointer' }} />
-                      <path d={d} fill="none" stroke={stroke} strokeWidth={isSel ? 3 : 2} markerEnd={markerEnd} style={{ pointerEvents: 'none' }} />
+                      <path d={d} fill="none" stroke={stroke} strokeWidth={strokeW} markerEnd="url(#ah)" style={{ pointerEvents: 'none' }} />
                       {editingConnId !== conn.id && (
-                        <circle cx={mx} cy={my} r={7} fill={conn.label ? stroke : (isSel ? 'rgba(229,57,53,0.18)' : 'rgba(55,138,221,0.18)')} stroke="none" style={{ cursor: 'pointer' }} onClick={e => { e.stopPropagation(); setEditingConnId(conn.id); setEditingConnValue(conn.label || '') }} />
+                        <circle cx={mx} cy={my} r={7} fill={conn.label ? stroke : `${stroke}30`} stroke="none" style={{ cursor: 'pointer' }} onClick={e => { e.stopPropagation(); setEditingConnId(conn.id); setEditingConnValue(conn.label || '') }} />
                       )}
                       {conn.label && editingConnId !== conn.id && (
                         <text x={mx} y={my - 10} textAnchor="middle" fontSize={11} fill={stroke} style={{ pointerEvents: 'none' }}>{conn.label}</text>
@@ -1872,8 +1871,29 @@ function AppInner({ userId, userEmail }) {
                             onChange={e => setEditingConnValue(e.target.value)}
                             onBlur={() => { saveConnLabel(editingConnId, editingConnValue); setEditingConnId(null) }}
                             onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') setEditingConnId(null) }}
-                            style={{ width: '100%', height: '100%', border: '1px solid #378ADD', borderRadius: 4, padding: '2px 6px', fontSize: 11, background: 'white', outline: 'none', textAlign: 'center' }}
+                            style={{ width: '100%', height: '100%', border: `1px solid ${connColor}`, borderRadius: 4, padding: '2px 6px', fontSize: 11, background: 'white', outline: 'none', textAlign: 'center' }}
                           />
+                        </foreignObject>
+                      )}
+                      {isSel && editingConnId !== conn.id && (
+                        <foreignObject x={mx - 76} y={my + 12} width={152} height={32}>
+                          <div style={{ display: 'flex', gap: 4, alignItems: 'center', background: '#fff', border: '1px solid rgba(0,0,0,0.12)', borderRadius: 20, padding: '4px 8px', boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}>
+                            {CONN_COLORS.map(c => (
+                              <div
+                                key={c}
+                                onClick={e => {
+                                  e.stopPropagation()
+                                  const cId = currentIdRef.current
+                                  setDb(prev => {
+                                    const cv = prev[cId]
+                                    if (!cv) return prev
+                                    return { ...prev, [cId]: { ...cv, connections: cv.connections.map(cn => cn.id === conn.id ? { ...cn, color: c } : cn) } }
+                                  })
+                                }}
+                                style={{ width: 16, height: 16, borderRadius: '50%', background: c, border: connColor === c ? '2.5px solid #000' : '1.5px solid rgba(0,0,0,0.18)', cursor: 'pointer', flexShrink: 0 }}
+                              />
+                            ))}
+                          </div>
                         </foreignObject>
                       )}
                     </g>
