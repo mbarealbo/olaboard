@@ -308,6 +308,10 @@ export default function AuthPage() {
               onClick={() => switchMode('login')}
             >{t('backToLogin')}</button>
           )}
+          <a href="/privacy" style={{ fontSize: 12, color: '#aaa', textDecoration: 'none' }}
+            onMouseEnter={e => e.currentTarget.style.color = '#378ADD'}
+            onMouseLeave={e => e.currentTarget.style.color = '#aaa'}
+          >Privacy Policy</a>
         </div>
       </Card>
     </Page>
