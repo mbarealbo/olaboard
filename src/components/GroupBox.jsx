@@ -185,8 +185,8 @@ export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit
       {(selected || hovered) && !editing && onResizeMouseDown && (
         <div
           style={{
-            position: 'absolute', bottom: -5, right: -5,
-            width: 10, height: 10, background: '#fff',
+            position: 'absolute', bottom: 2, right: 2,
+            width: 12, height: 12, background: 'rgba(55,138,221,0.15)',
             border: '1.5px solid #378ADD', borderRadius: 2,
             cursor: 'se-resize', zIndex: 10,
           }}
