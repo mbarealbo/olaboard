@@ -104,10 +104,21 @@ export function Group({ group, onTitleBarMouseDown, onResizeHandleMouseDown, onD
   )
 }
 
-export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit, onEndEdit, onTextChange, onDelete, onConnectDot, onConvertToPostIt, onConvertToFolder }) {
+const LABEL_FONTS = [
+  { key: 'sans',  label: 'Normal', family: 'system-ui, sans-serif' },
+  { key: 'mono',  label: 'Mono',   family: "'Space Mono', monospace" },
+  { key: 'hand',  label: 'Hand',   family: "'Caveat', cursive" },
+  { key: 'serif', label: 'Serif',  family: "'Lora', serif" },
+]
+
+export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit, onEndEdit, onTextChange, onDelete, onConnectDot, onConvertToPostIt, onConvertToFolder, onFontChange, onSizeChange }) {
   const { t } = useLang()
   const elRef = useRef(null)
   const [hovered, setHovered] = useState(false)
+
+  const activeFontKey = label.fontFamily || 'sans'
+  const fontFamily = LABEL_FONTS.find(f => f.key === activeFontKey)?.family || 'system-ui, sans-serif'
+  const fontSize = label.fontSize || 16
 
   useEffect(() => {
     if (editing && elRef.current) {
@@ -122,6 +133,8 @@ export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit
       } catch (_) {}
     }
   }, [editing]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const textStyle = { fontSize, fontFamily, color: 'var(--text)', outline: 'none', minWidth: 80, whiteSpace: 'pre-wrap' }
 
   return (
     <div
@@ -143,7 +156,7 @@ export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit
           ref={elRef}
           contentEditable
           suppressContentEditableWarning
-          style={{ fontSize: label.fontSize, color: 'var(--text)', outline: 'none', minWidth: 80, cursor: 'text', whiteSpace: 'pre-wrap' }}
+          style={{ ...textStyle, cursor: 'text' }}
           onMouseDown={e => e.stopPropagation()}
           onBlur={e => {
             const text = e.target.textContent.trim()
@@ -157,7 +170,7 @@ export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit
           }}
         />
       ) : (
-        <p style={{ fontSize: label.fontSize, color: 'var(--text)', margin: 0, minWidth: 80, whiteSpace: 'pre-wrap', cursor: 'move' }}>
+        <p style={{ ...textStyle, margin: 0, cursor: 'move' }}>
           {parseTextWithLinks(label.text)}
         </p>
       )}
@@ -170,21 +183,46 @@ export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit
         </>
       )}
       {(selected || hovered) && !editing && (
-        <div style={{
-          position: 'absolute', bottom: -30, left: '50%',
-          transform: 'translateX(-50%)', display: 'flex',
-          gap: 4, zIndex: 9999, pointerEvents: 'all',
-        }}>
-          <button
-            onMouseDown={e => e.stopPropagation()}
-            onClick={e => { e.stopPropagation(); onConvertToPostIt?.() }}
-            style={{ background: '#fff', border: '1px solid #d0d0d0', borderRadius: 4, padding: '3px 8px', fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap', boxShadow: '0 1px 4px rgba(0,0,0,0.1)' }}
-          >{t('convertToPostIt')}</button>
-          <button
-            onMouseDown={e => e.stopPropagation()}
-            onClick={e => { e.stopPropagation(); onConvertToFolder?.() }}
-            style={{ background: '#fff', border: '1px solid #d0d0d0', borderRadius: 4, padding: '3px 8px', fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap', boxShadow: '0 1px 4px rgba(0,0,0,0.1)' }}
-          ><Folder size={12} /></button>
+        <div
+          style={{
+            position: 'absolute', bottom: -38, left: '50%',
+            transform: 'translateX(-50%)', display: 'flex', alignItems: 'center',
+            gap: 2, zIndex: 9999, pointerEvents: 'all',
+            background: '#fff', border: '1px solid rgba(0,0,0,0.12)',
+            borderRadius: 20, padding: '4px 8px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+            whiteSpace: 'nowrap',
+          }}
+          onMouseDown={e => e.stopPropagation()}
+        >
+          {LABEL_FONTS.map(f => (
+            <button
+              key={f.key}
+              onClick={e => { e.stopPropagation(); onFontChange?.(f.key) }}
+              style={{
+                fontFamily: f.family, fontSize: 11,
+                background: activeFontKey === f.key ? '#378ADD' : 'transparent',
+                color: activeFontKey === f.key ? '#fff' : '#444',
+                border: 'none', borderRadius: 10,
+                padding: '2px 7px', cursor: 'pointer',
+              }}
+            >{f.label}</button>
+          ))}
+          <div style={{ width: 1, height: 14, background: '#ddd', margin: '0 4px', flexShrink: 0 }} />
+          <button onClick={e => { e.stopPropagation(); onSizeChange?.(-4) }} style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 14, color: '#555', padding: '0 3px', lineHeight: 1 }}>−</button>
+          <span style={{ fontSize: 11, color: '#555', minWidth: 20, textAlign: 'center' }}>{fontSize}</span>
+          <button onClick={e => { e.stopPropagation(); onSizeChange?.(4) }} style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 14, color: '#555', padding: '0 3px', lineHeight: 1 }}>+</button>
+          {(onConvertToPostIt || onConvertToFolder) && (
+            <>
+              <div style={{ width: 1, height: 14, background: '#ddd', margin: '0 4px', flexShrink: 0 }} />
+              {onConvertToPostIt && (
+                <button onClick={e => { e.stopPropagation(); onConvertToPostIt() }} style={{ background: 'transparent', border: 'none', borderRadius: 10, padding: '2px 6px', fontSize: 11, cursor: 'pointer', color: '#444', whiteSpace: 'nowrap' }}>{t('convertToPostIt')}</button>
+              )}
+              {onConvertToFolder && (
+                <button onClick={e => { e.stopPropagation(); onConvertToFolder() }} style={{ background: 'transparent', border: 'none', borderRadius: 10, padding: '2px 6px', fontSize: 11, cursor: 'pointer', color: '#444' }}><Folder size={11} /></button>
+              )}
+            </>
+          )}
         </div>
       )}
     </div>

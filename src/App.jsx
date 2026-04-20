@@ -2024,6 +2024,22 @@ function AppInner({ userId, userEmail }) {
                       return { ...prev, [cId]: { ...canvas, labels: (canvas.labels||[]).filter(l => l.id !== label.id) } }
                     })}
                     onConnectDot={(e, anchor) => onConnectDotMouseDown(e, label, anchor)}
+                    onFontChange={key => {
+                      const cId = currentId
+                      setDb(prev => {
+                        const cv = prev[cId]
+                        if (!cv) return prev
+                        return { ...prev, [cId]: { ...cv, labels: (cv.labels||[]).map(l => l.id === label.id ? { ...l, fontFamily: key } : l) } }
+                      })
+                    }}
+                    onSizeChange={delta => {
+                      const cId = currentId
+                      setDb(prev => {
+                        const cv = prev[cId]
+                        if (!cv) return prev
+                        return { ...prev, [cId]: { ...cv, labels: (cv.labels||[]).map(l => l.id === label.id ? { ...l, fontSize: Math.max(10, Math.min(72, (l.fontSize || 16) + delta)) } : l) } }
+                      })
+                    }}
                   />
                 ))}
 

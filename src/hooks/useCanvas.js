@@ -848,7 +848,7 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
 
   // ── label creation & update ───────────────────────────────────────────────
   function createLabel(wx, wy) {
-    const label = { id: uid(), x: wx, y: wy, text: '', fontSize: 16 }
+    const label = { id: uid(), x: wx, y: wy, text: '', fontSize: 16, fontFamily: 'sans' }
     const cId = currentIdRef.current
     setDb(prev => {
       const canvas = prev[cId]
