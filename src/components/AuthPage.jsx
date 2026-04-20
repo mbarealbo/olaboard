@@ -43,7 +43,7 @@ export default function AuthPage() {
     setLoading(true); setError(null)
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/board` },
+      options: { redirectTo: `${window.location.origin}/login` },
     })
     if (error) { setError(error.message); setLoading(false) }
   }
