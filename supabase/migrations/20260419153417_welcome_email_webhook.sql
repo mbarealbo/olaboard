@@ -8,6 +8,8 @@ begin
     body := jsonb_build_object('record', row_to_json(new))
   );
   return new;
+exception when others then
+  return new;
 end;
 $$ language plpgsql security definer;
 
