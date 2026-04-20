@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { useLang } from '../contexts/LangContext'
 import OlaboardLogo from './OlaboardLogo'
 
-const CONTACT_EMAIL = 'alberto.abate.work@gmail.com'
+const CONTACT_EMAIL = 'privacy@olab.quest'
+const COMPANY = 'Olab Quest di Alberto Abate'
+const VAT = '05532500872'
 const LAST_UPDATED = '20 aprile 2026'
 const LAST_UPDATED_EN = 'April 20, 2026'
 
@@ -14,7 +16,7 @@ const content = {
     sections: [
       {
         title: '1. Titolare del trattamento',
-        body: `Il titolare del trattamento dei dati personali è Alberto Abate, contattabile all'indirizzo email: ${CONTACT_EMAIL}.\n\nOlaboard è un'applicazione web per l'organizzazione visiva di note e canvas.`,
+        body: `Il titolare del trattamento dei dati personali è:\n\n**${COMPANY}**\nP.IVA ${VAT}\nEmail: ${CONTACT_EMAIL}\n\nOlaboard è un'applicazione web per l'organizzazione visiva di note e canvas.`,
       },
       {
         title: '2. Dati raccolti',
@@ -60,7 +62,7 @@ const content = {
     sections: [
       {
         title: '1. Data Controller',
-        body: `The data controller is Alberto Abate, reachable at: ${CONTACT_EMAIL}.\n\nOlaboard is a web application for visual note-taking and canvas organization.`,
+        body: `The data controller is:\n\n**${COMPANY}**\nVAT: ${VAT}\nEmail: ${CONTACT_EMAIL}\n\nOlaboard is a web application for visual note-taking and canvas organization.`,
       },
       {
         title: '2. Data We Collect',

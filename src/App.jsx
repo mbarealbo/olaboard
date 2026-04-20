@@ -15,6 +15,7 @@ import OlaboardLogo from './components/OlaboardLogo'
 import LandingPage from './components/LandingPage'
 import PricingPage from './components/PricingPage'
 import PrivacyPage from './components/PrivacyPage'
+import TermsPage from './components/TermsPage'
 import MobileBlock from './components/MobileBlock'
 import { PlanProvider, usePlan } from './contexts/PlanContext'
 import { countTotalCanvases } from './lib/plans'
@@ -179,6 +180,7 @@ export default function App() {
       <Route path="/landing" element={<LandingPage />} />
       <Route path="/pricing" element={<PricingPage />} />
       <Route path="/privacy" element={<PrivacyPage />} />
+      <Route path="/terms" element={<TermsPage />} />
       <Route path="/app" element={gate(<PlanProvider userId="local"><AppInner userId="local" userEmail="" /></PlanProvider>)} />
       <Route path="/login" element={gate(<LoginRoute />)} />
       <Route path="/board" element={gate(<BoardRoute />)} />

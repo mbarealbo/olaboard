@@ -312,6 +312,10 @@ export default function AuthPage() {
             onMouseEnter={e => e.currentTarget.style.color = '#378ADD'}
             onMouseLeave={e => e.currentTarget.style.color = '#aaa'}
           >Privacy Policy</a>
+          <a href="/terms" style={{ fontSize: 12, color: '#aaa', textDecoration: 'none' }}
+            onMouseEnter={e => e.currentTarget.style.color = '#378ADD'}
+            onMouseLeave={e => e.currentTarget.style.color = '#aaa'}
+          >Termini</a>
         </div>
       </Card>
     </Page>

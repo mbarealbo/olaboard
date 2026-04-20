@@ -637,6 +637,9 @@ export default function LandingPage() {
         <a href="/privacy" style={{ fontSize: 12, color: '#bbb', textDecoration: 'none', transition: 'color 0.15s' }}
           onMouseEnter={e => e.currentTarget.style.color = '#111'} onMouseLeave={e => e.currentTarget.style.color = '#bbb'}
         >Privacy Policy</a>
+        <a href="/terms" style={{ fontSize: 12, color: '#bbb', textDecoration: 'none', transition: 'color 0.15s' }}
+          onMouseEnter={e => e.currentTarget.style.color = '#111'} onMouseLeave={e => e.currentTarget.style.color = '#bbb'}
+        >Termini e Condizioni</a>
         <div style={{ flex: 1 }} />
         <span style={{ fontSize: 12, color: '#ccc' }}>Made with ♥ by Albo — <a href="https://olab.quest" target="_blank" rel="noreferrer" style={{ color: '#ccc', textDecoration: 'none', transition: 'color 0.15s' }} onMouseEnter={e => e.currentTarget.style.color = '#111'} onMouseLeave={e => e.currentTarget.style.color = '#ccc'}>olab.quest</a></span>
         <a href={GITHUB_URL} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#999', textDecoration: 'none', transition: 'color 0.15s' }}
