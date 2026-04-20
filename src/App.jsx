@@ -244,6 +244,7 @@ function AppInner({ userId, userEmail }) {
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [deleteError, setDeleteError] = useState(null)
+  const [confirmModal, setConfirmModal] = useState(null)
   const [demoBannerDismissed, setDemoBannerDismissed] = useState(false)
   const [upgradeYearly, setUpgradeYearly] = useState(false)
   const [checkoutLoading, setCheckoutLoading] = useState(null)
@@ -1066,10 +1067,17 @@ function AppInner({ userId, userEmail }) {
                         onMouseDown={e => e.stopPropagation()}
                         onClick={e => {
                           e.stopPropagation()
-                          if (!window.confirm(t('deleteBoardConfirm'))) return
-                          setBoards(prev => prev.filter(b => b.id !== board.id))
-                          setDb(prev => { const next = { ...prev }; delete next[board.id]; return next })
-                          deleteBoardDB(board.id).catch(console.error)
+                          setConfirmModal({
+                            title: lang === 'it' ? 'Elimina lavagna' : 'Delete board',
+                            message: lang === 'it' ? `Vuoi eliminare "${board.name}"? L'azione è irreversibile.` : `Delete "${board.name}"? This action cannot be undone.`,
+                            confirmLabel: lang === 'it' ? 'Elimina' : 'Delete',
+                            danger: true,
+                            onConfirm: () => {
+                              setBoards(prev => prev.filter(b => b.id !== board.id))
+                              setDb(prev => { const next = { ...prev }; delete next[board.id]; return next })
+                              deleteBoardDB(board.id).catch(console.error)
+                            }
+                          })
                         }}
                         title={t('deleteBoard')}
                       ><Trash2 size={12} /></button>
@@ -1297,11 +1305,16 @@ function AppInner({ userId, userEmail }) {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <button
-                  onClick={async () => {
-                    if (!window.confirm('Passare al piano Free? Perderai l\'accesso alle funzionalità Pro al termine del periodo attuale.')) return
-                    const { error } = await supabase.from('profiles').update({ plan: 'free' }).eq('id', userId)
-                    if (!error) { setShowManagePlan(false); window.location.reload() }
-                  }}
+                  onClick={() => setConfirmModal({
+                    title: 'Passa al piano Free',
+                    message: 'Perderai l\'accesso alle funzionalità Pro. Vuoi continuare?',
+                    confirmLabel: 'Passa a Free',
+                    danger: false,
+                    onConfirm: async () => {
+                      const { error } = await supabase.from('profiles').update({ plan: 'free' }).eq('id', userId)
+                      if (!error) { setShowManagePlan(false); window.location.reload() }
+                    }
+                  })}
                   style={{ width: '100%', padding: '12px 16px', borderRadius: 10, border: '1.5px solid #e5e7eb', background: '#fff', fontSize: 14, fontWeight: 600, color: '#333', cursor: 'pointer', textAlign: 'left' }}
                   onMouseEnter={e => e.currentTarget.style.borderColor = '#aaa'}
                   onMouseLeave={e => e.currentTarget.style.borderColor = '#e5e7eb'}
@@ -1311,11 +1324,16 @@ function AppInner({ userId, userEmail }) {
                 </button>
 
                 <button
-                  onClick={async () => {
-                    if (!window.confirm('Sei sicuro di voler cancellare l\'abbonamento? Il tuo account passerà al piano Free.')) return
-                    const { error } = await supabase.from('profiles').update({ plan: 'free', stripe_customer_id: null }).eq('id', userId)
-                    if (!error) { setShowManagePlan(false); window.location.reload() }
-                  }}
+                  onClick={() => setConfirmModal({
+                    title: 'Cancella abbonamento',
+                    message: 'Il tuo account tornerà al piano Free. Sei sicuro?',
+                    confirmLabel: 'Cancella abbonamento',
+                    danger: true,
+                    onConfirm: async () => {
+                      const { error } = await supabase.from('profiles').update({ plan: 'free', stripe_customer_id: null }).eq('id', userId)
+                      if (!error) { setShowManagePlan(false); window.location.reload() }
+                    }
+                  })}
                   style={{ width: '100%', padding: '12px 16px', borderRadius: 10, border: '1.5px solid #fecaca', background: '#fff5f5', fontSize: 14, fontWeight: 600, color: '#dc2626', cursor: 'pointer', textAlign: 'left' }}
                   onMouseEnter={e => e.currentTarget.style.background = '#fee2e2'}
                   onMouseLeave={e => e.currentTarget.style.background = '#fff5f5'}
@@ -1328,6 +1346,25 @@ function AppInner({ userId, userEmail }) {
               <p style={{ fontSize: 11, color: '#bbb', marginTop: 20, lineHeight: 1.5 }}>
                 Per problemi con la fatturazione scrivi a <a href="mailto:privacy@olab.quest" style={{ color: '#bbb' }}>privacy@olab.quest</a>
               </p>
+            </div>
+          </div>
+        )}
+
+        {confirmModal && (
+          <div onMouseDown={() => setConfirmModal(null)} style={{ position: 'fixed', inset: 0, zIndex: 10001, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+            <div onMouseDown={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 16, padding: '28px 24px 24px', width: '100%', maxWidth: 380, boxShadow: '0 24px 64px rgba(0,0,0,0.18)', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif' }}>
+              <div style={{ fontSize: 16, fontWeight: 750, letterSpacing: '-0.4px', marginBottom: 10 }}>{confirmModal.title}</div>
+              <p style={{ fontSize: 13, color: '#555', lineHeight: 1.6, margin: '0 0 24px' }}>{confirmModal.message}</p>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button
+                  onClick={() => setConfirmModal(null)}
+                  style={{ flex: 1, padding: '10px 0', borderRadius: 9, border: '1.5px solid #e5e7eb', background: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', color: '#333' }}
+                >{lang === 'it' ? 'Annulla' : 'Cancel'}</button>
+                <button
+                  onClick={async () => { await confirmModal.onConfirm(); setConfirmModal(null) }}
+                  style={{ flex: 1, padding: '10px 0', borderRadius: 9, border: 'none', background: confirmModal.danger ? '#e53935' : '#378ADD', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+                >{confirmModal.confirmLabel}</button>
+              </div>
             </div>
           </div>
         )}
