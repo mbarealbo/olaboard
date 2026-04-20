@@ -1155,7 +1155,13 @@ function AppInner({ userId, userEmail }) {
                 Made by{' '}
                 <a href="https://olab.quest" target="_blank" rel="noopener noreferrer" style={{ color: '#378ADD', textDecoration: 'none' }}>olab.quest</a>
               </div>
-              <div style={{ fontSize: 10, color: '#bbb', marginTop: 2 }}>v0.8.0</div>
+              <div style={{ fontSize: 10, color: '#bbb', marginTop: 4, display: 'flex', gap: 8 }}>
+                <span>v0.8.0</span>
+                <button onClick={() => window.revisitCkyConsent?.()} style={{ fontSize: 10, color: '#bbb', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}
+                  onMouseEnter={e => e.currentTarget.style.color = '#378ADD'}
+                  onMouseLeave={e => e.currentTarget.style.color = '#bbb'}
+                >Cookie Preferences</button>
+              </div>
             </div>
           </div>
         </div>
