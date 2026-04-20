@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useLang } from './contexts/LangContext'
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
-import { Trash2, Moon, Sun, Monitor, Zap, Folder, LogOut, Maximize2, Undo2, Redo2, User, MousePointerClick } from 'lucide-react'
+import { Trash2, Moon, Sun, Monitor, Zap, Folder, LogOut, Maximize2, Undo2, Redo2, User, MousePointerClick, Search } from 'lucide-react'
 import BlockEditor from './components/BlockEditor'
 import PostIt from './components/PostIt'
 import ImageCard from './components/ImageCard'
@@ -21,6 +21,7 @@ import { PlanProvider, usePlan } from './contexts/PlanContext'
 import { countTotalCanvases } from './lib/plans'
 import {
   fetchBoards as fetchBoardsDB,
+  searchCards,
   createBoard as createBoardDB,
   updateBoard as updateBoardDB,
   deleteBoard as deleteBoardDB,
@@ -245,6 +246,11 @@ function AppInner({ userId, userEmail }) {
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [deleteError, setDeleteError] = useState(null)
   const [confirmModal, setConfirmModal] = useState(null)
+  const [showSearch, setShowSearch] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState([])
+  const [searchLoading, setSearchLoading] = useState(false)
+  const searchTimerRef = useRef(null)
   const [demoBannerDismissed, setDemoBannerDismissed] = useState(false)
   const [upgradeYearly, setUpgradeYearly] = useState(false)
   const [checkoutLoading, setCheckoutLoading] = useState(null)
@@ -845,6 +851,19 @@ function AppInner({ userId, userEmail }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [undo, redo])
 
+  // ── Cmd+K search shortcut ─────────────────────────────────────────────────
+  useEffect(() => {
+    function onKey(e) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault()
+        setShowSearch(true)
+        setSearchQuery(''); setSearchResults([])
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
   // ── sidebar collapse toggle ───────────────────────────────────────────────
   function toggleCollapse(id) {
     setCollapsedIds(prev => {
@@ -1010,7 +1029,16 @@ function AppInner({ userId, userEmail }) {
         <div style={{ width: 210, flexShrink: 0, background: 'var(--sidebar-bg)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           {/* Top scrollable section */}
           <div style={{ flex: 1, overflowY: 'auto' }}>
-            <div style={{ padding: '14px 12px 10px' }}><OlaboardLogo size={20} fontSize={16} gap={7} color='var(--text)' /></div>
+            <div style={{ padding: '14px 12px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <OlaboardLogo size={20} fontSize={16} gap={7} color='var(--text)' />
+              <button
+                onClick={() => { setShowSearch(true); setSearchQuery(''); setSearchResults([]) }}
+                title="Cerca (⌘K)"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4, borderRadius: 6, display: 'flex', alignItems: 'center' }}
+                onMouseEnter={e => e.currentTarget.style.color = 'var(--text)'}
+                onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
+              ><Search size={14} /></button>
+            </div>
             <div style={{ padding: '0 12px 4px', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: 1, textTransform: 'uppercase' }}>{t('boards')}</div>
             {boards.map(board => {
               const isActive = stack[0] === board.id
@@ -1346,6 +1374,85 @@ function AppInner({ userId, userEmail }) {
               <p style={{ fontSize: 11, color: '#bbb', marginTop: 20, lineHeight: 1.5 }}>
                 Per problemi con la fatturazione scrivi a <a href="mailto:privacy@olab.quest" style={{ color: '#bbb' }}>privacy@olab.quest</a>
               </p>
+            </div>
+          </div>
+        )}
+
+        {showSearch && (
+          <div onMouseDown={() => setShowSearch(false)} style={{ position: 'fixed', inset: 0, zIndex: 10002, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '80px 16px 16px' }}>
+            <div onMouseDown={e => e.stopPropagation()} style={{ background: 'var(--bg, #fff)', borderRadius: 16, width: '100%', maxWidth: 560, boxShadow: '0 24px 64px rgba(0,0,0,0.22)', overflow: 'hidden', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif' }}>
+              {/* Input */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', borderBottom: '1px solid var(--border, #e5e7eb)' }}>
+                <Search size={16} style={{ color: 'var(--text-muted, #aaa)', flexShrink: 0 }} />
+                <input
+                  autoFocus
+                  value={searchQuery}
+                  placeholder={lang === 'it' ? 'Cerca in tutti i canvas…' : 'Search all canvases…'}
+                  onChange={e => {
+                    const q = e.target.value
+                    setSearchQuery(q)
+                    clearTimeout(searchTimerRef.current)
+                    if (q.trim().length < 2) { setSearchResults([]); return }
+                    setSearchLoading(true)
+                    searchTimerRef.current = setTimeout(async () => {
+                      try {
+                        const res = await searchCards(q, userId)
+                        setSearchResults(res)
+                      } catch (_) {}
+                      setSearchLoading(false)
+                    }, 280)
+                  }}
+                  onKeyDown={e => { if (e.key === 'Escape') setShowSearch(false) }}
+                  style={{ flex: 1, border: 'none', outline: 'none', fontSize: 15, background: 'transparent', color: 'var(--text, #111)', fontFamily: 'inherit' }}
+                />
+                {searchLoading && <span style={{ fontSize: 11, color: 'var(--text-muted, #aaa)' }}>…</span>}
+                <kbd style={{ fontSize: 10, color: 'var(--text-muted, #aaa)', background: 'var(--border, #f0f0f0)', borderRadius: 4, padding: '2px 5px' }}>Esc</kbd>
+              </div>
+
+              {/* Results */}
+              <div style={{ maxHeight: 380, overflowY: 'auto' }}>
+                {searchQuery.trim().length >= 2 && !searchLoading && searchResults.length === 0 && (
+                  <div style={{ padding: '28px 16px', textAlign: 'center', fontSize: 13, color: 'var(--text-muted, #aaa)' }}>
+                    {lang === 'it' ? 'Nessun risultato' : 'No results found'}
+                  </div>
+                )}
+                {searchResults.map(card => {
+                  const canvasName = card.canvases?.name || '—'
+                  const boardName = boards.find(b => b.id === card.canvases?.board_id)?.name || '—'
+                  const bodyPreview = (card.body || '').replace(/[#*`>\-]/g, '').trim().slice(0, 80)
+                  return (
+                    <div
+                      key={card.id}
+                      onClick={() => {
+                        setShowSearch(false)
+                        handleSidebarNavigate(card.canvas_id)
+                      }}
+                      style={{ padding: '12px 16px', cursor: 'pointer', borderBottom: '1px solid var(--border, #f0f0f0)' }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--border, #f5f5f5)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text, #111)', marginBottom: 3 }}>
+                        {card.is_folder ? '📁 ' : ''}{card.title || (lang === 'it' ? 'Senza titolo' : 'Untitled')}
+                      </div>
+                      {bodyPreview && (
+                        <div style={{ fontSize: 12, color: 'var(--text-muted, #888)', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {bodyPreview}
+                        </div>
+                      )}
+                      <div style={{ fontSize: 11, color: 'var(--text-muted, #bbb)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span>{boardName}</span>
+                        <span>›</span>
+                        <span>{canvasName}</span>
+                      </div>
+                    </div>
+                  )
+                })}
+                {!searchQuery.trim() && (
+                  <div style={{ padding: '20px 16px', textAlign: 'center', fontSize: 12, color: 'var(--text-muted, #bbb)' }}>
+                    {lang === 'it' ? 'Digita almeno 2 caratteri per cercare' : 'Type at least 2 characters to search'}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}

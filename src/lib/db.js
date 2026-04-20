@@ -149,6 +149,21 @@ export async function deleteConnection(id) {
   if (error) throw error
 }
 
+// ── SEARCH ────────────────────────────────────────────────────────────────────
+
+export async function searchCards(query, userId) {
+  if (!query || query.trim().length < 2) return []
+  const q = query.trim()
+  const { data, error } = await supabase
+    .from('cards')
+    .select('id, title, body, canvas_id, is_folder, canvases!inner(id, name, board_id, user_id)')
+    .eq('canvases.user_id', userId)
+    .or(`title.ilike.%${q}%,body.ilike.%${q}%`)
+    .limit(30)
+  if (error) throw error
+  return data || []
+}
+
 // ── BULK SYNC ─────────────────────────────────────────────────────────────────
 
 export async function upsertCards(cards, canvasId) {
