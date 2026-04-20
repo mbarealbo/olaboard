@@ -858,6 +858,8 @@ function AppInner({ userId, userEmail }) {
         setActiveTool(prev => prev === 'group' ? 'note' : 'group'); setSelectMode(false); setAutoCreate(false)
       } else if (e.key === 't' || e.key === 'T') {
         setActiveTool(prev => prev === 'text' ? 'note' : 'text'); setSelectMode(false); setAutoCreate(false)
+      } else if (e.key === 'i' || e.key === 'I') {
+        setShowIconPicker(prev => !prev)
       }
     }
     window.addEventListener('keydown', onKey)
