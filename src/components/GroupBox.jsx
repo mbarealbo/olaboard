@@ -115,6 +115,10 @@ export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit
   const { t } = useLang()
   const elRef = useRef(null)
   const [hovered, setHovered] = useState(false)
+  const hoverTimeout = useRef(null)
+
+  const startHover = () => { clearTimeout(hoverTimeout.current); setHovered(true) }
+  const endHover   = () => { hoverTimeout.current = setTimeout(() => setHovered(false), 200) }
 
   const activeFontKey = label.fontFamily || 'sans'
   const fontFamily = LABEL_FONTS.find(f => f.key === activeFontKey)?.family || 'system-ui, sans-serif'
@@ -148,8 +152,8 @@ export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit
       }}
       onMouseDown={e => { if (editing) return; e.stopPropagation(); onMouseDown(e) }}
       onDoubleClick={e => { e.stopPropagation(); onStartEdit() }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      onMouseEnter={startHover}
+      onMouseLeave={endHover}
     >
       {editing ? (
         <div
@@ -205,6 +209,8 @@ export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit
             whiteSpace: 'nowrap',
           }}
           onMouseDown={e => e.stopPropagation()}
+          onMouseEnter={startHover}
+          onMouseLeave={endHover}
         >
           {LABEL_FONTS.map(f => (
             <button
