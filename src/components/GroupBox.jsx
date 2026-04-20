@@ -145,7 +145,6 @@ export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit
         padding: '8px 16px', cursor: editing ? 'text' : 'move', zIndex: 1,
         border: selected || hovered ? '1px dashed #ccc' : '1px dashed transparent',
         borderRadius: 2, userSelect: 'none',
-        width: label.width || 'auto',
       }}
       onMouseDown={e => { if (editing) return; e.stopPropagation(); onMouseDown(e) }}
       onDoubleClick={e => { e.stopPropagation(); onStartEdit() }}

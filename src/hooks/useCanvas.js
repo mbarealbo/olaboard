@@ -239,17 +239,15 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
           w: Math.abs(wx - d.startWX), h: Math.abs(wy - d.startWY),
         })
       } else if (d.type === 'label-resize') {
-        const r = getBoardRect()
-        const o = offsetRef.current, s = scaleRef.current
-        const wx = (e.clientX - r.left - o.x) / s
-        const newW = Math.max(80, d.origW + (wx - d.startWX))
-        d.finalW = newW
+        const delta = (e.clientX - d.startClientX + e.clientY - d.startClientY) * 0.3
+        const newSize = Math.max(8, Math.min(120, Math.round(d.origFontSize + delta)))
+        d.finalFontSize = newSize
         setDb(prev => {
           const cId = currentIdRef.current
           const canvas = prev[cId]
           if (!canvas) return prev
           return { ...prev, [cId]: { ...canvas, labels: (canvas.labels||[]).map(l =>
-            l.id === d.labelId ? { ...l, width: newW } : l
+            l.id === d.labelId ? { ...l, fontSize: newSize } : l
           )}}
         })
       } else if (d.type === 'label') {
@@ -930,10 +928,7 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
 
   function onLabelResizeMouseDown(e, label) {
     e.stopPropagation()
-    const r = boardRef.current.getBoundingClientRect()
-    const o = offsetRef.current, s = scaleRef.current
-    const wx = (e.clientX - r.left - o.x) / s
-    dragging.current = { type: 'label-resize', labelId: label.id, origW: label.width || 200, startWX: wx }
+    dragging.current = { type: 'label-resize', labelId: label.id, origFontSize: label.fontSize || 16, startClientX: e.clientX, startClientY: e.clientY }
   }
 
   const boardCursor = isPanning ? 'grabbing' : 'crosshair'
