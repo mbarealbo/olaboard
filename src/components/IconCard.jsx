@@ -39,14 +39,13 @@ export default function IconCard({ card, selected, onMouseDown, onDelete, onConn
       style={{
         position: 'absolute', left: card.x, top: card.y,
         width: ICON_CARD_SIZE, height: ICON_CARD_SIZE,
-        border: selected ? '2px solid #378ADD' : '1.5px solid rgba(0,0,0,0.10)',
-        borderRadius: 14,
-        background: '#ffffff',
+        border: selected ? '1px dashed #378ADD' : (hovered ? '1px dashed #ccc' : '1px dashed transparent'),
+        borderRadius: 8,
+        background: 'transparent',
         cursor: 'move', userSelect: 'none', zIndex: 2,
         boxSizing: 'border-box',
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
         gap: 3,
-        boxShadow: selected ? '0 0 0 3px rgba(55,138,221,0.18), 0 2px 8px rgba(0,0,0,0.10)' : '0 2px 8px rgba(0,0,0,0.08)',
       }}
       onMouseDown={onMouseDown}
       onMouseEnter={() => setHovered(true)}
