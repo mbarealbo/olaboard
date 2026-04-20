@@ -240,6 +240,10 @@ function AppInner({ userId, userEmail }) {
   const [showAccount, setShowAccount] = useState(false)
   const [showUpgrade, setShowUpgrade] = useState(false)
   const [showManagePlan, setShowManagePlan] = useState(false)
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [deleteLoading, setDeleteLoading] = useState(false)
+  const [deleteError, setDeleteError] = useState(null)
   const [demoBannerDismissed, setDemoBannerDismissed] = useState(false)
   const [upgradeYearly, setUpgradeYearly] = useState(false)
   const [checkoutLoading, setCheckoutLoading] = useState(null)
@@ -1262,10 +1266,18 @@ function AppInner({ userId, userEmail }) {
                 <button onClick={() => setLang('en')} style={{ fontSize: 12, padding: '3px 10px', borderRadius: 4, border: '1px solid var(--border)', background: lang === 'en' ? 'var(--accent)' : 'var(--btn-bg)', color: lang === 'en' ? '#fff' : 'var(--btn-text)', cursor: 'pointer', fontFamily: 'inherit' }}>English</button>
               </div>
             </div>
-            <button
-              onClick={() => supabase.auth.signOut()}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 0', fontSize: 13, border: 'none', background: 'none', cursor: 'pointer', color: '#e53935', fontFamily: 'inherit' }}
-            ><LogOut size={13} /> {t('signOut')}</button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <button
+                onClick={() => supabase.auth.signOut()}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 0', fontSize: 13, border: 'none', background: 'none', cursor: 'pointer', color: '#e53935', fontFamily: 'inherit' }}
+              ><LogOut size={13} /> {t('signOut')}</button>
+              <button
+                onClick={() => { setShowAccount(false); setDeleteConfirmText(''); setDeleteError(null); setShowDeleteAccount(true) }}
+                style={{ fontSize: 11, color: '#bbb', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: '4px 0' }}
+                onMouseEnter={e => e.currentTarget.style.color = '#e53935'}
+                onMouseLeave={e => e.currentTarget.style.color = '#bbb'}
+              >{lang === 'it' ? 'Elimina account' : 'Delete account'}</button>
+            </div>
           </div>
         )}
 
@@ -1316,6 +1328,72 @@ function AppInner({ userId, userEmail }) {
               <p style={{ fontSize: 11, color: '#bbb', marginTop: 20, lineHeight: 1.5 }}>
                 Per problemi con la fatturazione scrivi a <a href="mailto:privacy@olab.quest" style={{ color: '#bbb' }}>privacy@olab.quest</a>
               </p>
+            </div>
+          </div>
+        )}
+
+        {showDeleteAccount && (
+          <div onMouseDown={() => !deleteLoading && setShowDeleteAccount(false)} style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+            <div onMouseDown={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 20, padding: '32px 28px 28px', width: '100%', maxWidth: 420, boxShadow: '0 24px 64px rgba(0,0,0,0.2)', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif', color: '#0a0a0a' }}>
+              <div style={{ textAlign: 'center', marginBottom: 20 }}>
+                <div style={{ fontSize: 36, marginBottom: 12 }}>⚠️</div>
+                <div style={{ fontSize: 18, fontWeight: 750, letterSpacing: '-0.5px', marginBottom: 8 }}>
+                  {lang === 'it' ? 'Elimina account' : 'Delete account'}
+                </div>
+                <p style={{ fontSize: 13, color: '#666', lineHeight: 1.6, margin: 0 }}>
+                  {lang === 'it'
+                    ? 'Questa azione è irreversibile. Tutti i tuoi canvas, note e immagini verranno eliminati definitivamente. L\'abbonamento Pro verrà cancellato.'
+                    : 'This action is irreversible. All your canvases, notes and images will be permanently deleted. Your Pro subscription will be cancelled.'}
+                </p>
+              </div>
+
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ fontSize: 12, fontWeight: 650, color: '#555', display: 'block', marginBottom: 6 }}>
+                  {lang === 'it' ? 'Digita ELIMINA per confermare' : 'Type DELETE to confirm'}
+                </label>
+                <input
+                  value={deleteConfirmText}
+                  onChange={e => { setDeleteConfirmText(e.target.value); setDeleteError(null) }}
+                  placeholder={lang === 'it' ? 'ELIMINA' : 'DELETE'}
+                  disabled={deleteLoading}
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', fontSize: 14, border: '1.5px solid #e5e7eb', borderRadius: 10, outline: 'none', fontFamily: 'inherit' }}
+                  onFocus={e => e.target.style.borderColor = '#e53935'}
+                  onBlur={e => e.target.style.borderColor = '#e5e7eb'}
+                />
+              </div>
+
+              {deleteError && (
+                <div style={{ marginBottom: 16, padding: '9px 12px', background: '#fff5f5', border: '1px solid #fecaca', borderRadius: 8, fontSize: 13, color: '#dc2626' }}>
+                  {deleteError}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button
+                  onClick={() => setShowDeleteAccount(false)}
+                  disabled={deleteLoading}
+                  style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: '1.5px solid #e5e7eb', background: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
+                >{lang === 'it' ? 'Annulla' : 'Cancel'}</button>
+                <button
+                  disabled={deleteLoading || (lang === 'it' ? deleteConfirmText !== 'ELIMINA' : deleteConfirmText !== 'DELETE')}
+                  onClick={async () => {
+                    setDeleteLoading(true); setDeleteError(null)
+                    try {
+                      const { data: { session } } = await supabase.auth.getSession()
+                      const res = await supabase.functions.invoke('delete-account', {
+                        headers: { Authorization: `Bearer ${session.access_token}` }
+                      })
+                      if (res.error) throw new Error(res.error.message)
+                      await supabase.auth.signOut()
+                      window.location.href = '/landing'
+                    } catch (err) {
+                      setDeleteError(err.message || (lang === 'it' ? 'Errore durante la cancellazione.' : 'Error during deletion.'))
+                      setDeleteLoading(false)
+                    }
+                  }}
+                  style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: 'none', background: deleteLoading || (lang === 'it' ? deleteConfirmText !== 'ELIMINA' : deleteConfirmText !== 'DELETE') ? '#fca5a5' : '#e53935', color: '#fff', fontSize: 14, fontWeight: 700, cursor: deleteLoading || (lang === 'it' ? deleteConfirmText !== 'ELIMINA' : deleteConfirmText !== 'DELETE') ? 'default' : 'pointer', fontFamily: 'inherit', transition: 'background 0.15s' }}
+                >{deleteLoading ? '…' : (lang === 'it' ? 'Elimina definitivamente' : 'Delete permanently')}</button>
+              </div>
             </div>
           </div>
         )}
