@@ -2322,7 +2322,7 @@ function AppInner({ userId, userEmail }) {
                     onConvertToPostIt={() => {
                       const cId = currentId
                       const snap = { id: label.id, x: label.x, y: label.y, text: label.text, fontSize: label.fontSize, fontFamily: label.fontFamily }
-                      const newCard = { id: label.id, x: label.x, y: label.y, title: label.text || '' }
+                      const newCard = { id: label.id, x: label.x, y: label.y, title: label.text || '', isFolder: false, isLabel: false, color: 'yellow' }
                       setDb(prev => {
                         const cv = prev[cId]
                         if (!cv) return prev

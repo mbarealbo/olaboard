@@ -200,41 +200,37 @@ export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit
           ))}
         </>
       )}
-      {(selected || hovered) && !editing && (
-        <>
-          {/* Right-middle handle: drag to control text wrap width — placed outside connect dot hitbox */}
-          {onResizeMouseDown && (
-            <div
-              title="Drag to set wrap width"
-              style={{
-                position: 'absolute', top: '50%', right: -24,
-                transform: 'translateY(-50%)',
-                width: 8, height: 22, background: 'rgba(55,138,221,0.15)',
-                border: '1.5px solid #378ADD', borderRadius: 3,
-                cursor: 'ew-resize', zIndex: 10,
-              }}
-              onMouseDown={e => { e.stopPropagation(); onResizeMouseDown(e) }}
-            />
-          )}
-          {/* Bottom-right handle: drag diagonally to scale font size */}
-          {onFontScaleMouseDown && (
-            <div
-              title="Drag to scale font size"
-              style={{
-                position: 'absolute', bottom: -18, right: -18,
-                width: 10, height: 10, background: 'rgba(55,138,221,0.15)',
-                border: '1.5px solid #378ADD', borderRadius: 2,
-                cursor: 'se-resize', zIndex: 10,
-              }}
-              onMouseDown={e => { e.stopPropagation(); onFontScaleMouseDown(e) }}
-            />
-          )}
-        </>
+      {/* Horizontal handle (width/wrap) — inside, hover only */}
+      {hovered && !editing && onResizeMouseDown && (
+        <div
+          title="Drag to set wrap width"
+          style={{
+            position: 'absolute', top: '50%', right: 3,
+            transform: 'translateY(-50%)',
+            width: 5, height: 18, background: 'rgba(55,138,221,0.25)',
+            border: '1.5px solid #378ADD', borderRadius: 3,
+            cursor: 'ew-resize', zIndex: 10,
+          }}
+          onMouseDown={e => { e.stopPropagation(); onResizeMouseDown(e) }}
+        />
+      )}
+      {/* Diagonal handle (font scale) — inside, hover + selected */}
+      {(selected || hovered) && !editing && onFontScaleMouseDown && (
+        <div
+          title="Drag to scale font size"
+          style={{
+            position: 'absolute', bottom: 3, right: 3,
+            width: 9, height: 9, background: 'rgba(55,138,221,0.25)',
+            border: '1.5px solid #378ADD', borderRadius: 2,
+            cursor: 'se-resize', zIndex: 10,
+          }}
+          onMouseDown={e => { e.stopPropagation(); onFontScaleMouseDown(e) }}
+        />
       )}
       {(selected || hovered) && !editing && (onConvertToPostIt || onConvertToFolder) && (
         <div
           style={{
-            position: 'absolute', bottom: -30, left: '50%',
+            position: 'absolute', bottom: -46, left: '50%',
             transform: 'translateX(-50%)', display: 'flex', alignItems: 'center',
             gap: 2, zIndex: 9999, pointerEvents: 'all',
             background: '#fff', border: '1px solid rgba(0,0,0,0.12)',
