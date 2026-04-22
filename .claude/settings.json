@@ -20,7 +20,13 @@
       "Bash(supabase init *)",
       "Bash(git commit *)",
       "Bash(node scripts/generate-og.mjs)",
-      "Bash(find /Users/albo/progetti/olaboard/src -type f -name \"*.jsx\" -exec grep -l \"onConnectDot\" {} \\\\;)"
+      "Bash(find /Users/albo/progetti/olaboard/src -type f -name \"*.jsx\" -exec grep -l \"onConnectDot\" {} \\\\;)",
+      "Bash(node scripts/normalize-illustrations.js)",
+      "Bash(curl -s http://localhost:5174/illustrations/manifest.json)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f'{len\\(d\\)} illustrazioni nel manifest'\\); [print\\(f'  {e[\\\\\"id\\\\\"]} — viewBox: {e[\\\\\"viewBox\\\\\"]}'\\) for e in d[:3]]\")",
+      "Bash(curl -s http://localhost:5174/illustrations/highlights/standing-1.svg)",
+      "Bash(kill %1)",
+      "Bash(node /Users/albo/progetti/olaboard/scripts/normalize-illustrations.js)"
     ]
   }
 }

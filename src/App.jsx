@@ -1,12 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useLang } from './contexts/LangContext'
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
-import { Trash2, Moon, Sun, Monitor, Zap, Folder, LogOut, Maximize2, Undo2, Redo2, User, MousePointerClick, Search } from 'lucide-react'
+import { Trash2, Moon, Sun, Monitor, Zap, Folder, LogOut, Maximize2, Undo2, Redo2, User, MousePointerClick, Search, PenLine } from 'lucide-react'
 import BlockEditor from './components/BlockEditor'
 import PostIt from './components/PostIt'
 import ImageCard from './components/ImageCard'
 import IconCard from './components/IconCard'
 import IconPicker from './components/IconPicker'
+import IllustrationNode from './components/IllustrationNode'
+import IllustrationPicker from './components/IllustrationPicker'
+import { fetchIllustrationSvg } from './components/IllustrationNode'
 import { ICON_MAP, ICON_STROKE_COLORS } from './lib/icons'
 import { Group, CanvasLabel } from './components/GroupBox'
 import { useCanvas } from './hooks/useCanvas'
@@ -228,6 +231,11 @@ function AppInner({ userId, userEmail }) {
   const [isDraggingIcon, setIsDraggingIcon] = useState(false)
   const [iconDragPos, setIconDragPos] = useState({ x: 0, y: 0 })
   const iconDragRef = useRef(null) // { iconName, color } while dragging
+  const [showIllustrationPicker, setShowIllustrationPicker] = useState(false)
+  const [isDraggingIllustration, setIsDraggingIllustration] = useState(false)
+  const [illustrationDragPos, setIllustrationDragPos] = useState({ x: 0, y: 0 })
+  const [illustrationDragSvg, setIllustrationDragSvg] = useState(null)
+  const illustrationDragRef = useRef(null) // { ill } while dragging
   const [autoCreate, setAutoCreate] = useState(true)
   const [selectMode, setSelectMode] = useState(false)
   const [scrollZoom, setScrollZoom] = useState(false)
@@ -296,7 +304,7 @@ function AppInner({ userId, userEmail }) {
 
   // ── map Supabase rows → app shape ─────────────────────────────────────────
   function mapCard(row) {
-    return { id: row.id, title: row.title || '', body: row.body || '', x: row.x, y: row.y, isFolder: row.is_folder || false, isLabel: row.is_label || false, color: row.color || 'yellow', createdAt: row.created_at, updatedAt: row.updated_at || row.created_at, url: row.url || null, width: row.width || null, height: row.height || null, isImage: !!(row.url) && row.node_type !== 'icon', nodeType: row.node_type || 'postit', isIcon: row.node_type === 'icon' }
+    return { id: row.id, title: row.title || '', body: row.body || '', x: row.x, y: row.y, isFolder: row.is_folder || false, isLabel: row.is_label || false, color: row.color || 'yellow', createdAt: row.created_at, updatedAt: row.updated_at || row.created_at, url: row.url || null, width: row.width || null, height: row.height || null, isImage: !!(row.url) && row.node_type !== 'icon', nodeType: row.node_type || 'postit', isIcon: row.node_type === 'icon', isIllustration: row.node_type === 'illustration' }
   }
 
   // ── image upload helpers ───────────────────────────────────────────────────
@@ -369,6 +377,80 @@ function AppInner({ userId, userEmail }) {
       window.removeEventListener('mouseup', onMouseUp)
     }
   }, [isDraggingIcon]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function placeIllustration(ill, x, y) {
+    const cId = currentIdRef.current
+    const currentCards = db[cId]?.cards || []
+    if (currentCards.filter(c => !c.isLabel).length >= limits.cardsPerCanvas) {
+      showLimitToast('cardsPerCanvas')
+      return
+    }
+    // Compute height from viewBox aspect ratio
+    const vbParts = (ill.viewBox || '0 0 200 200').trim().split(/\s+/)
+    const vbW = parseFloat(vbParts[2]) || 200
+    const vbH = parseFloat(vbParts[3]) || 200
+    const w = 200
+    const h = vbH > 0 ? Math.round(w * vbH / vbW) : 200
+    const newCard = { id: uid(), nodeType: 'illustration', isIllustration: true, body: ill.id, title: ill.name || '', x, y, width: w, height: h, isFolder: false, isLabel: false, isImage: false, isIcon: false, url: null, color: 'yellow' }
+    const saved = { ...newCard }
+    setDb(prev => {
+      const cv = prev[cId]
+      if (!cv) return prev
+      return { ...prev, [cId]: { ...cv, cards: [...cv.cards, newCard] } }
+    })
+    pushCommand({
+      undo: () => setDb(prev => { const cv = prev[cId]; if (!cv) return prev; return { ...prev, [cId]: { ...cv, cards: cv.cards.filter(c => c.id !== saved.id) } } }),
+      redo: () => setDb(prev => { const cv = prev[cId]; if (!cv) return prev; return { ...prev, [cId]: { ...cv, cards: [...cv.cards, saved] } } }),
+    })
+  }
+
+  function handleIllustrationClick(ill) {
+    const r = boardRef.current?.getBoundingClientRect()
+    if (!r) return
+    const o = illDragOffsetRef.current
+    const s = illDragScaleRef.current
+    const cx = (r.width / 2 - o.x) / s
+    const cy = (r.height / 2 - o.y) / s
+    placeIllustration(ill, Math.round(cx - 100), Math.round(cy - 100))
+  }
+
+  function handleIllustrationDragStart(ill, clientX, clientY) {
+    illustrationDragRef.current = { ill }
+    setIllustrationDragPos({ x: clientX, y: clientY })
+    setIsDraggingIllustration(true)
+    setShowIllustrationPicker(false)
+    document.body.style.cursor = 'grabbing'
+    fetchIllustrationSvg(ill.path).then(setIllustrationDragSvg)
+  }
+
+  useEffect(() => {
+    if (!isDraggingIllustration) return
+    function onMouseMove(e) {
+      setIllustrationDragPos({ x: e.clientX, y: e.clientY })
+    }
+    function onMouseUp(e) {
+      const drag = illustrationDragRef.current
+      illustrationDragRef.current = null
+      document.body.style.cursor = ''
+      setIsDraggingIllustration(false)
+      setIllustrationDragSvg(null)
+      if (!drag) return
+      const r = boardRef.current?.getBoundingClientRect()
+      if (r && e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
+        const o = illDragOffsetRef.current
+        const s = illDragScaleRef.current
+        const x = Math.round((e.clientX - r.left - o.x) / s - 100)
+        const y = Math.round((e.clientY - r.top  - o.y) / s - 100)
+        placeIllustration(drag.ill, x, y)
+      }
+    }
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', onMouseUp)
+    }
+  }, [isDraggingIllustration]) // eslint-disable-line react-hooks/exhaustive-deps
   function mapConn(row) {
     return { id: row.id, from: row.from_card_id, to: row.to_card_id, label: row.label || '', fromAnchor: row.from_anchor || 'right', toAnchor: row.to_anchor || 'left' }
   }
@@ -600,13 +682,17 @@ function AppInner({ userId, userEmail }) {
   const iconDragScaleRef = useRef(1)
   useEffect(() => { iconDragOffsetRef.current = offset }, [offset])
   useEffect(() => { iconDragScaleRef.current = scale }, [scale])
+  const illDragOffsetRef = useRef({ x: 0, y: 0 })
+  const illDragScaleRef = useRef(1)
+  useEffect(() => { illDragOffsetRef.current = offset }, [offset])
+  useEffect(() => { illDragScaleRef.current = scale }, [scale])
 
   // ── navigation ───────────────────────────────────────────────────────────
   function centerCanvas(canvasId, canvasOverride) {
     const canvas = canvasOverride || dbRef.current[canvasId]
     if (!canvas) { setOffset({ x: 0, y: 0 }); setScale(1); return }
     const elements = [
-      ...(canvas.cards || []).map(c => ({ x: c.x, y: c.y, w: c.isImage ? (c.width || 200) : CARD_W, h: c.isImage ? (c.height || 200) : CARD_H_HALF * 2 })),
+      ...(canvas.cards || []).map(c => ({ x: c.x, y: c.y, w: (c.isImage || c.isIllustration) ? (c.width || 200) : CARD_W, h: (c.isImage || c.isIllustration) ? (c.height || 200) : CARD_H_HALF * 2 })),
       ...(canvas.groups || []).map(g => ({ x: g.x, y: g.y, w: g.width, h: g.height })),
       ...(canvas.labels || []).map(l => ({ x: l.x, y: l.y, w: 100, h: 30 })),
     ]
@@ -904,7 +990,7 @@ function AppInner({ userId, userEmail }) {
       } else if (e.key === 't' || e.key === 'T') {
         setActiveTool(prev => prev === 'text' ? 'note' : 'text'); setSelectMode(false)
       } else if (e.key === 'i' || e.key === 'I') {
-        setShowIconPicker(prev => !prev)
+        setShowIllustrationPicker(prev => !prev)
       }
     }
     window.addEventListener('keydown', onKey)
@@ -1300,7 +1386,7 @@ function AppInner({ userId, userEmail }) {
 
             if (selected) {
               const card = cards.find(c => c.id === selected)
-              if (!card || card.isFolder || card.isLabel || card.isImage || card.isIcon) return null
+              if (!card || card.isFolder || card.isLabel || card.isImage || card.isIcon || card.isIllustration) return null
               const cur = card.color || 'yellow'
               return (
                 <div style={divStyle}>
@@ -1346,6 +1432,10 @@ function AppInner({ userId, userEmail }) {
                 onClick={!dis ? () => setShowIconPicker(v => !v) : undefined}
                 title="Add icon card"
               >⬡ Icons</button>
+              <button disabled={dis} style={activeBtn(showIllustrationPicker)}
+                onClick={!dis ? () => setShowIllustrationPicker(v => !v) : undefined}
+                title={t('illustrationsToolTitle')}
+              ><PenLine size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 3 }} />{t('illustrationsTool')}</button>
               <button disabled={dis} style={activeBtn(activeTool === 'group')}
                 onClick={!dis ? () => { setActiveTool(prev => prev === 'group' ? 'note' : 'group'); setSelectMode(false) } : undefined}
                 title={t('groupToolTitle')}
@@ -1449,6 +1539,8 @@ function AppInner({ userId, userEmail }) {
                 }} />
               </div>
             </div>
+            <p style={{ fontSize: 10, color: 'var(--text-muted)', lineHeight: 1.5, marginTop: -4 }}>{t('illustrationsAttribution')}</p>
+
             <div>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 6 }}>{t('lang')}</div>
               <div style={{ display: 'flex', gap: 6 }}>
@@ -1534,6 +1626,31 @@ function AppInner({ userId, userEmail }) {
 
         {showIconPicker && (
           <IconPicker onDragStart={handleIconDragStart} onClose={() => setShowIconPicker(false)} />
+        )}
+
+        {showIllustrationPicker && (
+          <IllustrationPicker
+            onDragStart={handleIllustrationDragStart}
+            onClick={handleIllustrationClick}
+            onClose={() => setShowIllustrationPicker(false)}
+          />
+        )}
+
+        {isDraggingIllustration && (
+          <div style={{
+            position: 'fixed',
+            left: illustrationDragPos.x - 60, top: illustrationDragPos.y - 60,
+            width: 120, height: 120,
+            pointerEvents: 'none', zIndex: 99999,
+            color: 'var(--text)', opacity: 0.65,
+            filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.2))',
+          }}>
+            {illustrationDragSvg ? (
+              <div dangerouslySetInnerHTML={{ __html: illustrationDragSvg }} style={{ width: '100%', height: '100%' }} />
+            ) : (
+              <div style={{ width: '100%', height: '100%', background: 'var(--border)', borderRadius: 8 }} />
+            )}
+          </div>
         )}
 
         {isDraggingIcon && iconDragRef.current && (() => {
@@ -1892,11 +2009,11 @@ function AppInner({ userId, userEmail }) {
                   if (!fromRes || !toRes) return null
                   const fe = fromRes.entity, te = toRes.entity
                   const feDims = fromRes.isLabel ? estimateLabelDims(fe) : null
-                  const feW = feDims?.w ?? (fe.isImage ? (fe.width || 200) : (fe.isIcon ? 80 : CARD_W))
-                  const feH = feDims?.h ?? (fe.isImage ? (fe.height || 200) : (fe.isIcon ? 80 : CARD_H_HALF * 2))
+                  const feW = feDims?.w ?? ((fe.isImage || fe.isIllustration) ? (fe.width || 200) : (fe.isIcon ? 80 : CARD_W))
+                  const feH = feDims?.h ?? ((fe.isImage || fe.isIllustration) ? (fe.height || 200) : (fe.isIcon ? 80 : CARD_H_HALF * 2))
                   const teDims = toRes.isLabel ? estimateLabelDims(te) : null
-                  const teW = teDims?.w ?? (te.isImage ? (te.width || 200) : (te.isIcon ? 80 : CARD_W))
-                  const teH = teDims?.h ?? (te.isImage ? (te.height || 200) : (te.isIcon ? 80 : CARD_H_HALF * 2))
+                  const teW = teDims?.w ?? ((te.isImage || te.isIllustration) ? (te.width || 200) : (te.isIcon ? 80 : CARD_W))
+                  const teH = teDims?.h ?? ((te.isImage || te.isIllustration) ? (te.height || 200) : (te.isIcon ? 80 : CARD_H_HALF * 2))
                   const fCX = fe.x + feW / 2
                   const fCY = fe.y + feH / 2
                   const tCX = te.x + teW / 2
@@ -2203,6 +2320,26 @@ function AppInner({ userId, userEmail }) {
                       />
                     )
                   }
+                  if (card.isIllustration) {
+                    return (
+                      <IllustrationNode
+                        key={card.id}
+                        card={card}
+                        selected={selected === card.id || multiSelected.includes(card.id)}
+                        onMouseDown={e => onCardMouseDown(e, card)}
+                        onDelete={() => {
+                          const cId = currentIdRef.current
+                          setDb(prev => {
+                            const cv = prev[cId]
+                            if (!cv) return prev
+                            return { ...prev, [cId]: { ...cv, cards: cv.cards.filter(c => c.id !== card.id), connections: cv.connections.filter(c => c.from !== card.id && c.to !== card.id) } }
+                          })
+                        }}
+                        onResizeMouseDown={e => onImageResizeMouseDown(e, card)}
+                        onConnectDot={(e, anchor) => onConnectDotMouseDown(e, card, anchor)}
+                      />
+                    )
+                  }
                   if (card.isLabel) {
                     const labelObj = { id: card.id, x: card.x, y: card.y, text: card.title || '', fontSize: card.fontSize || 16, fontFamily: card.fontFamily || 'sans' }
                     return (
@@ -2306,7 +2443,7 @@ function AppInner({ userId, userEmail }) {
                 {(() => {
                   if (!selected || editingCardId === selected || activeNoteId === selected) return null
                   const card = cards.find(c => c.id === selected)
-                  if (!card || card.isFolder || card.isLabel || card.isImage || card.isIcon) return null
+                  if (!card || card.isFolder || card.isLabel || card.isImage || card.isIcon || card.isIllustration) return null
                   return (
                     <div style={{
                       position: 'absolute',

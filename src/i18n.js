@@ -125,6 +125,11 @@ export const translations = {
     imageUrlPlaceholder: 'Incolla URL immagine...',
     uploadImage: 'Carica',
     imageCaptionPlaceholder: 'Didascalia...',
+
+    // Illustrations
+    illustrationsTool: 'Illustrazioni',
+    illustrationsToolTitle: 'Illustrazioni (I)',
+    illustrationsAttribution: 'Illustrazioni: Open Doodles by Pablo Stanley + Highlights by outdraw.design (CC0)',
   },
 
   en: {
@@ -253,5 +258,10 @@ export const translations = {
     imageUrlPlaceholder: 'Paste image URL...',
     uploadImage: 'Upload',
     imageCaptionPlaceholder: 'Caption...',
+
+    // Illustrations
+    illustrationsTool: 'Illustrations',
+    illustrationsToolTitle: 'Illustrations (I)',
+    illustrationsAttribution: 'Illustrations: Open Doodles by Pablo Stanley + Highlights by outdraw.design (CC0)',
   },
 }

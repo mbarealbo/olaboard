@@ -138,7 +138,8 @@ export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit
     }
   }, [editing]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const textStyle = { fontSize, fontFamily, color: 'var(--text)', outline: 'none', minWidth: 80, whiteSpace: 'pre-wrap' }
+  const hasFixedWidth = !!label.width
+  const textStyle = { fontSize, fontFamily, color: 'var(--text)', outline: 'none', whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflowWrap: 'break-word', ...(hasFixedWidth ? {} : { minWidth: 80 }) }
 
   return (
     <div
@@ -149,6 +150,7 @@ export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit
         padding: '8px 16px', cursor: editing ? 'text' : 'move', zIndex: 1,
         border: selected || hovered ? '1px dashed #ccc' : '1px dashed transparent',
         borderRadius: 2, userSelect: 'none',
+        ...(label.width ? { width: label.width } : {}),
       }}
       onMouseDown={e => { if (editing) return; e.stopPropagation(); onMouseDown(e) }}
       onDoubleClick={e => { e.stopPropagation(); onStartEdit() }}
@@ -204,7 +206,7 @@ export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit
             position: 'absolute', bottom: 2, right: 2,
             width: 12, height: 12, background: 'rgba(55,138,221,0.15)',
             border: '1.5px solid #378ADD', borderRadius: 2,
-            cursor: 'se-resize', zIndex: 10,
+            cursor: 'e-resize', zIndex: 10,
           }}
           onMouseDown={e => { e.stopPropagation(); onResizeMouseDown(e) }}
         />

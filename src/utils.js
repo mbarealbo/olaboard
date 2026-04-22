@@ -42,8 +42,9 @@ export function buildPath(db, targetId) {
 }
 
 export function anchorPoint(card, anchor, dims) {
-  const w = dims?.w ?? (card.isIcon ? 80 : (card.isImage ? (card.width || 200) : CARD_W))
-  const h = dims?.h ?? (card.isIcon ? 80 : (card.isImage ? (card.height || 200) : CARD_H_HALF * 2))
+  const isSized = card.isImage || card.isIllustration
+  const w = dims?.w ?? (card.isIcon ? 80 : (isSized ? (card.width || 200) : CARD_W))
+  const h = dims?.h ?? (card.isIcon ? 80 : (isSized ? (card.height || 200) : CARD_H_HALF * 2))
   switch (anchor) {
     case 'top':    return [card.x + w / 2, card.y]
     case 'bottom': return [card.x + w / 2, card.y + h]

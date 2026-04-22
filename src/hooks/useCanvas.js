@@ -226,15 +226,15 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
           w: Math.abs(wx - d.startWX), h: Math.abs(wy - d.startWY),
         })
       } else if (d.type === 'label-resize') {
-        const delta = (e.clientX - d.startClientX + e.clientY - d.startClientY) * 0.3
-        const newSize = Math.max(8, Math.min(120, Math.round(d.origFontSize + delta)))
-        d.finalFontSize = newSize
+        const deltaX = (e.clientX - d.startClientX) / scaleRef.current
+        const newWidth = Math.max(80, Math.round(d.origWidth + deltaX))
+        d.finalWidth = newWidth
         setDb(prev => {
           const cId = currentIdRef.current
           const canvas = prev[cId]
           if (!canvas) return prev
           return { ...prev, [cId]: { ...canvas, labels: (canvas.labels||[]).map(l =>
-            l.id === d.labelId ? { ...l, fontSize: newSize } : l
+            l.id === d.labelId ? { ...l, width: newWidth } : l
           )}}
         })
       } else if (d.type === 'label') {
@@ -382,7 +382,9 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
         if (canvas) {
           const ids = []
           for (const c of canvas.cards) {
-            const cx = c.x + (c.isLabel ? 56 : 65), cy = c.y + (c.isLabel ? 20 : 37)
+            const cw = (c.isImage || c.isIllustration) ? (c.width || 200) : (c.isLabel ? 112 : 130)
+            const ch = (c.isImage || c.isIllustration) ? (c.height || 200) : (c.isLabel ? 40 : 74)
+            const cx = c.x + cw / 2, cy = c.y + ch / 2
             if (cx >= rx && cx <= rx + rw && cy >= ry && cy <= ry + rh) ids.push(c.id)
           }
           for (const g of (canvas.groups || [])) {
@@ -448,6 +450,20 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
           } else {
             afterCanvas = { ...bc, labels: (bc.labels || []).map(l => l.id === labelId ? { ...l, x: d.finalX, y: d.finalY } : l) }
           }
+          pushCommandRef.current({
+            undo: () => setDb(prev => ({ ...prev, [cId]: bc })),
+            redo: () => setDb(prev => ({ ...prev, [cId]: afterCanvas })),
+          })
+        }
+      }
+
+      // Label resize completion: push history
+      if (dragging.current?.type === 'label-resize' && dragging.current.finalWidth !== undefined) {
+        const d = dragging.current
+        const cId = d.canvasId
+        const bc = d.canvasSnapshot
+        if (bc) {
+          const afterCanvas = { ...bc, labels: (bc.labels || []).map(l => l.id === d.labelId ? { ...l, width: d.finalWidth } : l) }
           pushCommandRef.current({
             undo: () => setDb(prev => ({ ...prev, [cId]: bc })),
             redo: () => setDb(prev => ({ ...prev, [cId]: afterCanvas })),
@@ -917,7 +933,11 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
 
   function onLabelResizeMouseDown(e, label) {
     e.stopPropagation()
-    dragging.current = { type: 'label-resize', labelId: label.id, origFontSize: label.fontSize || 16, startClientX: e.clientX, startClientY: e.clientY }
+    const container = e.target.closest('.canvas-label')
+    const renderedW = container ? container.getBoundingClientRect().width / scaleRef.current : 200
+    const origWidth = label.width || Math.round(renderedW)
+    const cId = currentIdRef.current
+    dragging.current = { type: 'label-resize', labelId: label.id, origWidth, startClientX: e.clientX, canvasId: cId, canvasSnapshot: dbRef.current[cId] }
   }
 
   const [spaceDown, setSpaceDown] = useState(false)
