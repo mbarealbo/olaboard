@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { uid, anchorPoint } from '../utils'
 import { useLang } from '../contexts/LangContext'
 
-export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnectionFn, setActiveNoteId, view, activeTool, setActiveTool, selectMode, setMultiSelected, setSelectionRect, onGroupCreated, pushCommand, maxCardsPerCanvas = Infinity, onLimitReached }) {
+export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnectionFn, setActiveNoteId, view, activeTool, setActiveTool, selectMode, setMultiSelected, setSelectionRect, onGroupCreated, pushCommand, maxCardsPerCanvas = Infinity, onLimitReached, scrollZoom = false }) {
   const { t } = useLang()
   const [offset, setOffset] = useState({ x: 0, y: 0 })
   const [scale, setScale] = useState(1)
@@ -334,35 +334,33 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
           const wy = (e.clientY - r.top  - o.y) / s
           const isText = activeToolRef.current === 'text'
           const newId = uid()
-          const newCard = isText
-            ? { id: newId, isLabel: true, title: 'Testo libero', x: wx - 56, y: wy - 20 }
-            : { id: newId, isLabel: false, title: '', x: wx - 65, y: wy - 37 }
           const newConn = { id: uid(), from: fromId, to: newId, fromAnchor, toAnchor, label: '' }
           const cId = currentIdRef.current
-          setDb(prev => {
-            const canvas = prev[cId]
-            if (!canvas) return prev
-            return {
-              ...prev,
-              [cId]: {
-                ...canvas,
-                cards: [...canvas.cards, newCard],
-                connections: [...canvas.connections, newConn],
-              },
-            }
-          })
-          pushCommandRef.current({
-            undo: () => setDb(prev => {
-              const cv = prev[cId]
-              if (!cv) return prev
-              return { ...prev, [cId]: { ...cv, cards: cv.cards.filter(c => c.id !== newId), connections: cv.connections.filter(c => c.id !== newConn.id) } }
-            }),
-            redo: () => setDb(prev => {
-              const cv = prev[cId]
-              if (!cv) return prev
-              return { ...prev, [cId]: { ...cv, cards: [...cv.cards, newCard], connections: [...cv.connections, newConn] } }
-            }),
-          })
+          if (isText) {
+            const newLabel = { id: newId, x: wx - 56, y: wy - 20, text: '', fontSize: 16, fontFamily: 'sans' }
+            setDb(prev => {
+              const canvas = prev[cId]
+              if (!canvas) return prev
+              return { ...prev, [cId]: { ...canvas, labels: [...(canvas.labels||[]), newLabel], connections: [...canvas.connections, newConn] } }
+            })
+            setSelectedLabel(newId)
+            setEditingLabelId(newId)
+            pushCommandRef.current({
+              undo: () => setDb(prev => { const cv = prev[cId]; if (!cv) return prev; return { ...prev, [cId]: { ...cv, labels: (cv.labels||[]).filter(l => l.id !== newId), connections: cv.connections.filter(c => c.id !== newConn.id) } } }),
+              redo: () => setDb(prev => { const cv = prev[cId]; if (!cv) return prev; return { ...prev, [cId]: { ...cv, labels: [...(cv.labels||[]), newLabel], connections: [...cv.connections, newConn] } } }),
+            })
+          } else {
+            const newCard = { id: newId, isLabel: false, title: '', x: wx - 65, y: wy - 37 }
+            setDb(prev => {
+              const canvas = prev[cId]
+              if (!canvas) return prev
+              return { ...prev, [cId]: { ...canvas, cards: [...canvas.cards, newCard], connections: [...canvas.connections, newConn] } }
+            })
+            pushCommandRef.current({
+              undo: () => setDb(prev => { const cv = prev[cId]; if (!cv) return prev; return { ...prev, [cId]: { ...cv, cards: cv.cards.filter(c => c.id !== newId), connections: cv.connections.filter(c => c.id !== newConn.id) } } }),
+              redo: () => setDb(prev => { const cv = prev[cId]; if (!cv) return prev; return { ...prev, [cId]: { ...cv, cards: [...cv.cards, newCard], connections: [...cv.connections, newConn] } } }),
+            })
+          }
         }
         connecting.current = null
         setConnectLine(null)
@@ -674,8 +672,8 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
     if (!el) return
     function onWheel(e) {
       e.preventDefault()
-      if (e.ctrlKey || e.metaKey) {
-        // pinch gesture or ctrl/cmd+scroll → zoom
+      if (e.ctrlKey || e.metaKey || scrollZoom) {
+        // pinch gesture or ctrl/cmd+scroll or scroll-zoom mode → zoom
         const r = el.getBoundingClientRect()
         const cx = e.clientX - r.left
         const cy = e.clientY - r.top
@@ -768,7 +766,7 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
         .map(c => ({ id: c.id, x: c.x, y: c.y }))
       dragging.current = { type: 'multi', startWX: wx, startWY: wy, cardOrigins, canvasId: cId, canvasSnapshot: dbRef.current[cId] }
     } else {
-      setSelected(card.id); setSelectedLabel(null)
+      setSelected(card.id); setSelectedLabel(null); setMultiSelected([])
       dragging.current = { type: 'card', cardId: card.id, startWX: wx, startWY: wy, origX: card.x, origY: card.y, canvasId: cId, canvasSnapshot: dbRef.current[cId] }
     }
   }
@@ -827,7 +825,7 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
   // ── label event handlers ──────────────────────────────────────────────────
   function onLabelMouseDown(e, label, isCardLabel) {
     e.stopPropagation()
-    setSelectedLabel(label.id); setSelected(null)
+    setSelectedLabel(label.id); setSelected(null); setMultiSelected([])
     const r = boardRef.current.getBoundingClientRect()
     const o = offsetRef.current, s = scaleRef.current
     const wx = (e.clientX - r.left - o.x) / s

@@ -230,6 +230,7 @@ function AppInner({ userId, userEmail }) {
   const iconDragRef = useRef(null) // { iconName, color } while dragging
   const [autoCreate, setAutoCreate] = useState(true)
   const [selectMode, setSelectMode] = useState(false)
+  const [scrollZoom, setScrollZoom] = useState(false)
   const [multiSelected, setMultiSelected] = useState([])
   const [selectionRect, setSelectionRect] = useState(null)
   const [listSelectMode, setListSelectMode] = useState(false)
@@ -587,7 +588,7 @@ function AppInner({ userId, userEmail }) {
     onLabelMouseDown, onLabelResizeMouseDown, zoomBy,
     activeAutoCreateRef, activeToolRef, multiSelectedRef,
     snapGuides,
-  } = useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnectionFn, setActiveNoteId, view, activeTool, setActiveTool, selectMode, setMultiSelected, setSelectionRect, onGroupCreated: id => setEditingGroupId(id), pushCommand, maxCardsPerCanvas: limits.cardsPerCanvas, onLimitReached: showLimitToast })
+  } = useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnectionFn, setActiveNoteId, view, activeTool, setActiveTool, selectMode, setMultiSelected, setSelectionRect, onGroupCreated: id => setEditingGroupId(id), pushCommand, maxCardsPerCanvas: limits.cardsPerCanvas, onLimitReached: showLimitToast, scrollZoom })
 
   useEffect(() => { activeAutoCreateRef.current = autoCreate }, [autoCreate, activeAutoCreateRef])
   useEffect(() => { activeToolRef.current = activeTool }, [activeTool, activeToolRef])
@@ -891,7 +892,9 @@ function AppInner({ userId, userEmail }) {
         return
       }
       if (view !== 'canvas') return
-      if (e.key === 's' || e.key === 'S') {
+      if (e.key === 'n' || e.key === 'N') {
+        setActiveTool('note'); setSelectMode(false)
+      } else if (e.key === 's' || e.key === 'S') {
         if (selectMode) { setSelectMode(false); setMultiSelected([]) }
         else { setSelectMode(true); setActiveTool('note') }
       } else if (e.key === 'q' || e.key === 'Q') {
@@ -2306,20 +2309,33 @@ function AppInner({ userId, userEmail }) {
               )}
 
               {/* Keyboard shortcut legend */}
-              <div style={{
-                position: 'absolute', bottom: 16, right: 72, zIndex: 50,
-                display: 'flex', gap: 4, alignItems: 'center',
-                pointerEvents: 'none', userSelect: 'none',
-              }}>
-                {['S', 'Q', 'G', 'T', 'Tab'].map(k => (
-                  <kbd key={k} style={{
-                    fontSize: 10, color: 'var(--text-muted)',
-                    background: 'var(--bg-panel)', border: '1px solid var(--border)',
-                    borderRadius: 4, padding: '1px 5px', fontFamily: 'monospace',
-                    boxShadow: '0 1px 0 var(--border)',
-                  }}>{k}</kbd>
-                ))}
-              </div>
+              {(() => {
+                const mod = /Mac|iPhone|iPad|iPod/.test(navigator.platform) ? '⌘' : 'Ctrl'
+                const kbdStyle = { fontSize: 10, color: 'var(--text-muted)', background: 'var(--bg-panel)', border: '1px solid var(--border)', borderRadius: 4, padding: '1px 5px', fontFamily: 'monospace', boxShadow: '0 1px 0 var(--border)', whiteSpace: 'nowrap' }
+                const labelStyle = { fontSize: 10, color: 'var(--text-muted)', whiteSpace: 'nowrap' }
+                const sep = <div style={{ width: 1, height: 12, background: 'var(--border)', margin: '0 2px' }} />
+                const groups = [
+                  [['N', 'Post-it'], ['T', lang === 'it' ? 'Testo' : 'Text'], ['I', lang === 'it' ? 'Icone' : 'Icons'], ['G', lang === 'it' ? 'Gruppo' : 'Group']],
+                  [['S', 'Select'], ['Q', 'Quick'], ['Space+drag', 'Pan']],
+                  [['scroll', 'Pan'], [`${mod} scroll`, 'Zoom']],
+                  [[`${mod}Z`, lang === 'it' ? 'Annulla' : 'Undo'], [`${mod}K`, lang === 'it' ? 'Cerca' : 'Search'], ['Del', lang === 'it' ? 'Elimina' : 'Delete']],
+                ]
+                return (
+                  <div style={{ position: 'absolute', bottom: 16, right: 72, zIndex: 50, display: 'flex', gap: 5, alignItems: 'center', pointerEvents: 'none', userSelect: 'none', flexWrap: 'wrap', justifyContent: 'flex-end', maxWidth: 600 }}>
+                    {groups.map((group, gi) => (
+                      <span key={gi} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        {gi > 0 && sep}
+                        {group.map(([key, label]) => (
+                          <span key={key} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                            <kbd style={kbdStyle}>{key}</kbd>
+                            <span style={labelStyle}>{label}</span>
+                          </span>
+                        ))}
+                      </span>
+                    ))}
+                  </div>
+                )
+              })()}
 
               {/* Undo / Redo overlay */}
               <div
