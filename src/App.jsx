@@ -2583,39 +2583,56 @@ function AppInner({ userId, userEmail }) {
                 const mod = /Mac|iPhone|iPad|iPod/.test(navigator.platform) ? '⌘' : 'Ctrl'
                 const kbdStyle = { fontSize: 10, color: 'var(--text-muted)', background: 'var(--bg-panel)', border: '1px solid var(--border)', borderRadius: 4, padding: '1px 5px', fontFamily: 'monospace', boxShadow: '0 1px 0 var(--border)', whiteSpace: 'nowrap' }
                 const labelStyle = { fontSize: 10, color: 'var(--text-muted)', whiteSpace: 'nowrap' }
-                const sep = <div style={{ width: 1, height: 12, background: 'var(--border)', margin: '0 2px' }} />
-                const groups = [
-                  [['N', 'Post-it'], ['T', lang === 'it' ? 'Testo' : 'Text'], ['G', lang === 'it' ? 'Gruppo' : 'Group'], ['I', lang === 'it' ? 'Icone' : 'Icons'], ['P', lang === 'it' ? 'Immagine' : 'Image'], ['D', lang === 'it' ? 'Disegni' : 'Draw']],
-                  [['S', 'Select'], ['Q', 'Quick'], ['Space+drag', 'Pan']],
-                  [['scroll', 'Pan'], [`${mod} scroll`, 'Zoom']],
-                  [[`${mod}Z`, lang === 'it' ? 'Annulla' : 'Undo'], [`${mod}K`, lang === 'it' ? 'Cerca' : 'Search'], ['Del', lang === 'it' ? 'Elimina' : 'Delete']],
-                ]
+                const sep = <div style={{ width: 1, height: 12, background: 'var(--border)', margin: '0 4px', flexShrink: 0 }} />
+                const row1 = [['N', 'Post-it'], ['T', lang === 'it' ? 'Testo' : 'Text'], ['G', lang === 'it' ? 'Gruppo' : 'Group'], ['I', lang === 'it' ? 'Icone' : 'Icons'], ['P', lang === 'it' ? 'Immagine' : 'Image'], ['D', lang === 'it' ? 'Disegni' : 'Draw']]
+                const row2 = [['S', 'Select'], ['Q', 'Quick'], sep, ['scroll', 'Pan'], [`${mod}+scroll`, 'Zoom'], sep, [`${mod}Z`, lang === 'it' ? 'Annulla' : 'Undo'], ['Del', lang === 'it' ? 'Elimina' : 'Delete']]
+                const toggle = () => setShowShortcuts(v => { const next = !v; localStorage.setItem('olaboard_shortcuts', next ? '1' : '0'); return next })
                 return (
                   <div
                     onMouseDown={e => e.stopPropagation()}
                     onDoubleClick={e => e.stopPropagation()}
-                    style={{ position: 'absolute', bottom: 16, right: 60, zIndex: 50, display: 'flex', alignItems: 'flex-end', gap: 6, userSelect: 'none' }}
+                    style={{ position: 'absolute', bottom: 16, right: 60, zIndex: 50, userSelect: 'none' }}
                   >
-                    {showShortcuts && (
-                      <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end', maxWidth: 560, pointerEvents: 'none' }}>
-                        {groups.map((group, gi) => (
-                          <span key={gi} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                            {gi > 0 && sep}
-                            {group.map(([key, label]) => (
+                    <div style={{
+                      background: 'var(--bg-panel)', border: '1px solid var(--border)',
+                      borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                      overflow: 'hidden',
+                    }}>
+                      {/* Header — always visible */}
+                      <div
+                        onClick={toggle}
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '4px 8px', cursor: 'pointer', borderBottom: showShortcuts ? '1px solid var(--border)' : 'none' }}
+                      >
+                        <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: 0.4, display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <span>⌨</span>
+                          <span>{lang === 'it' ? 'Scorciatoie' : 'Shortcuts'}</span>
+                        </span>
+                        <span style={{ fontSize: 9, color: 'var(--text-muted)', lineHeight: 1 }}>{showShortcuts ? '▲' : '▼'}</span>
+                      </div>
+                      {/* Two rows */}
+                      {showShortcuts && (
+                        <div style={{ padding: '6px 10px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'nowrap' }}>
+                            {row1.map(([key, label]) => (
                               <span key={key} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
                                 <kbd style={kbdStyle}>{key}</kbd>
                                 <span style={labelStyle}>{label}</span>
                               </span>
                             ))}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    <button
-                      onClick={() => setShowShortcuts(v => { const next = !v; localStorage.setItem('olaboard_shortcuts', next ? '1' : '0'); return next })}
-                      title={showShortcuts ? (lang === 'it' ? 'Nascondi shortcut' : 'Hide shortcuts') : (lang === 'it' ? 'Mostra shortcut' : 'Show shortcuts')}
-                      style={{ fontSize: 14, lineHeight: 1, padding: '3px 6px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-panel)', color: showShortcuts ? 'var(--accent)' : 'var(--text-muted)', cursor: 'pointer', flexShrink: 0 }}
-                    >⌨</button>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'nowrap' }}>
+                            {row2.map((item, i) =>
+                              Array.isArray(item)
+                                ? <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                                    <kbd style={kbdStyle}>{item[0]}</kbd>
+                                    <span style={labelStyle}>{item[1]}</span>
+                                  </span>
+                                : <div key={i} style={{ width: 1, height: 12, background: 'var(--border)', margin: '0 2px', flexShrink: 0 }} />
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )
               })()}
