@@ -2,7 +2,7 @@
 
 A visual thinking tool for capturing and connecting ideas on an infinite canvas.
 
-![version](https://img.shields.io/badge/version-0.8.0-blue) ![license](https://img.shields.io/badge/license-MIT-green) ![React](https://img.shields.io/badge/React-19-61dafb) ![Vite](https://img.shields.io/badge/Vite-8-646cff)
+![version](https://img.shields.io/badge/version-1.0.0-blue) ![license](https://img.shields.io/badge/license-MIT-green) ![React](https://img.shields.io/badge/React-19-61dafb) ![Vite](https://img.shields.io/badge/Vite-8-646cff)
 
 **[olaboard.netlify.app](https://olaboard.netlify.app.)** — try the live demo, no account needed.
 
@@ -46,15 +46,23 @@ Upgrade to Pro on [olab.quest](https://olab.quest) to support development and ge
 - Infinite canvas with pan and zoom
 - **Center button** — fits all elements in view with one click (centers automatically on navigation)
 - **Snap-to-alignment guides** — magnetic guide lines appear while dragging, snapping to edges and centers of other cards
-- **Post-it notes** with body preview, custom colors, and rich notes
+- **Post-it notes** with markdown body preview, custom colors, and rich notes
+  - **Context toolbar** on selection: instant color picker, no extra click needed
+- **Illustrations** — insert SVG characters from Open Doodles, Humaans, and Open Peeps packs
+  - Searchable picker with tabs per pack, lazy-loaded thumbnails
+  - Click to insert at canvas center, or drag directly to position
+  - SVGs adapt to the active theme via `currentColor`
+  - Press **I** to open the picker
+- **Free text labels** — transparent, draggable, connectable
+  - **Context toolbar** on selection: font family (sans/serif/mono/cursive) and font size; last used style is remembered
 - **Image cards** — drag & drop images, resize with aspect-ratio lock, connect with arrows
 - **Folders (nested canvases)** — infinite depth, double-click to enter, breadcrumb to go back
-- **Free text labels** — transparent, draggable, connectable
 - **Group boxes** — resizable containers that move cards inside them
 - **Arrows** with smart bezier routing, labels, and color on selection
 - **Quick Connect** — drag an arrow to empty space to auto-create a connected card
 - **Edge strips** — start a connection from anywhere along a card's edge, not just the 4 dots
 - **Multi-select** — lasso tool on canvas, or checkbox mode in list view
+- Trackpad two-finger scroll pans the canvas; pinch / Ctrl+scroll zooms; Space+drag also pans
 - Middle mouse to pan (grabbing cursor); left click on empty canvas for immediate lasso + deselect
 - Dot grid background (toggleable)
 
@@ -92,10 +100,12 @@ Upgrade to Pro on [olab.quest](https://olab.quest) to support development and ge
 
 | Shortcut | Action |
 |----------|--------|
+| `N` | Create new post-it at canvas center |
 | `S` | Lasso select mode |
 | `Q` | Quick Connect mode |
 | `G` | Group draw tool |
 | `T` | Text label tool |
+| `I` | Open / close Illustration Picker |
 | `Ctrl+Z` | Undo |
 | `Ctrl+Shift+Z` | Redo |
 | `Tab` | Cycle to next sibling board/folder |
@@ -177,6 +187,14 @@ Open `http://localhost:5173` — landing at `/landing`, demo canvas at `/app`.
 ---
 
 ## Changelog
+
+### 1.0.0
+- **Illustrations** — insert SVG characters from Open Doodles, Humaans, and Open Peeps packs; searchable picker with lazy thumbnails; drag to position or click to insert; theme-aware via `currentColor`; press `I` to open
+- **Context toolbar** — color picker for post-its and font/size selector for text labels appear inline on selection; last used label style is remembered for next creation
+- **Markdown preview** in post-it body (truncated to ~3 lines on canvas)
+- **Trackpad pan** — two-finger scroll pans the canvas (scroll = pan, Ctrl/pinch = zoom)
+- **Space+drag** to pan the canvas with grab cursor
+- **N shortcut** — creates a new post-it at the center of the current viewport
 
 ### 0.9.0
 - Google OAuth login ("Continue with Google" button on auth page)

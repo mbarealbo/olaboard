@@ -14,6 +14,8 @@
 - `src/hooks/useCanvas.js` – tutto lo stato canvas: offset, scale, dragging, connecting, keyboard, exitPoint
 - `src/components/PostIt.jsx` – componente PostIt con 4 connect dots cardinali, Lucide icons
 - `src/components/GroupBox.jsx` – Group (box ridimensionabile) e CanvasLabel (testo libero, link cliccabili)
+- `src/components/IllustrationNode.jsx` – nodo illustrazione SVG (fetch + cache in-memory, resize, connect dots)
+- `src/components/IllustrationPicker.jsx` – modale selezione illustrazioni con ricerca, tab per source, thumbnails lazy
 - `src/components/BlockEditor.jsx` – editor blocchi stile Notion con slash commands, blocchi immagine, link cliccabili nei blocchi `p`
 - `src/components/AuthPage.jsx` – login/signup (email+password, Google OAuth), reset password, new password
 - `src/components/LandingPage.jsx` – landing pubblica con mockup animati e footer legale
@@ -25,6 +27,8 @@
 - `src/lib/plans.js` – limiti per piano (free/pro/god), countTotalCanvases
 - `src/contexts/PlanContext.jsx` – piano utente da Supabase profiles
 - `src/utils.js` – costanti CARD_W=130, CARD_H_HALF=37, uid() (crypto.randomUUID), buildPath()
+- `scripts/normalize-illustrations.js` – script Node.js per normalizzare SVG (converte fill/stroke fissi in `currentColor`)
+- `public/illustrations/` – SVG illustrazioni organizzati per pack (`humaans/`, `open-doodles/`, `open-peeps/`) + `manifest.json`
 - `supabase/functions/delete-account/` – Edge Function: cancella storage, annulla sub Stripe, elimina auth user (cascade DB)
 - `supabase/functions/create-checkout/` – Edge Function: crea sessione checkout Stripe
 - `supabase/functions/stripe-webhook/` – Edge Function: webhook Stripe con template email
@@ -48,8 +52,11 @@
 
 ### Shape app (dopo mapCard/mapConn)
 ```js
-// Card
-{ id, title, body, x, y, color, isFolder, isLabel, createdAt }
+// Card (postit)
+{ id, title, body, x, y, color, isFolder, isLabel, isImage, isIcon, isIllustration,
+  nodeType, width, height, url, createdAt, updatedAt }
+
+// nodeType: 'postit' | 'icon' | 'illustration' | 'image'
 
 // Connection
 { id, from, to, label, fromAnchor, toAnchor }
@@ -58,7 +65,7 @@
 { id, title, x, y, width, height, cardIds: [] }
 
 // Label standalone
-{ id, x, y, text, fontSize }
+{ id, x, y, text, fontSize, fontFamily }
 ```
 
 ## Stato in AppInner
@@ -70,6 +77,9 @@
 - `collapsedIds` – Set di id di cartelle/board collassati nella sidebar, persistito in `localStorage['olaboard_expanded']`
 - `sidebarFocusId` – id dell'elemento sidebar con focus tastiera (Up/Down/Enter)
 - `listSelectMode` – boolean, attiva la selezione multipla nella vista elenco
+- `lastLabelStyle` – `{ fontFamily?, fontSize? }` ultimo stile usato su un'etichetta, applicato alla prossima creazione
+- `showIllustrationPicker` – boolean, mostra `<IllustrationPicker>`
+- `isDraggingIllustration` + `illustrationDragPos` + `illustrationDragSvg` – stato drag illustrazione fuori dal picker
 - Stack persistito in `localStorage` (STACK_KEY), validato al boot
 
 ## Refs in AppInner
@@ -118,14 +128,25 @@
 
 ### Canvas
 - Pan/zoom infinito (drag sfondo, scroll, bottoni +/−)
+- **Pan trackpad/space**: two-finger scroll → pan (non zoom), `ctrlKey`/pinch → zoom, Space+drag → grab-pan
 - Bottone **Center** (Maximize2 icon) nella toolbar: chiama `centerCanvas(currentId)` per adattare la vista agli elementi
 - Accentramento automatico al primo caricamento e ad ogni navigazione canvas
 - Post-it: doppio click crea, doppio click rinomina inline
   - 8 colori, COLOR_MAP light/dark, HC_COLOR_MAP high-contrast
   - `getTextColor(bgHex)`: testo scuro/chiaro automatico per luminanza
+  - **Context toolbar**: quando un post-it è selezionato, mostra color picker inline sopra il canvas
+  - **Markdown preview** nel body del post-it (righe ~3)
 - Cartelle: doppio click entra nel canvas figlio
 - Testo libero (`isLabel:true`): card senza sfondo, testo `var(--text)` (bianco in HC)
+  - **Context toolbar** sulle label: font family (sans/serif/mono/cursive) + font size; stile viene memorizzato in `lastLabelStyle`
 - Gruppi: box ridimensionabili, titolo editabile, drag muove card interne
+- **Illustrazioni SVG**: nodo `isIllustration`, renderizzato da `IllustrationNode`
+  - SVG serviti da `public/illustrations/` (tre pack: Open Doodles, Humaans, Open Peeps)
+  - Ogni SVG normalizzato per usare `currentColor` → si adatta al tema
+  - Picker (`IllustrationPicker`): modale con ricerca e tab per pack, thumbnails lazy via `IntersectionObserver`
+  - Click → inserisce al centro del viewport; drag → posiziona liberamente
+  - Shortcut **I** per aprire/chiudere il picker
+  - `public/illustrations/manifest.json`: lista di `{ id, name, path, source, tags }`
 - Frecce bezier con exitPoint geometrico, control points adattivi
 - 4 connect dots per card (top/right/bottom/left), visibili su hover
 - Etichette frecce: input inline, cancellabile svuotando
@@ -159,10 +180,12 @@
 - Board row: `sidebarFocusId === board.id` → highlight, hover disabilitato quando già evidenziato
 
 ### Tastiera
+- **N** – crea nuovo post-it al centro del viewport corrente
 - **S** – attiva Select mode
 - **Q** – attiva Quick mode
 - **G** – toggle tool Gruppo
 - **T** – toggle tool Testo
+- **I** – apre/chiude `IllustrationPicker`
 - **Tab** – cicla canvas fratelli allo stesso livello (root: board list; annidato: folder figli del parent)
 - **↑/↓** – muove `sidebarFocusId` attraverso la lista flat degli item sidebar visibili (rispetta collapsed), wrap-around
 - **Enter** – naviga all'item `sidebarFocusId`
@@ -172,7 +195,8 @@
 - Tutte le shortcut disabilitate quando focus su input/textarea/contenteditable
 
 ### Legenda shortcut
-- `<kbd>` chips (S Q G T Tab) in basso a destra del canvas, `pointerEvents: none`
+- `<kbd>` chips adattivi in basso a destra del canvas, `pointerEvents: none`
+- Mostra: N, T, I, G in modalità normale; shortcut contestuali in select/quick mode
 
 ### Note e organizzazione
 - Pannello note: side (380px) e full mode
