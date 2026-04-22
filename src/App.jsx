@@ -257,6 +257,7 @@ function AppInner({ userId, userEmail }) {
     } catch { return new Set() }
   })
   const [sidebarFocusId, setSidebarFocusId] = useState(null)
+  const [showExportMenu, setShowExportMenu] = useState(false)
   const [showAccount, setShowAccount] = useState(false)
   const [showUpgrade, setShowUpgrade] = useState(false)
   const [showManagePlan, setShowManagePlan] = useState(false)
@@ -644,6 +645,7 @@ function AppInner({ userId, userEmail }) {
   const connections = currentCanvas.connections
   const groups = currentCanvas.groups || []
   const labels = currentCanvas.labels || []
+  const isSingleSelect = multiSelected.length === 0
 
   // ── stable db mutators ────────────────────────────────────────────────────
   const updateCardFn = useCallback((cardId, updates) => {
@@ -1164,6 +1166,84 @@ function AppInner({ userId, userEmail }) {
     a.click()
   }
 
+  function exportPdf() {
+    const canvas = db[currentId]
+    const PAD = 60
+
+    // Compute world bounding box of all elements
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+    const allCards = canvas?.cards || []
+    const allLabels = canvas?.labels || []
+    const allGroups = canvas?.groups || []
+    for (const c of allCards) {
+      const w = (c.isImage || c.isIllustration) ? (c.width || 200) : (c.isIcon ? 80 : 130)
+      const h = (c.isImage || c.isIllustration) ? (c.height || 200) : (c.isIcon ? 80 : 74)
+      minX = Math.min(minX, c.x); minY = Math.min(minY, c.y)
+      maxX = Math.max(maxX, c.x + w); maxY = Math.max(maxY, c.y + h)
+    }
+    for (const l of allLabels) {
+      minX = Math.min(minX, l.x); minY = Math.min(minY, l.y)
+      maxX = Math.max(maxX, l.x + (l.width || 200)); maxY = Math.max(maxY, l.y + 40)
+    }
+    for (const g of allGroups) {
+      minX = Math.min(minX, g.x); minY = Math.min(minY, g.y)
+      maxX = Math.max(maxX, g.x + g.width); maxY = Math.max(maxY, g.y + g.height)
+    }
+    if (!isFinite(minX)) return
+
+    const contentW = maxX - minX + PAD * 2
+    const contentH = maxY - minY + PAD * 2
+
+    // Clone the world div (the one with pan/zoom transform)
+    const boardEl = boardRef.current
+    const innerEl = boardEl?.querySelector('[style*="transformOrigin"]')
+    if (!innerEl) return
+    const clone = innerEl.cloneNode(true)
+
+    // Remove interactive overlays (connect dots, resize handles, delete buttons, pills)
+    clone.querySelectorAll('.connect-dot, [title="Drag to scale font size"]').forEach(el => el.remove())
+
+    // Reset transform to align content to (PAD, PAD)
+    clone.style.transform = `translate(${PAD - minX}px, ${PAD - minY}px)`
+    clone.style.position = 'absolute'
+    clone.style.top = '0'
+    clone.style.left = '0'
+
+    const wrapperHtml = `<div style="position:relative;width:${contentW}px;height:${contentH}px">${clone.outerHTML}</div>`
+
+    const cssVars = `
+      --text:#111; --text-muted:#888; --bg:#f8f8f8; --bg-panel:#fff;
+      --border:#e0e0e0; --accent:#378ADD; --btn-bg:#f3f4f6; --btn-text:#333;
+      --sidebar-bg:#fafafa; --grid-dot:#d1d5db;
+    `
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${canvas.name}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono&family=Caveat&family=Lora:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <style>
+      :root{${cssVars}}
+      *{box-sizing:border-box}
+      body{margin:0;padding:0;background:#f8f8f8;font-family:system-ui,sans-serif}
+      h1{font-size:14px;font-weight:600;color:#888;padding:12px 20px 0;margin:0}
+      .wrap{background:white;margin:8px;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+      @media print{
+        body{background:white}
+        .title{display:none}
+        .wrap{margin:0;box-shadow:none;border-radius:0}
+        @page{size:auto;margin:8mm}
+        *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      }
+    </style></head>
+    <body>
+      <p class="title" style="font-size:13px;color:#888;padding:12px 20px 4px;margin:0">${canvas.name}</p>
+      <div class="wrap">${wrapperHtml}</div>
+    </body></html>`
+
+    const w = window.open('', '_blank')
+    w.document.write(html)
+    w.document.close()
+    w.addEventListener('load', () => { setTimeout(() => w.print(), 300) })
+  }
+
   // ── list view ─────────────────────────────────────────────────────────────
   const listItems = [
     ...cards.map(c => ({
@@ -1519,7 +1599,28 @@ function AppInner({ userId, userEmail }) {
               <button disabled={view !== 'canvas'} style={{ ...smallBtn, ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }} onClick={view === 'canvas' ? () => centerCanvas(currentId) : undefined} title="Centra elementi"><Maximize2 size={13} /></button>
             </div>
 
-          <button disabled={view !== 'canvas'} style={{ ...smallBtn, ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }} onClick={view === 'canvas' ? exportMd : undefined}>↓ MD</button>
+          <div style={{ position: 'relative' }}>
+            <button
+              disabled={view !== 'canvas'}
+              style={{ ...smallBtn, ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }}
+              onClick={view === 'canvas' ? () => setShowExportMenu(v => !v) : undefined}
+            >↓ {lang === 'it' ? 'Esporta' : 'Export'}</button>
+            {showExportMenu && view === 'canvas' && (
+              <div
+                style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, background: 'var(--bg-panel)', border: '1px solid var(--border)', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.12)', zIndex: 500, overflow: 'hidden', minWidth: 100 }}
+                onMouseLeave={() => setShowExportMenu(false)}
+              >
+                <button onClick={() => { exportMd(); setShowExportMenu(false) }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 14px', fontSize: 12, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text)' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--btn-bg)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                >Markdown (.md)</button>
+                <button onClick={() => { exportPdf(); setShowExportMenu(false) }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 14px', fontSize: 12, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text)' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--btn-bg)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                >PDF (.pdf)</button>
+              </div>
+            )}
+          </div>
 
           {/* Account button */}
           <button
@@ -2293,7 +2394,7 @@ function AppInner({ userId, userEmail }) {
                       if (!canvas) return prev
                       return { ...prev, [cId]: { ...canvas, labels: (canvas.labels||[]).filter(l => l.id !== label.id) } }
                     })}
-                    onConnectDot={(e, anchor, dims) => onConnectDotMouseDown(e, label, anchor, dims)}
+                    onConnectDot={label.text ? (e, anchor, dims) => onConnectDotMouseDown(e, label, anchor, dims) : undefined}
                     onFontChange={key => {
                       setLastLabelStyle({ fontFamily: key })
                       const cId = currentId
@@ -2319,7 +2420,7 @@ function AppInner({ userId, userEmail }) {
                     }}
                     onResizeMouseDown={e => onLabelResizeMouseDown(e, label)}
                     onFontScaleMouseDown={e => onLabelFontScaleMouseDown(e, label)}
-                    onConvertToPostIt={() => {
+                    onConvertToPostIt={isSingleSelect ? () => {
                       const cId = currentId
                       const snap = { id: label.id, x: label.x, y: label.y, text: label.text, fontSize: label.fontSize, fontFamily: label.fontFamily }
                       const newCard = { id: label.id, x: label.x, y: label.y, title: label.text || '', isFolder: false, isLabel: false, color: 'yellow' }
@@ -2333,8 +2434,8 @@ function AppInner({ userId, userEmail }) {
                         undo: () => setDb(prev => { const cv = prev[cId]; if (!cv) return prev; return { ...prev, [cId]: { ...cv, cards: cv.cards.filter(c => c.id !== snap.id), labels: [...(cv.labels||[]), snap] } } }),
                         redo: () => setDb(prev => { const cv = prev[cId]; if (!cv) return prev; return { ...prev, [cId]: { ...cv, labels: (cv.labels||[]).filter(l => l.id !== snap.id), cards: [...cv.cards, newCard] } } }),
                       })
-                    }}
-                    onConvertToFolder={() => {
+                    } : undefined}
+                    onConvertToFolder={isSingleSelect ? () => {
                       const cId = currentId
                       const snap = { id: label.id, x: label.x, y: label.y, text: label.text, fontSize: label.fontSize, fontFamily: label.fontFamily }
                       const newCard = { id: label.id, x: label.x, y: label.y, title: label.text || '', isFolder: true }
@@ -2348,7 +2449,7 @@ function AppInner({ userId, userEmail }) {
                         undo: () => setDb(prev => { const cv = prev[cId]; if (!cv) return prev; return { ...prev, [cId]: { ...cv, cards: cv.cards.filter(c => c.id !== snap.id), labels: [...(cv.labels||[]), snap] } } }),
                         redo: () => setDb(prev => { const cv = prev[cId]; if (!cv) return prev; return { ...prev, [cId]: { ...cv, labels: (cv.labels||[]).filter(l => l.id !== snap.id), cards: [...cv.cards, newCard] } } }),
                       })
-                    }}
+                    } : undefined}
                   />
                 ))}
 
@@ -2391,7 +2492,7 @@ function AppInner({ userId, userEmail }) {
                           })
                         }}
                         onConnectDot={(e, anchor) => onConnectDotMouseDown(e, card, anchor)}
-                        onColorChange={color => updateCardFn(card.id, { color })}
+                        onColorChange={isSingleSelect ? color => updateCardFn(card.id, { color }) : undefined}
                       />
                     )
                   }
@@ -2442,23 +2543,23 @@ function AppInner({ userId, userEmail }) {
                           if (!canvas) return prev
                           return { ...prev, [cId]: { ...canvas, cards: canvas.cards.filter(c => c.id !== card.id) } }
                         })}
-                        onConnectDot={(e, anchor, dims) => onConnectDotMouseDown(e, labelObj, anchor, dims)}
+                        onConnectDot={card.title ? (e, anchor, dims) => onConnectDotMouseDown(e, labelObj, anchor, dims) : undefined}
                         onFontChange={key => updateCardFn(card.id, { fontFamily: key })}
                         onSizeChange={delta => updateCardFn(card.id, { fontSize: Math.max(10, Math.min(120, (card.fontSize || 16) + delta)) })}
-                        onConvertToPostIt={() => {
+                        onConvertToPostIt={isSingleSelect ? () => {
                           updateCardFn(card.id, { isLabel: false })
                           pushCommand({
                             undo: () => updateCardFn(card.id, { isLabel: true }),
                             redo: () => updateCardFn(card.id, { isLabel: false }),
                           })
-                        }}
-                        onConvertToFolder={() => {
+                        } : undefined}
+                        onConvertToFolder={isSingleSelect ? () => {
                           updateCardFn(card.id, { isLabel: false, isFolder: true })
                           pushCommand({
                             undo: () => updateCardFn(card.id, { isLabel: true, isFolder: false }),
                             redo: () => updateCardFn(card.id, { isLabel: false, isFolder: true }),
                           })
-                        }}
+                        } : undefined}
                       />
                     )
                   }
@@ -2481,7 +2582,7 @@ function AppInner({ userId, userEmail }) {
                         }
                       }}
                       onNoteOpen={() => openNote(card)}
-                      onToggleFolder={() => {
+                      onToggleFolder={isSingleSelect ? () => {
                         const becomingFolder = !card.isFolder
                         if (becomingFolder && countTotalCanvases(boards, db) >= limits.totalCanvases) {
                           showLimitToast('totalCanvases'); return
@@ -2497,14 +2598,14 @@ function AppInner({ userId, userEmail }) {
                           undo: () => updateCardFn(card.id, { isFolder: !becomingFolder }),
                           redo: () => updateCardFn(card.id, { isFolder: becomingFolder }),
                         })
-                      }}
-                      onConvertToLabel={() => {
+                      } : undefined}
+                      onConvertToLabel={isSingleSelect ? () => {
                         updateCardFn(card.id, { isLabel: true })
                         pushCommand({
                           undo: () => updateCardFn(card.id, { isLabel: false }),
                           redo: () => updateCardFn(card.id, { isLabel: true }),
                         })
-                      }}
+                      } : undefined}
                       onConnectDot={(e, anchor) => onConnectDotMouseDown(e, card, anchor)}
                       initialEditing={editingCardId === card.id}
                       onEditStarted={() => setEditingCardId(null)}
@@ -2599,7 +2700,7 @@ function AppInner({ userId, userEmail }) {
                   <div
                     onMouseDown={e => e.stopPropagation()}
                     onDoubleClick={e => e.stopPropagation()}
-                    style={{ position: 'absolute', bottom: 16, right: 60, zIndex: 50, userSelect: 'none' }}
+                    style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 50, userSelect: 'none' }}
                   >
                     <div style={{
                       background: 'var(--bg-panel)', border: '1px solid var(--border)',
@@ -2744,6 +2845,24 @@ function AppInner({ userId, userEmail }) {
           ) : (
             /* ── List view ───────────────────────────────────────────────── */
             <div style={{ flex: 1, overflowY: 'auto', padding: 24, background: 'var(--bg)' }}>
+              {stack.length > 1 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 16, fontSize: 12, flexWrap: 'wrap' }}>
+                  {stack.map((id, i) => {
+                    const isLast = i === stack.length - 1
+                    return (
+                      <span key={id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        {i > 0 && <span style={{ color: 'var(--text-muted)' }}>›</span>}
+                        <span
+                          style={{ fontWeight: isLast ? 600 : 400, color: isLast ? 'var(--text)' : 'var(--accent)', cursor: isLast ? 'default' : 'pointer' }}
+                          onMouseEnter={e => { if (!isLast) e.currentTarget.style.textDecoration = 'underline' }}
+                          onMouseLeave={e => { e.currentTarget.style.textDecoration = 'none' }}
+                          onClick={() => !isLast && navigateTo(i)}
+                        >{db[id]?.name || id}</span>
+                      </span>
+                    )
+                  })}
+                </div>
+              )}
               <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
                 {[['az', t('sortAZ')], ['za', t('sortZA')], ['date', t('sortDate')]].map(([v, l]) => (
                   <button key={v} onClick={() => setListSort(v)} style={{ ...smallBtn, fontWeight: listSort === v ? 700 : 400, background: listSort === v ? 'var(--accent)' : 'var(--btn-bg)', color: listSort === v ? '#fff' : 'var(--btn-text)', border: '1px solid var(--border)' }}>{l}</button>

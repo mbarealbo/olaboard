@@ -43,6 +43,61 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
   useEffect(() => {
     function getBoardRect() { return boardRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 } }
 
+    function elDims(c) {
+      if (c.isImage || c.isIllustration) return { w: c.width || 200, h: c.height || 200 }
+      if (c.isIcon) return { w: 80, h: 80 }
+      if (c.isLabel) return { w: c.width || 80, h: 24 }
+      return { w: 130, h: 74 }
+    }
+
+    function snapToGuides(nx, ny, dw, dh, excludeCardId, excludeLabelId, s) {
+      const SNAP_PX = 8
+      const threshold = SNAP_PX / s
+      const canvas = dbRef.current[currentIdRef.current]
+      const guides = []
+      let bestSnapX = null, bestSnapXDist = threshold
+      let bestSnapY = null, bestSnapYDist = threshold
+
+      const snapTargets = [
+        ...(canvas?.cards || [])
+          .filter(c => c.id !== excludeCardId)
+          .map(c => { const d = elDims(c); return { x: c.x, y: c.y, w: d.w, h: d.h } }),
+        ...(canvas?.labels || [])
+          .filter(l => l.id !== excludeLabelId)
+          .map(l => ({ x: l.x, y: l.y, w: l.width || 80, h: 24 })),
+      ]
+
+      const dragRefsX = [nx, nx + dw / 2, nx + dw]
+      const dragRefsY = [ny, ny + dh / 2, ny + dh]
+
+      for (const t of snapTargets) {
+        const otherRefsX = [t.x, t.x + t.w / 2, t.x + t.w]
+        const otherRefsY = [t.y, t.y + t.h / 2, t.y + t.h]
+        for (const dr of dragRefsX) {
+          for (const or of otherRefsX) {
+            const dist = Math.abs(dr - or)
+            if (dist < bestSnapXDist) {
+              bestSnapXDist = dist
+              bestSnapX = { snapNX: nx + (or - dr), worldX: or }
+            }
+          }
+        }
+        for (const dr of dragRefsY) {
+          for (const or of otherRefsY) {
+            const dist = Math.abs(dr - or)
+            if (dist < bestSnapYDist) {
+              bestSnapYDist = dist
+              bestSnapY = { snapNY: ny + (or - dr), worldY: or }
+            }
+          }
+        }
+      }
+
+      if (bestSnapX) { nx = bestSnapX.snapNX; guides.push({ axis: 'v', w: bestSnapX.worldX }) }
+      if (bestSnapY) { ny = bestSnapY.snapNY; guides.push({ axis: 'h', w: bestSnapY.worldY }) }
+      return { nx, ny, guides }
+    }
+
     function onMove(e) {
       // Group draw preview
       if (groupDrawing.current) {
@@ -105,39 +160,10 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
         let ny = d.origY + (wy - d.startWY)
 
         // ── snap-to-alignment guides ────────────────────────────────────────
-        const SNAP_PX = 8
-        const threshold = SNAP_PX / s
-        const canvas = dbRef.current[currentIdRef.current]
-        const others = (canvas?.cards || []).filter(c => c.id !== d.cardId && !c.isLabel)
-        const guides = []
-        let bestSnapX = null, bestSnapXDist = threshold
-        let bestSnapY = null, bestSnapYDist = threshold
-        for (const c of others) {
-          const dragRefs = [nx, nx + 65, nx + 130]
-          const otherRefs = [c.x, c.x + 65, c.x + 130]
-          for (const dr of dragRefs) {
-            for (const or of otherRefs) {
-              const dist = Math.abs(dr - or)
-              if (dist < bestSnapXDist) {
-                bestSnapXDist = dist
-                bestSnapX = { snapNX: nx + (or - dr), worldX: or }
-              }
-            }
-          }
-          const dragRefsY = [ny, ny + 37, ny + 74]
-          const otherRefsY = [c.y, c.y + 37, c.y + 74]
-          for (const dr of dragRefsY) {
-            for (const or of otherRefsY) {
-              const dist = Math.abs(dr - or)
-              if (dist < bestSnapYDist) {
-                bestSnapYDist = dist
-                bestSnapY = { snapNY: ny + (or - dr), worldY: or }
-              }
-            }
-          }
-        }
-        if (bestSnapX) { nx = bestSnapX.snapNX; guides.push({ axis: 'v', w: bestSnapX.worldX }) }
-        if (bestSnapY) { ny = bestSnapY.snapNY; guides.push({ axis: 'h', w: bestSnapY.worldY }) }
+        const dw = (d.card.isImage || d.card.isIllustration) ? (d.card.width || 200) : (d.card.isIcon ? 80 : 130)
+        const dh = (d.card.isImage || d.card.isIllustration) ? (d.card.height || 200) : (d.card.isIcon ? 80 : 74)
+        const { nx: snappedX, ny: snappedY, guides } = snapToGuides(nx, ny, dw, dh, d.cardId, null, s)
+        nx = snappedX; ny = snappedY
         setSnapGuides(guides)
         // ───────────────────────────────────────────────────────────────────
 
@@ -238,10 +264,22 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
           )}}
         })
       } else if (d.type === 'label-fontscale') {
-        const delta = ((e.clientX - d.startClientX) + (e.clientY - d.startClientY)) / 2 / scaleRef.current
-        const newSize = Math.max(10, Math.min(120, Math.round(d.origFontSize + delta * 0.25)))
-        const ratio = newSize / d.origFontSize
-        const newWidth = d.origWidth ? Math.max(80, Math.round(d.origWidth * ratio)) : null
+        const r = getBoardRect()
+        const o = offsetRef.current, s = scaleRef.current
+        const wx = (e.clientX - r.left - o.x) / s
+        const wy = (e.clientY - r.top  - o.y) / s
+        const dx = wx - d.startWX
+        const dy = wy - d.startWY
+        let newSize, newWidth
+        if (d.origWidth) {
+          const sc = Math.max((d.origWidth + dx) / d.origWidth, (d.origHeight + dy) / d.origHeight, 40 / d.origWidth)
+          newSize = Math.max(10, Math.min(120, Math.round(d.origFontSize * sc)))
+          newWidth = Math.max(80, Math.round(d.origWidth * sc))
+        } else {
+          const sc = Math.max((d.origHeight + dy) / d.origHeight, 10 / d.origFontSize)
+          newSize = Math.max(10, Math.min(120, Math.round(d.origFontSize * sc)))
+          newWidth = null
+        }
         d.finalFontSize = newSize
         d.finalWidth = newWidth
         setDb(prev => {
@@ -250,7 +288,7 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
           if (!canvas) return prev
           return { ...prev, [cId]: { ...canvas, labels: (canvas.labels||[]).map(l => {
             if (l.id !== d.labelId) return l
-            return { ...l, fontSize: newSize, ...(newWidth ? { width: newWidth } : {}) }
+            return newWidth ? { ...l, fontSize: newSize, width: newWidth } : { ...l, fontSize: newSize }
           })}}
         })
       } else if (d.type === 'label') {
@@ -258,8 +296,11 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
         const o = offsetRef.current, s = scaleRef.current
         const wx = (e.clientX - r.left - o.x) / s
         const wy = (e.clientY - r.top  - o.y) / s
-        const nx = d.origX + (wx - d.startWX)
-        const ny = d.origY + (wy - d.startWY)
+        let nx = d.origX + (wx - d.startWX)
+        let ny = d.origY + (wy - d.startWY)
+        const { nx: snappedX, ny: snappedY, guides } = snapToGuides(nx, ny, d.labelW || 80, d.labelH || 24, null, d.labelId, s)
+        nx = snappedX; ny = snappedY
+        setSnapGuides(guides)
         d.finalX = nx; d.finalY = ny
         setDb(prev => {
           const cId = currentIdRef.current
@@ -354,11 +395,10 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
           const newConn = { id: uid(), from: fromId, to: newId, fromAnchor, toAnchor, label: '' }
           const cId = currentIdRef.current
           if (isText) {
-            const { fontFamily: lf, fontSize: ls } = lastLabelStyleRef.current
+            const { fontFamily: lf } = lastLabelStyleRef.current
             const srcLabel = dbRef.current[cId]?.labels?.find(l => l.id === fromId)
             const fontFamily = srcLabel?.fontFamily || lf
-            const fontSize = srcLabel?.fontSize || ls
-            const newLabel = { id: newId, x: wx - 56, y: wy - 20, text: '', fontSize, fontFamily }
+            const newLabel = { id: newId, x: wx - 100, y: wy - 20, text: '', fontSize: 16, fontFamily }
             setDb(prev => {
               const canvas = prev[cId]
               if (!canvas) return prev
@@ -377,6 +417,7 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
               if (!canvas) return prev
               return { ...prev, [cId]: { ...canvas, cards: [...canvas.cards, newCard], connections: [...canvas.connections, newConn] } }
             })
+            setSelected(newId); setSelectedLabel(null)
             pushCommandRef.current({
               undo: () => setDb(prev => { const cv = prev[cId]; if (!cv) return prev; return { ...prev, [cId]: { ...cv, cards: cv.cards.filter(c => c.id !== newId), connections: cv.connections.filter(c => c.id !== newConn.id) } } }),
               redo: () => setDb(prev => { const cv = prev[cId]; if (!cv) return prev; return { ...prev, [cId]: { ...cv, cards: [...cv.cards, newCard], connections: [...cv.connections, newConn] } } }),
@@ -821,7 +862,7 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
       dragging.current = { type: 'multi', startWX: wx, startWY: wy, cardOrigins, canvasId: cId, canvasSnapshot: dbRef.current[cId] }
     } else {
       setSelected(card.id); setSelectedLabel(null); setMultiSelected([])
-      dragging.current = { type: 'card', cardId: card.id, startWX: wx, startWY: wy, origX: card.x, origY: card.y, canvasId: cId, canvasSnapshot: dbRef.current[cId] }
+      dragging.current = { type: 'card', cardId: card.id, card, startWX: wx, startWY: wy, origX: card.x, origY: card.y, canvasId: cId, canvasSnapshot: dbRef.current[cId] }
     }
   }
 
@@ -885,7 +926,11 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
     const wx = (e.clientX - r.left - o.x) / s
     const wy = (e.clientY - r.top  - o.y) / s
     const cId = currentIdRef.current
-    dragging.current = { type: 'label', labelId: label.id, startWX: wx, startWY: wy, origX: label.x, origY: label.y, isCardLabel: !!isCardLabel, canvasId: cId, canvasSnapshot: dbRef.current[cId] }
+    const el = e.currentTarget?.closest('[data-card-id]')
+    const elRect = el ? el.getBoundingClientRect() : null
+    const labelW = elRect ? elRect.width / s : (label.width || 80)
+    const labelH = elRect ? elRect.height / s : 24
+    dragging.current = { type: 'label', labelId: label.id, labelW, labelH, startWX: wx, startWY: wy, origX: label.x, origY: label.y, isCardLabel: !!isCardLabel, canvasId: cId, canvasSnapshot: dbRef.current[cId] }
   }
 
   // ── zoom buttons ──────────────────────────────────────────────────────────
@@ -935,8 +980,8 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
   function setLastLabelStyle(style) { lastLabelStyleRef.current = { ...lastLabelStyleRef.current, ...style } }
 
   function createLabel(wx, wy, width) {
-    const { fontFamily, fontSize } = lastLabelStyleRef.current
-    const label = { id: uid(), x: wx, y: wy, text: '', fontSize, fontFamily, ...(width ? { width } : {}) }
+    const { fontFamily } = lastLabelStyleRef.current
+    const label = { id: uid(), x: wx - 100, y: wy - 20, text: '', fontSize: 16, fontFamily, ...(width ? { width } : {}) }
     const cId = currentIdRef.current
     setDb(prev => {
       const canvas = prev[cId]
@@ -978,11 +1023,16 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
 
   function onLabelFontScaleMouseDown(e, label) {
     e.stopPropagation()
+    const r = boardRef.current.getBoundingClientRect()
+    const o = offsetRef.current, s = scaleRef.current
+    const wx = (e.clientX - r.left - o.x) / s
+    const wy = (e.clientY - r.top  - o.y) / s
     const container = e.target.closest('.canvas-label')
-    const renderedW = container ? container.getBoundingClientRect().width / scaleRef.current : null
-    const origWidth = label.width || (renderedW ? Math.round(renderedW) : null)
+    const rect = container ? container.getBoundingClientRect() : null
+    const origWidth = label.width || null
+    const origHeight = rect ? Math.round(rect.height / s) : (label.fontSize || 16) * 2
     const cId = currentIdRef.current
-    dragging.current = { type: 'label-fontscale', labelId: label.id, origFontSize: label.fontSize || 16, origWidth, startClientX: e.clientX, startClientY: e.clientY, canvasId: cId, canvasSnapshot: dbRef.current[cId] }
+    dragging.current = { type: 'label-fontscale', labelId: label.id, origFontSize: label.fontSize || 16, origWidth, origHeight, startWX: wx, startWY: wy, canvasId: cId, canvasSnapshot: dbRef.current[cId] }
   }
 
   const [spaceDown, setSpaceDown] = useState(false)
