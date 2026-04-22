@@ -77,7 +77,7 @@
 - `collapsedIds` – Set di id di cartelle/board collassati nella sidebar, persistito in `localStorage['olaboard_expanded']`
 - `sidebarFocusId` – id dell'elemento sidebar con focus tastiera (Up/Down/Enter)
 - `listSelectMode` – boolean, attiva la selezione multipla nella vista elenco
-- `lastLabelStyle` – `{ fontFamily?, fontSize? }` ultimo stile usato su un'etichetta, applicato alla prossima creazione
+- `lastLabelStyle` – `{ fontFamily? }` ultimo font family usato su un'etichetta, applicato alla prossima creazione (fontSize sempre 16 di default)
 - `showIllustrationPicker` – boolean, mostra `<IllustrationPicker>`
 - `isDraggingIllustration` + `illustrationDragPos` + `illustrationDragSvg` – stato drag illustrazione fuori dal picker
 - Stack persistito in `localStorage` (STACK_KEY), validato al boot
@@ -138,7 +138,12 @@
   - **Markdown preview** nel body del post-it (righe ~3)
 - Cartelle: doppio click entra nel canvas figlio
 - Testo libero (`isLabel:true`): card senza sfondo, testo `var(--text)` (bianco in HC)
-  - **Context toolbar** sulle label: font family (sans/serif/mono/cursive) + font size; stile viene memorizzato in `lastLabelStyle`
+  - **Context toolbar** sulle label: font family (sans/serif/mono/cursive) + font size; solo font family viene memorizzato in `lastLabelStyle` (size sempre 16 alla creazione)
+  - **Auto-sizing**: nuove label senza `width` fissa si allargano con il testo (`white-space: pre`); il drag del bordo destro imposta una larghezza fissa con wrapping
+  - **Resize diagonale** (handle bottom-right, stile illustrazioni): scala font + larghezza proporzionalmente (world coords, `max(scaleFromW, scaleFromH)`); se nessuna larghezza fissa, scala solo il font
+  - **Selezione**: bordo `2px solid #378ADD` identico alle illustrazioni
+  - Connect dots nascosti se la label non ha testo
+  - Pills (convert) nascoste in multi-select
 - Gruppi: box ridimensionabili, titolo editabile, drag muove card interne
 - **Illustrazioni SVG**: nodo `isIllustration`, renderizzato da `IllustrationNode`
   - SVG serviti da `public/illustrations/` (tre pack: Open Doodles, Humaans, Open Peeps)
@@ -150,7 +155,8 @@
 - Frecce bezier con exitPoint geometrico, control points adattivi
 - 4 connect dots per card (top/right/bottom/left), visibili su hover
 - Etichette frecce: input inline, cancellabile svuotando
-- ⚡ Quick (autoCreate): drag freccia → crea card collegata
+- ⚡ Quick (autoCreate): drag freccia → crea card collegata; la nuova card viene auto-selezionata
+- **Snap-to-alignment guides**: guide magnetiche su tutti i tipi di elemento (post-it, immagini, icone, illustrazioni, label), usano dimensioni reali per ciascun tipo; attive sia su drag card che su drag label
 - Griglia puntini toggle
 - activeTool modale: `'note'|'text'|'group'`
 
@@ -195,22 +201,31 @@
 - Tutte le shortcut disabilitate quando focus su input/textarea/contenteditable
 
 ### Legenda shortcut
-- `<kbd>` chips adattivi in basso a destra del canvas, `pointerEvents: none`
-- Mostra: N, T, I, G in modalità normale; shortcut contestuali in select/quick mode
+- `<kbd>` chips collassabili in basso al centro del canvas, toggle ⌨, persistito in localStorage
+- Due righe: riga 1 strumenti (N/T/G/I/P/D), riga 2 comandi (S/Q/scroll/zoom/undo/del)
+- Pills (color picker icone, convert post-it/cartella/testo) nascoste quando `multiSelected.length > 0`
 
 ### Note e organizzazione
 - Pannello note: side (380px) e full mode
 - BlockEditor stile Notion: p/h1/h2/h3/ul/ol/quote/code + blocchi immagine
 - Preview body sui post-it (max 3 righe)
 - Vista Elenco con sort az/za/date
+- **Breadcrumb in lista**: quando si è dentro una cartella e si apre la vista Elenco, il path di navigazione è visibile in cima (stessa logica del breadcrumb canvas)
 - Sidebar: multi-board, rinomina inline, cancella (con conferma), + Nuova lavagna, Esci
 - Breadcrumb overlay bottom-left (annidato)
-- Export markdown canvas
+- **Export menu**: tasto "↓ Esporta" con dropdown → Markdown (.md) o PDF grafico (clona DOM canvas, calcola bounding box, apre nuova finestra con CSS vars inline + print)
 
 ### Temi
 - Light / Dark / High Contrast (CSS variables)
 - HC: sidebar-active `#7b2fff`, toolbar active `#7b2fff`, testo libero `var(--text)` → bianco
 - Bottone tema fisso (fixed bottom-right, `Maximize2` icon)
+
+### i18n
+- 4 lingue: Italiano, English, Español, Deutsch
+- `src/i18n.js`: tutte le stringhe UI (~170 chiavi per lingua)
+- `src/contexts/LangContext.jsx`: auto-detect da `navigator.language`, persistito in localStorage
+- `t(key, vars)`: interpolazione `{{name}}` per stringhe dinamiche
+- Fallback chain: lingua corrente → English → chiave raw
 
 ## Logica frecce (exitPoint)
 ```js
@@ -234,11 +249,10 @@ function exitPoint(entity, isLbl, goingRight, goingDown, isHoriz, isSource) {
 - `showAccount` – pannello account (piano, storage, lingua, logout, elimina account)
 - `showUpgrade` – upgrade a Pro con checkout Stripe
 - `showManagePlan` – gestione piano Pro (downgrade a Free, cancella abbonamento)
-- `showDeleteAccount` – eliminazione account con conferma testuale ("ELIMINA"/"DELETE")
+- `showDeleteAccount` – eliminazione account con conferma testuale (parola localizzata: "ELIMINA"/"DELETE"/"ELIMINAR"/"LÖSCHEN")
 - `confirmModal` – modale generica riutilizzabile `{ title, message, confirmLabel, danger, onConfirm }` — usata per elimina lavagna, downgrade, cancella abbonamento
 
 ## Prossimi step
-1. Export PDF / screenshot canvas
-2. Ricerca full-text tra le idee
-3. Collaborazione real-time (Supabase Realtime)
-4. Mobile & touch support
+1. Ricerca full-text tra le idee
+2. Collaborazione real-time (Supabase Realtime)
+3. Mobile & touch support

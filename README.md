@@ -2,7 +2,7 @@
 
 A visual thinking tool for capturing and connecting ideas on an infinite canvas.
 
-![version](https://img.shields.io/badge/version-1.0.0-blue) ![license](https://img.shields.io/badge/license-MIT-green) ![React](https://img.shields.io/badge/React-19-61dafb) ![Vite](https://img.shields.io/badge/Vite-8-646cff)
+![version](https://img.shields.io/badge/version-1.1.0-blue) ![license](https://img.shields.io/badge/license-MIT-green) ![React](https://img.shields.io/badge/React-19-61dafb) ![Vite](https://img.shields.io/badge/Vite-8-646cff)
 
 **[olaboard.netlify.app](https://olaboard.netlify.app.)** — try the live demo, no account needed.
 
@@ -89,7 +89,11 @@ Upgrade to Pro on [olab.quest](https://olab.quest) to support development and ge
 - **Collapsible sidebar tree** — state persisted across sessions
 - **Breadcrumb** navigation anchored to canvas bottom-left
 - **List view** — all elements with type badge, creation date, and bulk-select
-- **Export to Markdown** — current canvas as `.md` file
+- **Export** — Markdown (`.md`) or graphic PDF (visual snapshot of the canvas, browser print-to-PDF)
+
+### Languages
+- Italian, English, Spanish, German
+- Auto-detected from browser locale, switchable in account panel
 
 ### Themes
 - Light (default)
@@ -189,6 +193,17 @@ Open `http://localhost:5173` — landing at `/landing`, demo canvas at `/app`.
 ---
 
 ## Changelog
+
+### 1.1.0
+- **Spanish and German** language support (4 languages total: IT, EN, ES, DE) — auto-detected from browser locale, all UI strings fully translated
+- **Graphic PDF export** — visual snapshot of the canvas (clones the live DOM, fits all elements, browser print-to-PDF); MD export unchanged
+- **Text labels redesigned** — auto-size to content with no default width; right-edge drag sets a fixed width for wrapping; diagonal handle (illustration-style world-coord scaling) scales font size only when no width is set, or both font + width proportionally when it is
+- **Label selection** matches illustrations: solid `2px #378ADD` border
+- **Snap-to-alignment guides** extended to all element types — images, icons, illustrations, and text labels now snap against each other
+- **Quick-mode**: newly created post-its are auto-selected
+- **Context pills** (color picker, convert buttons) hidden during multi-select
+- **Breadcrumb in list view** — folder path visible when browsing a nested canvas in List mode
+- **Shortcuts panel** repositioned to bottom-center of the board
 
 ### 1.0.0
 - **Illustrations** — insert SVG characters from Open Doodles, Humaans, and Open Peeps packs; searchable picker with lazy thumbnails; drag to position or click to insert; theme-aware via `currentColor`; press `I` to open

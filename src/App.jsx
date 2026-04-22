@@ -1364,9 +1364,9 @@ function AppInner({ userId, userEmail }) {
                         onClick={e => {
                           e.stopPropagation()
                           setConfirmModal({
-                            title: lang === 'it' ? 'Elimina lavagna' : 'Delete board',
-                            message: lang === 'it' ? `Vuoi eliminare "${board.name}"? L'azione è irreversibile.` : `Delete "${board.name}"? This action cannot be undone.`,
-                            confirmLabel: lang === 'it' ? 'Elimina' : 'Delete',
+                            title: t('deleteBoardTitle'),
+                            message: t('deleteBoardMessage', { name: board.name }),
+                            confirmLabel: t('delete'),
                             danger: true,
                             onConfirm: () => {
                               setBoards(prev => prev.filter(b => b.id !== board.id))
@@ -1604,7 +1604,7 @@ function AppInner({ userId, userEmail }) {
               disabled={view !== 'canvas'}
               style={{ ...smallBtn, ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }}
               onClick={view === 'canvas' ? () => setShowExportMenu(v => !v) : undefined}
-            >↓ {lang === 'it' ? 'Esporta' : 'Export'}</button>
+            >↓ {t('export')}</button>
             {showExportMenu && view === 'canvas' && (
               <div
                 style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, background: 'var(--bg-panel)', border: '1px solid var(--border)', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.12)', zIndex: 500, overflow: 'hidden', minWidth: 100 }}
@@ -1698,9 +1698,10 @@ function AppInner({ userId, userEmail }) {
 
             <div>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 6 }}>{t('lang')}</div>
-              <div style={{ display: 'flex', gap: 6 }}>
-                <button onClick={() => setLang('it')} style={{ fontSize: 12, padding: '3px 10px', borderRadius: 4, border: '1px solid var(--border)', background: lang === 'it' ? 'var(--accent)' : 'var(--btn-bg)', color: lang === 'it' ? '#fff' : 'var(--btn-text)', cursor: 'pointer', fontFamily: 'inherit' }}>Italiano</button>
-                <button onClick={() => setLang('en')} style={{ fontSize: 12, padding: '3px 10px', borderRadius: 4, border: '1px solid var(--border)', background: lang === 'en' ? 'var(--accent)' : 'var(--btn-bg)', color: lang === 'en' ? '#fff' : 'var(--btn-text)', cursor: 'pointer', fontFamily: 'inherit' }}>English</button>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {[['it','Italiano'],['en','English'],['es','Español'],['de','Deutsch']].map(([code, label]) => (
+                  <button key={code} onClick={() => setLang(code)} style={{ fontSize: 12, padding: '3px 10px', borderRadius: 4, border: '1px solid var(--border)', background: lang === code ? 'var(--accent)' : 'var(--btn-bg)', color: lang === code ? '#fff' : 'var(--btn-text)', cursor: 'pointer', fontFamily: 'inherit' }}>{label}</button>
+                ))}
               </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1713,7 +1714,7 @@ function AppInner({ userId, userEmail }) {
                 style={{ fontSize: 11, color: '#bbb', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: '4px 0' }}
                 onMouseEnter={e => e.currentTarget.style.color = '#e53935'}
                 onMouseLeave={e => e.currentTarget.style.color = '#bbb'}
-              >{lang === 'it' ? 'Elimina account' : 'Delete account'}</button>
+              >{t('deleteAccountLink')}</button>
             </div>
           </div>
         )}
@@ -1835,7 +1836,7 @@ function AppInner({ userId, userEmail }) {
                 <input
                   autoFocus
                   value={searchQuery}
-                  placeholder={lang === 'it' ? 'Cerca in tutti i canvas…' : 'Search all canvases…'}
+                  placeholder={t('searchPlaceholder')}
                   onChange={e => {
                     const q = e.target.value
                     setSearchQuery(q)
@@ -1861,7 +1862,7 @@ function AppInner({ userId, userEmail }) {
               <div style={{ maxHeight: 380, overflowY: 'auto' }}>
                 {searchQuery.trim().length >= 2 && !searchLoading && searchResults.length === 0 && (
                   <div style={{ padding: '28px 16px', textAlign: 'center', fontSize: 13, color: 'var(--text-muted, #aaa)' }}>
-                    {lang === 'it' ? 'Nessun risultato' : 'No results found'}
+                    {t('noResults')}
                   </div>
                 )}
                 {searchResults.map(card => {
@@ -1880,7 +1881,7 @@ function AppInner({ userId, userEmail }) {
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                     >
                       <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text, #111)', marginBottom: 3 }}>
-                        {card.is_folder ? '📁 ' : ''}{card.title || (lang === 'it' ? 'Senza titolo' : 'Untitled')}
+                        {card.is_folder ? '📁 ' : ''}{card.title || t('untitled')}
                       </div>
                       {bodyPreview && (
                         <div style={{ fontSize: 12, color: 'var(--text-muted, #888)', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -1897,7 +1898,7 @@ function AppInner({ userId, userEmail }) {
                 })}
                 {!searchQuery.trim() && (
                   <div style={{ padding: '20px 16px', textAlign: 'center', fontSize: 12, color: 'var(--text-muted, #bbb)' }}>
-                    {lang === 'it' ? 'Digita almeno 2 caratteri per cercare' : 'Type at least 2 characters to search'}
+                    {t('searchHint')}
                   </div>
                 )}
               </div>
@@ -1930,23 +1931,21 @@ function AppInner({ userId, userEmail }) {
               <div style={{ textAlign: 'center', marginBottom: 20 }}>
                 <div style={{ fontSize: 36, marginBottom: 12 }}>⚠️</div>
                 <div style={{ fontSize: 18, fontWeight: 750, letterSpacing: '-0.5px', marginBottom: 8 }}>
-                  {lang === 'it' ? 'Elimina account' : 'Delete account'}
+                  {t('deleteAccountTitle')}
                 </div>
                 <p style={{ fontSize: 13, color: '#666', lineHeight: 1.6, margin: 0 }}>
-                  {lang === 'it'
-                    ? 'Questa azione è irreversibile. Tutti i tuoi canvas, note e immagini verranno eliminati definitivamente. L\'abbonamento Pro verrà cancellato.'
-                    : 'This action is irreversible. All your canvases, notes and images will be permanently deleted. Your Pro subscription will be cancelled.'}
+                  {t('deleteAccountMessage')}
                 </p>
               </div>
 
               <div style={{ marginBottom: 20 }}>
                 <label style={{ fontSize: 12, fontWeight: 650, color: '#555', display: 'block', marginBottom: 6 }}>
-                  {lang === 'it' ? 'Digita ELIMINA per confermare' : 'Type DELETE to confirm'}
+                  {t('deleteConfirmHint')}
                 </label>
                 <input
                   value={deleteConfirmText}
                   onChange={e => { setDeleteConfirmText(e.target.value); setDeleteError(null) }}
-                  placeholder={lang === 'it' ? 'ELIMINA' : 'DELETE'}
+                  placeholder={t('deleteConfirmWord')}
                   disabled={deleteLoading}
                   style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', fontSize: 14, border: '1.5px solid #e5e7eb', borderRadius: 10, outline: 'none', fontFamily: 'inherit' }}
                   onFocus={e => e.target.style.borderColor = '#e53935'}
@@ -1965,9 +1964,9 @@ function AppInner({ userId, userEmail }) {
                   onClick={() => setShowDeleteAccount(false)}
                   disabled={deleteLoading}
                   style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: '1.5px solid #e5e7eb', background: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
-                >{lang === 'it' ? 'Annulla' : 'Cancel'}</button>
+                >{t('cancel')}</button>
                 <button
-                  disabled={deleteLoading || (lang === 'it' ? deleteConfirmText !== 'ELIMINA' : deleteConfirmText !== 'DELETE')}
+                  disabled={deleteLoading || deleteConfirmText !== t('deleteConfirmWord')}
                   onClick={async () => {
                     setDeleteLoading(true); setDeleteError(null)
                     try {
@@ -1979,12 +1978,12 @@ function AppInner({ userId, userEmail }) {
                       await supabase.auth.signOut()
                       window.location.href = '/landing'
                     } catch (err) {
-                      setDeleteError(err.message || (lang === 'it' ? 'Errore durante la cancellazione.' : 'Error during deletion.'))
+                      setDeleteError(err.message || t('deleteError'))
                       setDeleteLoading(false)
                     }
                   }}
-                  style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: 'none', background: deleteLoading || (lang === 'it' ? deleteConfirmText !== 'ELIMINA' : deleteConfirmText !== 'DELETE') ? '#fca5a5' : '#e53935', color: '#fff', fontSize: 14, fontWeight: 700, cursor: deleteLoading || (lang === 'it' ? deleteConfirmText !== 'ELIMINA' : deleteConfirmText !== 'DELETE') ? 'default' : 'pointer', fontFamily: 'inherit', transition: 'background 0.15s' }}
-                >{deleteLoading ? '…' : (lang === 'it' ? 'Elimina definitivamente' : 'Delete permanently')}</button>
+                  style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: 'none', background: deleteLoading || deleteConfirmText !== t('deleteConfirmWord') ? '#fca5a5' : '#e53935', color: '#fff', fontSize: 14, fontWeight: 700, cursor: deleteLoading || deleteConfirmText !== t('deleteConfirmWord') ? 'default' : 'pointer', fontFamily: 'inherit', transition: 'background 0.15s' }}
+                >{deleteLoading ? '…' : t('deletePermanently')}</button>
               </div>
             </div>
           </div>
@@ -1998,16 +1997,14 @@ function AppInner({ userId, userEmail }) {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                 <div style={{ fontSize: 18, fontWeight: 750, letterSpacing: '-0.5px' }}>
                   {userId === 'local'
-                    ? (lang === 'it' ? 'Registrati per salvare i tuoi dati' : 'Sign up to save your data')
+                    ? t('signUpToSave')
                     : 'Upgrade to Pro'}
                 </div>
                 <button onClick={() => setShowUpgrade(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#aaa', fontSize: 20, lineHeight: 1, padding: 0 }}>×</button>
               </div>
               {userId === 'local' && (
                 <p style={{ fontSize: 13, color: '#888', marginBottom: 20, marginTop: 0 }}>
-                  {lang === 'it'
-                    ? 'La demo salva i dati solo in questo browser. Con un account gratuito li tieni al sicuro e sincronizzati.'
-                    : 'The demo saves data in this browser only. With a free account your data is safe and synced across devices.'}
+                  {t('demoSaveDesc')}
                 </p>
               )}
 
@@ -2015,10 +2012,10 @@ function AppInner({ userId, userEmail }) {
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
                 <div style={{ display: 'inline-flex', background: '#f5f5f5', borderRadius: 100, padding: 3 }}>
                   <button onClick={() => setUpgradeYearly(false)} style={{ padding: '5px 16px', borderRadius: 100, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, background: !upgradeYearly ? '#fff' : 'transparent', color: !upgradeYearly ? '#111' : '#888', boxShadow: !upgradeYearly ? '0 1px 4px rgba(0,0,0,0.10)' : 'none', transition: 'all 0.15s' }}>
-                    {lang === 'it' ? 'Mensile' : 'Monthly'}
+                    {t('monthly')}
                   </button>
                   <button onClick={() => setUpgradeYearly(true)} style={{ padding: '5px 16px', borderRadius: 100, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, background: upgradeYearly ? '#fff' : 'transparent', color: upgradeYearly ? '#111' : '#888', boxShadow: upgradeYearly ? '0 1px 4px rgba(0,0,0,0.10)' : 'none', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 6 }}>
-                    {lang === 'it' ? 'Annuale' : 'Yearly'} <span style={{ fontSize: 9, fontWeight: 700, background: '#e8f5e9', color: '#2e7d32', borderRadius: 20, padding: '1px 6px' }}>-37%</span>
+                    {t('yearly')} <span style={{ fontSize: 9, fontWeight: 700, background: '#e8f5e9', color: '#2e7d32', borderRadius: 20, padding: '1px 6px' }}>-37%</span>
                   </button>
                 </div>
               </div>
@@ -2028,7 +2025,7 @@ function AppInner({ userId, userEmail }) {
 
                 {/* Free */}
                 <div style={{ flex: 1, border: '1px solid #e5e7eb', borderRadius: 14, padding: '20px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: '#888', letterSpacing: 1, textTransform: 'uppercase' }}>{lang === 'it' ? 'Gratuito' : 'Free'}</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#888', letterSpacing: 1, textTransform: 'uppercase' }}>{t('free')}</div>
                   <div><span style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-1.5px' }}>€0</span><span style={{ fontSize: 12, color: '#999', marginLeft: 3 }}>forever</span></div>
                   {['3 boards', '150 cards/canvas', '30 canvases', '20 MB storage'].map(f => (
                     <div key={f} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -2039,13 +2036,13 @@ function AppInner({ userId, userEmail }) {
                   <button
                     onClick={() => { setShowUpgrade(false); navigate('/login') }}
                     style={{ marginTop: 'auto', padding: '9px 0', borderRadius: 8, border: '1.5px solid #e0e0e0', background: '#fff', fontSize: 13, fontWeight: 650, cursor: 'pointer', color: '#111' }}
-                  >{lang === 'it' ? 'Registrati gratis' : 'Sign up free'}</button>
+                  >{t('signUpFree')}</button>
                 </div>
 
                 {/* Pro */}
                 <div style={{ flex: 1, border: '2px solid #378ADD', borderRadius: 14, padding: '20px 18px', display: 'flex', flexDirection: 'column', gap: 10, position: 'relative', boxShadow: '0 4px 20px rgba(55,138,221,0.12)' }}>
                   <div style={{ position: 'absolute', top: -11, left: '50%', transform: 'translateX(-50%)', background: '#378ADD', color: '#fff', fontSize: 9, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', padding: '2px 10px', borderRadius: 20, whiteSpace: 'nowrap' }}>
-                    {lang === 'it' ? 'Più popolare' : 'Most popular'}
+                    {t('mostPopular')}
                   </div>
                   <div style={{ fontSize: 10, fontWeight: 700, color: '#378ADD', letterSpacing: 1, textTransform: 'uppercase' }}>Pro</div>
                   <div>
@@ -2054,11 +2051,11 @@ function AppInner({ userId, userEmail }) {
                     {upgradeYearly && <div style={{ fontSize: 11, color: '#888' }}>billed €45/year</div>}
                   </div>
                   {[
-                    lang === 'it' ? 'Lavagne illimitate' : 'Unlimited boards',
-                    lang === 'it' ? 'Card illimitate' : 'Unlimited cards',
-                    lang === 'it' ? 'Canvas illimitati' : 'Unlimited canvases',
+                    t('unlimitedBoards'),
+                    t('unlimitedCards'),
+                    t('unlimitedCanvases'),
                     '100 MB storage',
-                    lang === 'it' ? 'Supporto prioritario' : 'Priority support',
+                    t('prioritySupport'),
                   ].map(f => (
                     <div key={f} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                       <span style={{ color: '#378ADD', fontSize: 13 }}>✓</span>
@@ -2069,7 +2066,7 @@ function AppInner({ userId, userEmail }) {
                     <button
                       onClick={() => { setShowUpgrade(false); navigate('/login?intent=pro') }}
                       style={{ marginTop: 'auto', padding: '9px 0', borderRadius: 8, border: 'none', background: '#378ADD', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
-                    >{lang === 'it' ? 'Registrati e vai a Pro →' : 'Sign up and go Pro →'}</button>
+                    >{t('signUpPro')}</button>
                   ) : (
                     <button
                       onClick={() => startCheckout(upgradeYearly ? 'yearly' : 'monthly')}
@@ -2637,7 +2634,7 @@ function AppInner({ userId, userEmail }) {
                       boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
                       zIndex: 5,
                     }}>
-                      {lang === 'it' ? 'Doppio click o INVIO per scrivere una nota' : 'Double click or ENTER to write a note'}
+                      {t('noteHint')}
                     </div>
                   )
                 })()}
@@ -2693,8 +2690,8 @@ function AppInner({ userId, userEmail }) {
                 const kbdStyle = { fontSize: 10, color: 'var(--text-muted)', background: 'var(--bg-panel)', border: '1px solid var(--border)', borderRadius: 4, padding: '1px 5px', fontFamily: 'monospace', boxShadow: '0 1px 0 var(--border)', whiteSpace: 'nowrap' }
                 const labelStyle = { fontSize: 10, color: 'var(--text-muted)', whiteSpace: 'nowrap' }
                 const sep = <div style={{ width: 1, height: 12, background: 'var(--border)', margin: '0 4px', flexShrink: 0 }} />
-                const row1 = [['N', 'Post-it'], ['T', lang === 'it' ? 'Testo' : 'Text'], ['G', lang === 'it' ? 'Gruppo' : 'Group'], ['I', lang === 'it' ? 'Icone' : 'Icons'], ['P', lang === 'it' ? 'Immagine' : 'Image'], ['D', lang === 'it' ? 'Disegni' : 'Draw']]
-                const row2 = [['S', 'Select'], ['Q', 'Quick'], sep, ['scroll', 'Pan'], [`${mod}+scroll`, 'Zoom'], sep, [`${mod}Z`, lang === 'it' ? 'Annulla' : 'Undo'], ['Del', lang === 'it' ? 'Elimina' : 'Delete']]
+                const row1 = [['N', 'Post-it'], ['T', t('kbdText')], ['G', t('kbdGroup')], ['I', t('kbdIcons')], ['P', t('kbdImage')], ['D', t('kbdDraw')]]
+                const row2 = [['S', 'Select'], ['Q', 'Quick'], sep, ['scroll', 'Pan'], [`${mod}+scroll`, 'Zoom'], sep, [`${mod}Z`, t('kbdUndo')], ['Del', t('delete')]]
                 const toggle = () => setShowShortcuts(v => { const next = !v; localStorage.setItem('olaboard_shortcuts', next ? '1' : '0'); return next })
                 return (
                   <div
@@ -2714,7 +2711,7 @@ function AppInner({ userId, userEmail }) {
                       >
                         <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: 0.4, display: 'flex', alignItems: 'center', gap: 5 }}>
                           <span>⌨</span>
-                          <span>{lang === 'it' ? 'Scorciatoie' : 'Shortcuts'}</span>
+                          <span>{t('shortcuts')}</span>
                         </span>
                         <span style={{ fontSize: 9, color: 'var(--text-muted)', lineHeight: 1 }}>{showShortcuts ? '▲' : '▼'}</span>
                       </div>
@@ -2803,11 +2800,11 @@ function AppInner({ userId, userEmail }) {
                   <MousePointerClick size={15} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
                   <span style={{ fontSize: 13, color: 'var(--text)', fontFamily: 'system-ui, sans-serif' }}>
                     {activeTool === 'text'
-                      ? (lang === 'it' ? 'Doppio click per aggiungere testo' : 'Double click to add text')
+                      ? t('addTextHint')
                       : activeTool === 'group'
-                      ? (lang === 'it' ? 'Trascina per creare un gruppo' : 'Drag to create a group')
+                      ? t('drawGroupHint')
                       : activeTool === 'icon'
-                      ? (lang === 'it' ? 'Scegli un\'icona dal pannello' : 'Choose an icon from the panel')
+                      ? t('chooseIconHint')
                       : t('emptyCanvasHint')}
                   </span>
                 </div>
@@ -2877,7 +2874,7 @@ function AppInner({ userId, userEmail }) {
                 const badgeIcon = item.type === 'folder' ? <Folder size={12} /> : item.type === 'label' ? <span style={{fontSize:11}}>T</span> : <span style={{fontSize:11}}>✎</span>
                 const badgeLabel = item.type === 'folder' ? t('typeFolder') : item.type === 'label' ? t('typeLabel') : t('typeNote')
                 const dateStr = item.createdAt
-                  ? new Date(item.createdAt).toLocaleDateString(lang === 'it' ? 'it-IT' : 'en-US', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                  ? new Date(item.createdAt).toLocaleDateString(t('dateLocale'), { day: '2-digit', month: '2-digit', year: 'numeric' })
                   : '—'
                 const isChecked = multiSelected.includes(item.id)
                 function handleClick() {
