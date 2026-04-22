@@ -2594,7 +2594,7 @@ function AppInner({ userId, userEmail }) {
                   <div
                     onMouseDown={e => e.stopPropagation()}
                     onDoubleClick={e => e.stopPropagation()}
-                    style={{ position: 'absolute', bottom: 16, right: 16, zIndex: 50, display: 'flex', alignItems: 'flex-end', gap: 6, userSelect: 'none' }}
+                    style={{ position: 'absolute', bottom: 16, right: 60, zIndex: 50, display: 'flex', alignItems: 'flex-end', gap: 6, userSelect: 'none' }}
                   >
                     {showShortcuts && (
                       <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end', maxWidth: 560, pointerEvents: 'none' }}>
