@@ -128,10 +128,10 @@ export const translations = {
 
     // Illustrations
     illustrationsTool: 'Illustrazioni',
-    illustrationsToolTitle: 'Illustrazioni (I)',
+    illustrationsToolTitle: 'Illustrazioni (D)',
     illustrationsAttribution: 'Illustrazioni: Open Doodles by Pablo Stanley + Highlights by outdraw.design (CC0)',
     imageTool: 'Immagine',
-    imageToolTitle: 'Carica immagine dal computer',
+    imageToolTitle: 'Carica immagine (P)',
     dropImageHere: 'Rilascia per inserire l\'immagine',
   },
 
@@ -264,10 +264,10 @@ export const translations = {
 
     // Illustrations
     illustrationsTool: 'Illustrations',
-    illustrationsToolTitle: 'Illustrations (I)',
+    illustrationsToolTitle: 'Illustrations (D)',
     illustrationsAttribution: 'Illustrations: Open Doodles by Pablo Stanley + Highlights by outdraw.design (CC0)',
     imageTool: 'Image',
-    imageToolTitle: 'Upload image from computer',
+    imageToolTitle: 'Upload image (P)',
     dropImageHere: 'Drop to add image',
   },
 }

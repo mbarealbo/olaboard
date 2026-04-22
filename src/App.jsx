@@ -1014,6 +1014,10 @@ function AppInner({ userId, userEmail }) {
       } else if (e.key === 't' || e.key === 'T') {
         setActiveTool(prev => prev === 'text' ? 'note' : 'text'); setSelectMode(false)
       } else if (e.key === 'i' || e.key === 'I') {
+        setShowIconPicker(prev => !prev)
+      } else if (e.key === 'p' || e.key === 'P') {
+        imageInputRef.current?.click()
+      } else if (e.key === 'd' || e.key === 'D') {
         setShowIllustrationPicker(prev => !prev)
       }
     }
@@ -1462,7 +1466,7 @@ function AppInner({ userId, userEmail }) {
             <div style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
               <button disabled={dis} style={activeBtn(showIconPicker)}
                 onClick={!dis ? () => setShowIconPicker(v => !v) : undefined}
-                title="Add icon card"
+                title="Icons (I)"
               >⬡ Icons</button>
               <button disabled={dis} style={{ ...activeBtn(false) }}
                 onClick={!dis ? () => imageInputRef.current?.click() : undefined}
@@ -2580,7 +2584,7 @@ function AppInner({ userId, userEmail }) {
                 const labelStyle = { fontSize: 10, color: 'var(--text-muted)', whiteSpace: 'nowrap' }
                 const sep = <div style={{ width: 1, height: 12, background: 'var(--border)', margin: '0 2px' }} />
                 const groups = [
-                  [['N', 'Post-it'], ['T', lang === 'it' ? 'Testo' : 'Text'], ['I', lang === 'it' ? 'Icone' : 'Icons'], ['G', lang === 'it' ? 'Gruppo' : 'Group']],
+                  [['N', 'Post-it'], ['T', lang === 'it' ? 'Testo' : 'Text'], ['G', lang === 'it' ? 'Gruppo' : 'Group'], ['I', lang === 'it' ? 'Icone' : 'Icons'], ['P', lang === 'it' ? 'Immagine' : 'Image'], ['D', lang === 'it' ? 'Disegni' : 'Draw']],
                   [['S', 'Select'], ['Q', 'Quick'], ['Space+drag', 'Pan']],
                   [['scroll', 'Pan'], [`${mod} scroll`, 'Zoom']],
                   [[`${mod}Z`, lang === 'it' ? 'Annulla' : 'Undo'], [`${mod}K`, lang === 'it' ? 'Cerca' : 'Search'], ['Del', lang === 'it' ? 'Elimina' : 'Delete']],

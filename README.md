@@ -101,11 +101,13 @@ Upgrade to Pro on [olab.quest](https://olab.quest) to support development and ge
 | Shortcut | Action |
 |----------|--------|
 | `N` | Create new post-it at canvas center |
+| `T` | Text label tool |
+| `G` | Group draw tool |
+| `I` | Open / close Icon Picker |
+| `P` | Upload image from computer |
+| `D` | Open / close Illustration Picker (Draw) |
 | `S` | Lasso select mode |
 | `Q` | Quick Connect mode |
-| `G` | Group draw tool |
-| `T` | Text label tool |
-| `I` | Open / close Illustration Picker |
 | `Ctrl+Z` | Undo |
 | `Ctrl+Shift+Z` | Redo |
 | `Tab` | Cycle to next sibling board/folder |
