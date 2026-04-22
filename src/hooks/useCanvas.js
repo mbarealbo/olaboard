@@ -240,14 +240,18 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
       } else if (d.type === 'label-fontscale') {
         const delta = ((e.clientX - d.startClientX) + (e.clientY - d.startClientY)) / 2 / scaleRef.current
         const newSize = Math.max(10, Math.min(120, Math.round(d.origFontSize + delta * 0.25)))
+        const ratio = newSize / d.origFontSize
+        const newWidth = d.origWidth ? Math.max(80, Math.round(d.origWidth * ratio)) : null
         d.finalFontSize = newSize
+        d.finalWidth = newWidth
         setDb(prev => {
           const cId = currentIdRef.current
           const canvas = prev[cId]
           if (!canvas) return prev
-          return { ...prev, [cId]: { ...canvas, labels: (canvas.labels||[]).map(l =>
-            l.id === d.labelId ? { ...l, fontSize: newSize } : l
-          )}}
+          return { ...prev, [cId]: { ...canvas, labels: (canvas.labels||[]).map(l => {
+            if (l.id !== d.labelId) return l
+            return { ...l, fontSize: newSize, ...(newWidth ? { width: newWidth } : {}) }
+          })}}
         })
       } else if (d.type === 'label') {
         const r = getBoardRect()
@@ -489,7 +493,10 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
         const cId = d.canvasId
         const bc = d.canvasSnapshot
         if (bc) {
-          const afterCanvas = { ...bc, labels: (bc.labels || []).map(l => l.id === d.labelId ? { ...l, fontSize: d.finalFontSize } : l) }
+          const afterCanvas = { ...bc, labels: (bc.labels || []).map(l => {
+            if (l.id !== d.labelId) return l
+            return { ...l, fontSize: d.finalFontSize, ...(d.finalWidth ? { width: d.finalWidth } : {}) }
+          })}
           pushCommandRef.current({
             undo: () => setDb(prev => ({ ...prev, [cId]: bc })),
             redo: () => setDb(prev => ({ ...prev, [cId]: afterCanvas })),
@@ -968,8 +975,11 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
 
   function onLabelFontScaleMouseDown(e, label) {
     e.stopPropagation()
+    const container = e.target.closest('.canvas-label')
+    const renderedW = container ? container.getBoundingClientRect().width / scaleRef.current : null
+    const origWidth = label.width || (renderedW ? Math.round(renderedW) : null)
     const cId = currentIdRef.current
-    dragging.current = { type: 'label-fontscale', labelId: label.id, origFontSize: label.fontSize || 16, startClientX: e.clientX, startClientY: e.clientY, canvasId: cId, canvasSnapshot: dbRef.current[cId] }
+    dragging.current = { type: 'label-fontscale', labelId: label.id, origFontSize: label.fontSize || 16, origWidth, startClientX: e.clientX, startClientY: e.clientY, canvasId: cId, canvasSnapshot: dbRef.current[cId] }
   }
 
   const [spaceDown, setSpaceDown] = useState(false)
