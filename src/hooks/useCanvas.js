@@ -355,7 +355,10 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
           const cId = currentIdRef.current
           if (isText) {
             const { fontFamily: lf, fontSize: ls } = lastLabelStyleRef.current
-            const newLabel = { id: newId, x: wx - 56, y: wy - 20, text: '', fontSize: ls, fontFamily: lf }
+            const srcLabel = dbRef.current[cId]?.labels?.find(l => l.id === fromId)
+            const fontFamily = srcLabel?.fontFamily || lf
+            const fontSize = srcLabel?.fontSize || ls
+            const newLabel = { id: newId, x: wx - 56, y: wy - 20, text: '', fontSize, fontFamily }
             setDb(prev => {
               const canvas = prev[cId]
               if (!canvas) return prev

@@ -202,14 +202,14 @@ export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit
       )}
       {(selected || hovered) && !editing && (
         <>
-          {/* Right-middle handle: drag to control text wrap width */}
+          {/* Right-middle handle: drag to control text wrap width — placed outside connect dot hitbox */}
           {onResizeMouseDown && (
             <div
               title="Drag to set wrap width"
               style={{
-                position: 'absolute', top: '50%', right: -5,
+                position: 'absolute', top: '50%', right: -24,
                 transform: 'translateY(-50%)',
-                width: 8, height: 20, background: 'rgba(55,138,221,0.15)',
+                width: 8, height: 22, background: 'rgba(55,138,221,0.15)',
                 border: '1.5px solid #378ADD', borderRadius: 3,
                 cursor: 'ew-resize', zIndex: 10,
               }}
@@ -221,7 +221,7 @@ export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit
             <div
               title="Drag to scale font size"
               style={{
-                position: 'absolute', bottom: -5, right: -5,
+                position: 'absolute', bottom: -18, right: -18,
                 width: 10, height: 10, background: 'rgba(55,138,221,0.15)',
                 border: '1.5px solid #378ADD', borderRadius: 2,
                 cursor: 'se-resize', zIndex: 10,

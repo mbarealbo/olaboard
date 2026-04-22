@@ -2295,6 +2295,7 @@ function AppInner({ userId, userEmail }) {
                     })}
                     onConnectDot={(e, anchor, dims) => onConnectDotMouseDown(e, label, anchor, dims)}
                     onFontChange={key => {
+                      setLastLabelStyle({ fontFamily: key })
                       const cId = currentId
                       setDb(prev => {
                         const cv = prev[cId]
@@ -2307,7 +2308,13 @@ function AppInner({ userId, userEmail }) {
                       setDb(prev => {
                         const cv = prev[cId]
                         if (!cv) return prev
-                        return { ...prev, [cId]: { ...cv, labels: (cv.labels||[]).map(l => l.id === label.id ? { ...l, fontSize: Math.max(10, Math.min(72, (l.fontSize || 16) + delta)) } : l) } }
+                        const newLabels = cv.labels.map(l => {
+                          if (l.id !== label.id) return l
+                          const newSize = Math.max(10, Math.min(72, (l.fontSize || 16) + delta))
+                          setLastLabelStyle({ fontSize: newSize })
+                          return { ...l, fontSize: newSize }
+                        })
+                        return { ...prev, [cId]: { ...cv, labels: newLabels } }
                       })
                     }}
                     onResizeMouseDown={e => onLabelResizeMouseDown(e, label)}
