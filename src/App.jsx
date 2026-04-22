@@ -587,7 +587,7 @@ function AppInner({ userId, userEmail }) {
     onImageResizeMouseDown,
     onLabelMouseDown, onLabelResizeMouseDown, zoomBy,
     activeAutoCreateRef, activeToolRef, multiSelectedRef,
-    snapGuides,
+    snapGuides, setLastLabelStyle,
   } = useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnectionFn, setActiveNoteId, view, activeTool, setActiveTool, selectMode, setMultiSelected, setSelectionRect, onGroupCreated: id => setEditingGroupId(id), pushCommand, maxCardsPerCanvas: limits.cardsPerCanvas, onLimitReached: showLimitToast, scrollZoom })
 
   useEffect(() => { activeAutoCreateRef.current = autoCreate }, [autoCreate, activeAutoCreateRef])
@@ -1249,6 +1249,72 @@ function AppInner({ userId, userEmail }) {
 
           {/* Current canvas name */}
           <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{displayName || db[currentId]?.name || ''}</span>
+
+          {/* Context toolbar */}
+          {view === 'canvas' && (() => {
+            const FONT_OPTIONS = [
+              { key: 'sans',  label: 'Normal',      family: 'system-ui, sans-serif' },
+              { key: 'mono',  label: 'Mono',         family: "'Space Mono', monospace" },
+              { key: 'hand',  label: 'Handwriting',  family: "'Caveat', cursive" },
+              { key: 'serif', label: 'Serif',        family: "'Lora', serif" },
+            ]
+            const COLORS = ['yellow', 'orange', 'green', 'blue', 'pink', 'purple', 'white', 'red']
+            const COLOR_HEX = { yellow: '#FAC775', orange: '#EF9F27', green: '#b8e986', blue: '#89cff0', pink: '#ffb3c6', purple: '#d4a8ff', white: '#f5f5f5', red: '#ff8a80' }
+            const divStyle = { display: 'flex', alignItems: 'center', gap: 4, paddingLeft: 10, marginLeft: 2, borderLeft: '1px solid var(--border)' }
+
+            const activeEl = selectedLabel || editingLabelId
+            if (activeEl) {
+              const standaloneLabel = labels.find(l => l.id === activeEl)
+              const lbl = standaloneLabel || cards.find(c => c.id === activeEl && c.isLabel)
+              if (!lbl) return null
+              const activeFontKey = lbl.fontFamily || 'sans'
+              const activeFontFamily = FONT_OPTIONS.find(f => f.key === activeFontKey)?.family || 'system-ui, sans-serif'
+              const fontSize = lbl.fontSize || 16
+              const updateLbl = (changes) => {
+                if (changes.fontFamily || changes.fontSize) setLastLabelStyle(changes)
+                if (standaloneLabel) {
+                  const cId = currentId
+                  setDb(prev => { const cv = prev[cId]; if (!cv) return prev; return { ...prev, [cId]: { ...cv, labels: cv.labels.map(l => l.id === activeEl ? { ...l, ...changes } : l) } } })
+                } else {
+                  updateCardFn(activeEl, changes)
+                }
+              }
+              return (
+                <div style={divStyle}>
+                  <select
+                    value={activeFontKey}
+                    onChange={e => updateLbl({ fontFamily: e.target.value })}
+                    style={{ fontFamily: activeFontFamily, fontSize: 12, padding: '3px 6px', borderRadius: 6, border: '1px solid var(--btn-border)', background: 'var(--btn-bg)', color: 'var(--btn-text)', cursor: 'pointer', outline: 'none' }}
+                  >
+                    {FONT_OPTIONS.map(f => (
+                      <option key={f.key} value={f.key}>{f.label}</option>
+                    ))}
+                  </select>
+                  <div style={{ width: 1, height: 14, background: 'var(--border)', margin: '0 2px' }} />
+                  <button onClick={() => updateLbl({ fontSize: Math.max(10, fontSize - 4) })} style={smallBtn}>−</button>
+                  <span style={{ fontSize: 11, color: 'var(--text)', minWidth: 22, textAlign: 'center' }}>{fontSize}</span>
+                  <button onClick={() => updateLbl({ fontSize: Math.min(120, fontSize + 4) })} style={smallBtn}>+</button>
+                </div>
+              )
+            }
+
+            if (selected) {
+              const card = cards.find(c => c.id === selected)
+              if (!card || card.isFolder || card.isLabel || card.isImage || card.isIcon) return null
+              const cur = card.color || 'yellow'
+              return (
+                <div style={divStyle}>
+                  {COLORS.map(c => (
+                    <button key={c} onClick={() => updateCardFn(selected, { color: c })}
+                      style={{ width: 16, height: 16, borderRadius: '50%', background: COLOR_HEX[c], border: cur === c ? '2.5px solid var(--accent)' : '1.5px solid rgba(0,0,0,0.12)', cursor: 'pointer', padding: 0, flexShrink: 0 }}
+                    />
+                  ))}
+                </div>
+              )
+            }
+
+            return null
+          })()}
 
           <div style={{ flex: 1 }} />
 

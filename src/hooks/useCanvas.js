@@ -27,6 +27,7 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
   const activeToolRef = useRef('note')
   const multiSelectedRef = useRef([])
   const pushCommandRef = useRef(pushCommand)
+  const lastLabelStyleRef = useRef({ fontFamily: 'sans', fontSize: 16 })
 
   useEffect(() => { offsetRef.current = offset }, [offset])
   useEffect(() => { scaleRef.current = scale }, [scale])
@@ -337,7 +338,8 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
           const newConn = { id: uid(), from: fromId, to: newId, fromAnchor, toAnchor, label: '' }
           const cId = currentIdRef.current
           if (isText) {
-            const newLabel = { id: newId, x: wx - 56, y: wy - 20, text: '', fontSize: 16, fontFamily: 'sans' }
+            const { fontFamily: lf, fontSize: ls } = lastLabelStyleRef.current
+            const newLabel = { id: newId, x: wx - 56, y: wy - 20, text: '', fontSize: ls, fontFamily: lf }
             setDb(prev => {
               const canvas = prev[cId]
               if (!canvas) return prev
@@ -878,8 +880,11 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
   }
 
   // ── label creation & update ───────────────────────────────────────────────
+  function setLastLabelStyle(style) { lastLabelStyleRef.current = { ...lastLabelStyleRef.current, ...style } }
+
   function createLabel(wx, wy, width) {
-    const label = { id: uid(), x: wx, y: wy, text: '', fontSize: 16, fontFamily: 'sans', ...(width ? { width } : {}) }
+    const { fontFamily, fontSize } = lastLabelStyleRef.current
+    const label = { id: uid(), x: wx, y: wy, text: '', fontSize, fontFamily, ...(width ? { width } : {}) }
     const cId = currentIdRef.current
     setDb(prev => {
       const canvas = prev[cId]
@@ -942,7 +947,7 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
     onGroupTitleBarMouseDown, onGroupResizeHandleMouseDown,
     onImageResizeMouseDown,
     onLabelMouseDown, onLabelResizeMouseDown, zoomBy,
-    createLabel, updateLabel,
+    createLabel, updateLabel, setLastLabelStyle,
     activeAutoCreateRef, activeToolRef, multiSelectedRef,
     snapGuides,
   }

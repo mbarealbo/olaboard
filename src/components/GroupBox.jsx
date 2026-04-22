@@ -160,6 +160,7 @@ export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit
           ref={elRef}
           contentEditable
           suppressContentEditableWarning
+          data-placeholder={t('untitled')}
           style={{ ...textStyle, cursor: 'text' }}
           onMouseDown={e => e.stopPropagation()}
           onBlur={e => {
@@ -175,7 +176,10 @@ export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit
         />
       ) : (
         <p style={{ ...textStyle, margin: 0, cursor: 'move' }}>
-          {parseTextWithLinks(label.text)}
+          {label.text
+            ? parseTextWithLinks(label.text)
+            : <span style={{ opacity: 0.35, pointerEvents: 'none', fontStyle: 'italic' }}>{t('untitled')}</span>
+          }
         </p>
       )}
       {onConnectDot && (

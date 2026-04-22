@@ -1,6 +1,34 @@
 import { useRef, useEffect, useState } from 'react'
 import { Folder, FileText, Type } from 'lucide-react'
 import { useLang } from '../contexts/LangContext'
+import { parseMarkdown } from './BlockEditor'
+
+function BodyPreview({ body, textColor }) {
+  const blocks = parseMarkdown(body)
+  return (
+    <>
+      {blocks.map(block => {
+        const { id, type, content } = block
+        if (type === 'image') return null
+        const c = content || ''
+        switch (type) {
+          case 'h1': case 'h2': case 'h3':
+            return <div key={id} style={{ fontWeight: 700 }}>{c}</div>
+          case 'ul':
+            return <div key={id}>• {c}</div>
+          case 'ol':
+            return <div key={id}>· {c}</div>
+          case 'quote':
+            return <div key={id} style={{ borderLeft: '2px solid currentColor', paddingLeft: 4, opacity: 0.7 }}>{c}</div>
+          case 'code':
+            return <div key={id} style={{ fontFamily: 'monospace', fontSize: 9 }}>{c}</div>
+          default:
+            return <div key={id}>{c}</div>
+        }
+      })}
+    </>
+  )
+}
 
 const COLOR_MAP = {
   yellow: '#FAC775', orange: '#EF9F27', green: '#b8e986',
@@ -122,9 +150,10 @@ export default function PostIt({ card, selected, onMouseDown, onClick, onDblClic
       {card.body ? (
         <div style={{
           fontSize: 10, color: `${textColor}99`, lineHeight: 1.4, marginTop: 4,
-          overflow: 'hidden', display: '-webkit-box',
-          WebkitLineClamp: 3, WebkitBoxOrient: 'vertical',
-        }}>{card.body}</div>
+          overflow: 'hidden', maxHeight: `${10 * 1.4 * 3}px`,
+        }}>
+          <BodyPreview body={card.body} textColor={textColor} />
+        </div>
       ) : null}
 
       <div className="postit-actions">

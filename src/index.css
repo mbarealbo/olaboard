@@ -151,3 +151,11 @@ body { font-family: system-ui, sans-serif; background: var(--bg); }
   pointer-events: none;
 }
 
+/* ── Canvas label placeholder ───────────────────────────────────────────────── */
+[contenteditable][data-placeholder]:empty::before {
+  content: attr(data-placeholder);
+  opacity: 0.35;
+  pointer-events: none;
+  font-style: italic;
+}
+
