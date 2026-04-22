@@ -236,6 +236,9 @@ function AppInner({ userId, userEmail }) {
   const [illustrationDragPos, setIllustrationDragPos] = useState({ x: 0, y: 0 })
   const [illustrationDragSvg, setIllustrationDragSvg] = useState(null)
   const illustrationDragRef = useRef(null) // { ill } while dragging
+  const [isDragOver, setIsDragOver] = useState(false)
+  const dragCounterRef = useRef(0)
+  const imageInputRef = useRef(null)
   const [autoCreate, setAutoCreate] = useState(true)
   const [selectMode, setSelectMode] = useState(false)
   const [scrollZoom, setScrollZoom] = useState(false)
@@ -315,6 +318,27 @@ function AppInner({ userId, userEmail }) {
       throw new Error('storage_limit')
     }
     return uploadImageDB(file, userId)
+  }
+
+  async function placeImageFromFile(file, wx, wy) {
+    const { url } = await handleUploadImage(file)
+    const dims = await new Promise(resolve => {
+      const img = new Image()
+      img.onload = () => { const maxW = 400; const ratio = Math.min(1, maxW / img.naturalWidth); resolve({ w: Math.round(img.naturalWidth * ratio), h: Math.round(img.naturalHeight * ratio) }) }
+      img.onerror = () => resolve({ w: 300, h: 200 })
+      img.src = url
+    })
+    const newCard = { id: uid(), isImage: true, url, width: dims.w, height: dims.h, x: Math.round(wx - dims.w / 2), y: Math.round(wy - dims.h / 2), title: '', body: '', isFolder: false, isLabel: false, color: 'yellow' }
+    const cId = currentIdRef.current
+    setDb(prev => {
+      const cv = prev[cId]
+      if (!cv) return prev
+      return { ...prev, [cId]: { ...cv, cards: [...cv.cards, newCard] } }
+    })
+    pushCommand({
+      undo: () => setDb(prev => { const cv = prev[cId]; if (!cv) return prev; return { ...prev, [cId]: { ...cv, cards: cv.cards.filter(c => c.id !== newCard.id) } } }),
+      redo: () => setDb(prev => { const cv = prev[cId]; if (!cv) return prev; return { ...prev, [cId]: { ...cv, cards: [...cv.cards, newCard] } } }),
+    })
   }
 
   function getStoragePath(url) {
@@ -1436,6 +1460,27 @@ function AppInner({ userId, userEmail }) {
                 onClick={!dis ? () => setShowIllustrationPicker(v => !v) : undefined}
                 title={t('illustrationsToolTitle')}
               ><PenLine size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 3 }} />{t('illustrationsTool')}</button>
+              <button disabled={dis} style={{ ...activeBtn(false) }}
+                onClick={!dis ? () => imageInputRef.current?.click() : undefined}
+                title={t('imageToolTitle')}
+              >🖼 {t('imageTool')}</button>
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={async e => {
+                  const file = e.target.files?.[0]
+                  e.target.value = ''
+                  if (!file) return
+                  const r = boardRef.current?.getBoundingClientRect()
+                  const bw = r?.width ?? 800
+                  const bh = r?.height ?? 600
+                  const wx = (bw / 2 - offset.x) / scale
+                  const wy = (bh / 2 - offset.y) / scale
+                  try { await placeImageFromFile(file, wx, wy) } catch (err) { alert(err.message) }
+                }}
+              />
               <button disabled={dis} style={activeBtn(activeTool === 'group')}
                 onClick={!dis ? () => { setActiveTool(prev => prev === 'group' ? 'note' : 'group'); setSelectMode(false) } : undefined}
                 title={t('groupToolTitle')}
@@ -1941,38 +1986,51 @@ function AppInner({ userId, userEmail }) {
               style={{ flex: 1, position: 'relative', overflow: 'hidden', cursor: boardCursor, userSelect: 'none', backgroundColor: 'var(--bg)', backgroundImage: showGrid ? 'radial-gradient(circle, var(--grid-dot) 1px, transparent 1px)' : 'none', backgroundSize: `${20 * scale}px ${20 * scale}px`, backgroundPosition: `${offset.x % (20 * scale)}px ${offset.y % (20 * scale)}px` }}
               onMouseDown={e => { setSelectedConn(null); setSelectedGroup(null); onBoardMouseDown(e) }}
               onDoubleClick={onBoardDblClick}
+              onDragEnter={e => {
+                e.preventDefault()
+                if ([...e.dataTransfer.types].includes('Files')) {
+                  dragCounterRef.current += 1
+                  if (dragCounterRef.current === 1) setIsDragOver(true)
+                }
+              }}
+              onDragLeave={e => {
+                dragCounterRef.current -= 1
+                if (dragCounterRef.current <= 0) { dragCounterRef.current = 0; setIsDragOver(false) }
+              }}
               onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy' }}
               onDrop={async e => {
                 e.preventDefault()
+                dragCounterRef.current = 0
+                setIsDragOver(false)
                 const file = [...e.dataTransfer.files].find(f => f.type.startsWith('image/'))
                 if (!file) return
                 const r = boardRef.current.getBoundingClientRect()
                 const wx = (e.clientX - r.left - offset.x) / scale
                 const wy = (e.clientY - r.top - offset.y) / scale
-                try {
-                  const { url } = await handleUploadImage(file)
-                  const dims = await new Promise(resolve => {
-                    const img = new Image()
-                    img.onload = () => { const maxW = 400; const ratio = Math.min(1, maxW / img.naturalWidth); resolve({ w: Math.round(img.naturalWidth * ratio), h: Math.round(img.naturalHeight * ratio) }) }
-                    img.onerror = () => resolve({ w: 300, h: 200 })
-                    img.src = url
-                  })
-                  const newCard = { id: uid(), isImage: true, url, width: dims.w, height: dims.h, x: Math.round(wx - dims.w / 2), y: Math.round(wy - dims.h / 2), title: '', body: '', isFolder: false, isLabel: false, color: 'yellow' }
-                  const cId = currentIdRef.current
-                  setDb(prev => {
-                    const cv = prev[cId]
-                    if (!cv) return prev
-                    return { ...prev, [cId]: { ...cv, cards: [...cv.cards, newCard] } }
-                  })
-                  pushCommand({
-                    undo: () => setDb(prev => { const cv = prev[cId]; if (!cv) return prev; return { ...prev, [cId]: { ...cv, cards: cv.cards.filter(c => c.id !== newCard.id) } } }),
-                    redo: () => setDb(prev => { const cv = prev[cId]; if (!cv) return prev; return { ...prev, [cId]: { ...cv, cards: [...cv.cards, newCard] } } }),
-                  })
-                } catch (err) {
-                  alert(err.message)
-                }
+                try { await placeImageFromFile(file, wx, wy) } catch (err) { alert(err.message) }
               }}
             >
+              {/* Drop overlay */}
+              {isDragOver && (
+                <div style={{
+                  position: 'absolute', inset: 0, zIndex: 500, pointerEvents: 'none',
+                  background: 'rgba(55,138,221,0.08)',
+                  border: '3px dashed #378ADD',
+                  borderRadius: 4,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <div style={{
+                    background: 'var(--bg-panel)', borderRadius: 12,
+                    border: '2px solid #378ADD',
+                    padding: '18px 32px',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+                    boxShadow: '0 4px 24px rgba(55,138,221,0.18)',
+                  }}>
+                    <span style={{ fontSize: 36, lineHeight: 1 }}>🖼</span>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: '#378ADD' }}>{t('dropImageHere')}</span>
+                  </div>
+                </div>
+              )}
               {/* SVG overlay – arrows in screen-space */}
               <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
                 <defs>
