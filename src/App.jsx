@@ -692,7 +692,7 @@ function AppInner({ userId, userEmail }) {
     onCardMouseDown, onConnectDotMouseDown,
     onGroupTitleBarMouseDown, onGroupResizeHandleMouseDown,
     onImageResizeMouseDown,
-    onLabelMouseDown, onLabelResizeMouseDown, zoomBy,
+    onLabelMouseDown, onLabelResizeMouseDown, onLabelFontScaleMouseDown, zoomBy,
     activeAutoCreateRef, activeToolRef, multiSelectedRef,
     snapGuides, setLastLabelStyle,
   } = useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnectionFn, setActiveNoteId, view, activeTool, setActiveTool, selectMode, setMultiSelected, setSelectionRect, onGroupCreated: id => setEditingGroupId(id), pushCommand, maxCardsPerCanvas: limits.cardsPerCanvas, onLimitReached: showLimitToast, scrollZoom })
@@ -2311,6 +2311,7 @@ function AppInner({ userId, userEmail }) {
                       })
                     }}
                     onResizeMouseDown={e => onLabelResizeMouseDown(e, label)}
+                    onFontScaleMouseDown={e => onLabelFontScaleMouseDown(e, label)}
                     onConvertToPostIt={() => {
                       const cId = currentId
                       const snap = { id: label.id, x: label.x, y: label.y, text: label.text, fontSize: label.fontSize, fontFamily: label.fontFamily }

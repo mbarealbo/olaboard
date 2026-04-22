@@ -237,6 +237,18 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
             l.id === d.labelId ? { ...l, width: newWidth } : l
           )}}
         })
+      } else if (d.type === 'label-fontscale') {
+        const delta = ((e.clientX - d.startClientX) + (e.clientY - d.startClientY)) / 2 / scaleRef.current
+        const newSize = Math.max(10, Math.min(120, Math.round(d.origFontSize + delta * 0.25)))
+        d.finalFontSize = newSize
+        setDb(prev => {
+          const cId = currentIdRef.current
+          const canvas = prev[cId]
+          if (!canvas) return prev
+          return { ...prev, [cId]: { ...canvas, labels: (canvas.labels||[]).map(l =>
+            l.id === d.labelId ? { ...l, fontSize: newSize } : l
+          )}}
+        })
       } else if (d.type === 'label') {
         const r = getBoardRect()
         const o = offsetRef.current, s = scaleRef.current
@@ -464,6 +476,20 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
         const bc = d.canvasSnapshot
         if (bc) {
           const afterCanvas = { ...bc, labels: (bc.labels || []).map(l => l.id === d.labelId ? { ...l, width: d.finalWidth } : l) }
+          pushCommandRef.current({
+            undo: () => setDb(prev => ({ ...prev, [cId]: bc })),
+            redo: () => setDb(prev => ({ ...prev, [cId]: afterCanvas })),
+          })
+        }
+      }
+
+      // Label font-scale completion: push history
+      if (dragging.current?.type === 'label-fontscale' && dragging.current.finalFontSize !== undefined) {
+        const d = dragging.current
+        const cId = d.canvasId
+        const bc = d.canvasSnapshot
+        if (bc) {
+          const afterCanvas = { ...bc, labels: (bc.labels || []).map(l => l.id === d.labelId ? { ...l, fontSize: d.finalFontSize } : l) }
           pushCommandRef.current({
             undo: () => setDb(prev => ({ ...prev, [cId]: bc })),
             redo: () => setDb(prev => ({ ...prev, [cId]: afterCanvas })),
@@ -940,6 +966,12 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
     dragging.current = { type: 'label-resize', labelId: label.id, origWidth, startClientX: e.clientX, canvasId: cId, canvasSnapshot: dbRef.current[cId] }
   }
 
+  function onLabelFontScaleMouseDown(e, label) {
+    e.stopPropagation()
+    const cId = currentIdRef.current
+    dragging.current = { type: 'label-fontscale', labelId: label.id, origFontSize: label.fontSize || 16, startClientX: e.clientX, startClientY: e.clientY, canvasId: cId, canvasSnapshot: dbRef.current[cId] }
+  }
+
   const [spaceDown, setSpaceDown] = useState(false)
   useEffect(() => {
     const dn = (e) => { if (e.key === ' ' && !e.target.isContentEditable && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') setSpaceDown(true) }
@@ -966,7 +998,7 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
     onCardMouseDown, onConnectDotMouseDown,
     onGroupTitleBarMouseDown, onGroupResizeHandleMouseDown,
     onImageResizeMouseDown,
-    onLabelMouseDown, onLabelResizeMouseDown, zoomBy,
+    onLabelMouseDown, onLabelResizeMouseDown, onLabelFontScaleMouseDown, zoomBy,
     createLabel, updateLabel, setLastLabelStyle,
     activeAutoCreateRef, activeToolRef, multiSelectedRef,
     snapGuides,
