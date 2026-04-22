@@ -783,9 +783,11 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
     }
   }
 
-  function onConnectDotMouseDown(e, card, anchor) {
+  function onConnectDotMouseDown(e, card, anchor, dims) {
     e.stopPropagation(); e.preventDefault()
-    const [wx, wy] = anchorPoint(card, anchor)
+    const s = scaleRef.current
+    const worldDims = dims ? { w: dims.w / s, h: dims.h / s } : undefined
+    const [wx, wy] = anchorPoint(card, anchor, worldDims)
     const [sx, sy] = w2s(wx, wy)
     connecting.current = { fromId: card.id, fromAnchor: anchor }
     setConnectLine({ x1: sx, y1: sy, x2: sx, y2: sy })

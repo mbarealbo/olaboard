@@ -2035,7 +2035,7 @@ function AppInner({ userId, userEmail }) {
                       if (!canvas) return prev
                       return { ...prev, [cId]: { ...canvas, labels: (canvas.labels||[]).filter(l => l.id !== label.id) } }
                     })}
-                    onConnectDot={(e, anchor) => onConnectDotMouseDown(e, label, anchor)}
+                    onConnectDot={(e, anchor, dims) => onConnectDotMouseDown(e, label, anchor, dims)}
                     onFontChange={key => {
                       const cId = currentId
                       setDb(prev => {
@@ -2126,7 +2126,7 @@ function AppInner({ userId, userEmail }) {
                           if (!canvas) return prev
                           return { ...prev, [cId]: { ...canvas, cards: canvas.cards.filter(c => c.id !== card.id) } }
                         })}
-                        onConnectDot={(e, anchor) => onConnectDotMouseDown(e, labelObj, anchor)}
+                        onConnectDot={(e, anchor, dims) => onConnectDotMouseDown(e, labelObj, anchor, dims)}
                         onConvertToPostIt={() => {
                           updateCardFn(card.id, { isLabel: false })
                           pushCommand({

@@ -180,10 +180,15 @@ export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit
       )}
       {onConnectDot && (
         <>
-          <div className="connect-dot connect-dot-top"    onMouseDown={e => { e.stopPropagation(); e.preventDefault(); onConnectDot(e, 'top') }} />
-          <div className="connect-dot connect-dot-right"  onMouseDown={e => { e.stopPropagation(); e.preventDefault(); onConnectDot(e, 'right') }} />
-          <div className="connect-dot connect-dot-bottom" onMouseDown={e => { e.stopPropagation(); e.preventDefault(); onConnectDot(e, 'bottom') }} />
-          <div className="connect-dot connect-dot-left"   onMouseDown={e => { e.stopPropagation(); e.preventDefault(); onConnectDot(e, 'left') }} />
+          {['top','right','bottom','left'].map(anchor => (
+            <div key={anchor} className={`connect-dot connect-dot-${anchor}`}
+              onMouseDown={e => {
+                e.stopPropagation(); e.preventDefault()
+                const rect = e.currentTarget.closest('.canvas-label')?.getBoundingClientRect()
+                onConnectDot(e, anchor, rect ? { w: rect.width, h: rect.height } : null)
+              }}
+            />
+          ))}
         </>
       )}
       {(selected || hovered) && !editing && onResizeMouseDown && (
