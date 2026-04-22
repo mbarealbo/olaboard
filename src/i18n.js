@@ -30,6 +30,8 @@ export const translations = {
     viewList: 'Elenco',
 
     // Toolbar
+    postItTool: '✎ Post-it',
+    postItToolTitle: 'Aggiungi post-it',
     groupTool: '□ Gruppo',
     groupToolTitle: 'Disegna gruppo',
     textTool: 'T Testo',
@@ -156,6 +158,8 @@ export const translations = {
     viewList: 'List',
 
     // Toolbar
+    postItTool: '✎ Post-it',
+    postItToolTitle: 'Add post-it',
     groupTool: '□ Group',
     groupToolTitle: 'Draw group',
     textTool: 'T Text',

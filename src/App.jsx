@@ -893,14 +893,13 @@ function AppInner({ userId, userEmail }) {
       if (view !== 'canvas') return
       if (e.key === 's' || e.key === 'S') {
         if (selectMode) { setSelectMode(false); setMultiSelected([]) }
-        else { setSelectMode(true); setActiveTool('note'); setAutoCreate(false) }
+        else { setSelectMode(true); setActiveTool('note') }
       } else if (e.key === 'q' || e.key === 'Q') {
-        if (autoCreate) { setAutoCreate(false) }
-        else { setAutoCreate(true); setSelectMode(false); setActiveTool('note') }
+        setAutoCreate(v => !v)
       } else if (e.key === 'g' || e.key === 'G') {
-        setActiveTool(prev => prev === 'group' ? 'note' : 'group'); setSelectMode(false); setAutoCreate(false)
+        setActiveTool(prev => prev === 'group' ? 'note' : 'group'); setSelectMode(false)
       } else if (e.key === 't' || e.key === 'T') {
-        setActiveTool(prev => prev === 'text' ? 'note' : 'text'); setSelectMode(false); setAutoCreate(false)
+        setActiveTool(prev => prev === 'text' ? 'note' : 'text'); setSelectMode(false)
       } else if (e.key === 'i' || e.key === 'I') {
         setShowIconPicker(prev => !prev)
       }
@@ -1258,51 +1257,54 @@ function AppInner({ userId, userEmail }) {
           </div>
 
           {/* Canvas tools */}
-          {(activeColor => <>
-            <div style={{ display: 'flex', gap: 2 }}>
-              <button
-                disabled={view !== 'canvas'}
-                style={{ ...smallBtn, background: activeTool === 'group' ? activeColor : 'var(--btn-bg)', color: activeTool === 'group' ? '#fff' : 'var(--btn-text)', borderColor: activeTool === 'group' ? activeColor : 'var(--btn-border)', ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }}
-                onClick={view === 'canvas' ? () => setActiveTool(prev => prev === 'group' ? 'note' : 'group') : undefined}
-                title={t('groupToolTitle')}
-              >{t('groupTool')}</button>
-              <button
-                disabled={view !== 'canvas'}
-                style={{ ...smallBtn, background: activeTool === 'text' ? activeColor : 'var(--btn-bg)', color: activeTool === 'text' ? '#fff' : 'var(--btn-text)', borderColor: activeTool === 'text' ? activeColor : 'var(--btn-border)', ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }}
-                onClick={view === 'canvas' ? () => setActiveTool(prev => prev === 'text' ? 'note' : 'text') : undefined}
+          {(activeColor => {
+            const dis = view !== 'canvas'
+            const disStyle = dis ? { opacity: 0.4, cursor: 'not-allowed' } : {}
+            const activeBtn = (active) => ({ ...smallBtn, background: active ? activeColor : 'var(--btn-bg)', color: active ? '#fff' : 'var(--btn-text)', borderColor: active ? activeColor : 'var(--btn-border)', ...disStyle })
+            const divider = <div style={{ width: 1, height: 20, background: 'var(--border)', margin: '0 3px', alignSelf: 'center' }} />
+            return <>
+            {/* Group 1: insertion tools */}
+            <div style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+              <button disabled={dis} style={activeBtn(activeTool === 'note' && !selectMode)}
+                onClick={!dis ? () => { setActiveTool('note'); setSelectMode(false) } : undefined}
+                title={t('postItToolTitle')}
+              >{t('postItTool')}</button>
+              <button disabled={dis} style={activeBtn(activeTool === 'text')}
+                onClick={!dis ? () => { setActiveTool(prev => prev === 'text' ? 'note' : 'text'); setSelectMode(false) } : undefined}
                 title={t('textToolTitle')}
               >{t('textTool')}</button>
-              <button
-                disabled={view !== 'canvas'}
-                style={{ ...smallBtn, ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }}
-                onClick={view === 'canvas' ? () => setShowGrid(v => !v) : undefined}
-                title={t('gridToggleTitle')}
-              >{showGrid ? '⊞ Grid' : '⊟ Grid'}</button>
-              <button
-                disabled={view !== 'canvas'}
-                style={{ ...smallBtn, background: autoCreate ? activeColor : 'var(--btn-bg)', color: autoCreate ? '#fff' : 'var(--btn-text)', borderColor: autoCreate ? activeColor : 'var(--btn-border)', ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }}
-                onClick={view === 'canvas' ? () => setAutoCreate(v => !v) : undefined}
-                title={t('quickConnectTitle')}
-              ><Zap size={14} /> Quick</button>
-              <button
-                disabled={view !== 'canvas'}
-                style={{ ...smallBtn, background: selectMode ? activeColor : 'var(--btn-bg)', color: selectMode ? '#fff' : 'var(--btn-text)', borderColor: selectMode ? activeColor : 'var(--btn-border)', ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }}
-                onClick={view === 'canvas' ? () => { setSelectMode(v => !v); setActiveTool('note'); setAutoCreate(false) } : undefined}
-                title={t('selectTitle')}
-              >⬚ Select</button>
-              <button
-                disabled={view !== 'canvas'}
-                style={{ ...smallBtn, ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }}
-                onClick={view === 'canvas' ? () => setShowIconPicker(true) : undefined}
+              <button disabled={dis} style={activeBtn(showIconPicker)}
+                onClick={!dis ? () => setShowIconPicker(v => !v) : undefined}
                 title="Add icon card"
               >⬡ Icons</button>
+              <button disabled={dis} style={activeBtn(activeTool === 'group')}
+                onClick={!dis ? () => { setActiveTool(prev => prev === 'group' ? 'note' : 'group'); setSelectMode(false) } : undefined}
+                title={t('groupToolTitle')}
+              >{t('groupTool')}</button>
             </div>
+            {divider}
+            {/* Group 2: visual tools */}
+            <div style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+              <button disabled={dis} style={activeBtn(selectMode)}
+                onClick={!dis ? () => { setSelectMode(v => !v); setActiveTool('note') } : undefined}
+                title={t('selectTitle')}
+              >⬚ Select</button>
+              <button disabled={dis} style={{ ...smallBtn, ...disStyle }}
+                onClick={!dis ? () => setShowGrid(v => !v) : undefined}
+                title={t('gridToggleTitle')}
+              >{showGrid ? '⊞ Grid' : '⊟ Grid'}</button>
+              <button disabled={dis} style={activeBtn(autoCreate)}
+                onClick={!dis ? () => setAutoCreate(v => !v) : undefined}
+                title={t('quickConnectTitle')}
+              ><Zap size={14} /> Quick</button>
+            </div>
+            </>
+          })(theme === 'high-contrast' ? '#7b2fff' : 'var(--accent)')}
             <div style={{ display: 'flex', gap: 2 }}>
               <button disabled={view !== 'canvas'} style={{ ...smallBtn, ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }} onClick={view === 'canvas' ? () => zoomBy(1.2) : undefined}>+</button>
               <button disabled={view !== 'canvas'} style={{ ...smallBtn, ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }} onClick={view === 'canvas' ? () => zoomBy(0.8) : undefined}>−</button>
               <button disabled={view !== 'canvas'} style={{ ...smallBtn, ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }} onClick={view === 'canvas' ? () => centerCanvas(currentId) : undefined} title="Centra elementi"><Maximize2 size={13} /></button>
             </div>
-          </>)(theme === 'high-contrast' ? '#7b2fff' : 'var(--accent)')}
 
           <button disabled={view !== 'canvas'} style={{ ...smallBtn, ...(view !== 'canvas' ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }} onClick={view === 'canvas' ? exportMd : undefined}>↓ MD</button>
 
@@ -1795,9 +1797,18 @@ function AppInner({ userId, userEmail }) {
                     <polygon points="0 0, 10 3.5, 0 7" fill="#e53935" />
                   </marker>
                 </defs>
-                {connections.map(conn => {
-                  const isSel = selectedConn === conn.id
-                  const allLabels = [...labels, ...cards.filter(c => c.isLabel).map(c => ({ id: c.id, x: c.x, y: c.y }))]
+                {(() => {
+                  const allLabels = [
+                    ...labels,
+                    ...cards.filter(c => c.isLabel).map(c => ({ id: c.id, x: c.x, y: c.y, text: c.title || '', fontSize: 16, fontFamily: 'sans' })),
+                  ]
+                  function estimateLabelDims(entity) {
+                    const text = entity.text || ''
+                    const fontSize = entity.fontSize || 16
+                    const ratios = { mono: 0.60, hand: 0.36, serif: 0.48, sans: 0.50 }
+                    const charW = fontSize * (ratios[entity.fontFamily] || 0.50)
+                    return { w: Math.max(50, text.length * charW + 32), h: fontSize * 1.4 + 16 }
+                  }
                   function resolveEntity(id) {
                     const card = cards.find(c => c.id === id && !c.isLabel)
                     if (card) return { entity: card, isLabel: false }
@@ -1805,14 +1816,18 @@ function AppInner({ userId, userEmail }) {
                     if (lbl) return { entity: lbl, isLabel: true }
                     return null
                   }
+                  return connections.map(conn => {
+                  const isSel = selectedConn === conn.id
                   const fromRes = resolveEntity(conn.from)
                   const toRes   = resolveEntity(conn.to)
                   if (!fromRes || !toRes) return null
                   const fe = fromRes.entity, te = toRes.entity
-                  const feW = fromRes.isLabel ? 100 : (fe.isImage ? (fe.width || 200) : (fe.isIcon ? 80 : CARD_W))
-                  const feH = fromRes.isLabel ? 30  : (fe.isImage ? (fe.height || 200) : (fe.isIcon ? 80 : CARD_H_HALF * 2))
-                  const teW = toRes.isLabel   ? 100 : (te.isImage ? (te.width || 200) : (te.isIcon ? 80 : CARD_W))
-                  const teH = toRes.isLabel   ? 30  : (te.isImage ? (te.height || 200) : (te.isIcon ? 80 : CARD_H_HALF * 2))
+                  const feDims = fromRes.isLabel ? estimateLabelDims(fe) : null
+                  const feW = feDims?.w ?? (fe.isImage ? (fe.width || 200) : (fe.isIcon ? 80 : CARD_W))
+                  const feH = feDims?.h ?? (fe.isImage ? (fe.height || 200) : (fe.isIcon ? 80 : CARD_H_HALF * 2))
+                  const teDims = toRes.isLabel ? estimateLabelDims(te) : null
+                  const teW = teDims?.w ?? (te.isImage ? (te.width || 200) : (te.isIcon ? 80 : CARD_W))
+                  const teH = teDims?.h ?? (te.isImage ? (te.height || 200) : (te.isIcon ? 80 : CARD_H_HALF * 2))
                   const fCX = fe.x + feW / 2
                   const fCY = fe.y + feH / 2
                   const tCX = te.x + teW / 2
@@ -1879,7 +1894,7 @@ function AppInner({ userId, userEmail }) {
                       )}
                     </g>
                   )
-                })}
+                })})()}
                 {connectLine && (
                   <line x1={connectLine.x1} y1={connectLine.y1} x2={connectLine.x2} y2={connectLine.y2} stroke="#378ADD" strokeWidth={2} strokeDasharray="5,4" />
                 )}
@@ -2053,6 +2068,36 @@ function AppInner({ userId, userEmail }) {
                       })
                     }}
                     onResizeMouseDown={e => onLabelResizeMouseDown(e, label)}
+                    onConvertToPostIt={() => {
+                      const cId = currentId
+                      const snap = { id: label.id, x: label.x, y: label.y, text: label.text, fontSize: label.fontSize, fontFamily: label.fontFamily }
+                      const newCard = { id: label.id, x: label.x, y: label.y, title: label.text || '' }
+                      setDb(prev => {
+                        const cv = prev[cId]
+                        if (!cv) return prev
+                        return { ...prev, [cId]: { ...cv, labels: (cv.labels||[]).filter(l => l.id !== label.id), cards: [...cv.cards, newCard] } }
+                      })
+                      setSelectedLabel(null)
+                      pushCommand({
+                        undo: () => setDb(prev => { const cv = prev[cId]; if (!cv) return prev; return { ...prev, [cId]: { ...cv, cards: cv.cards.filter(c => c.id !== snap.id), labels: [...(cv.labels||[]), snap] } } }),
+                        redo: () => setDb(prev => { const cv = prev[cId]; if (!cv) return prev; return { ...prev, [cId]: { ...cv, labels: (cv.labels||[]).filter(l => l.id !== snap.id), cards: [...cv.cards, newCard] } } }),
+                      })
+                    }}
+                    onConvertToFolder={() => {
+                      const cId = currentId
+                      const snap = { id: label.id, x: label.x, y: label.y, text: label.text, fontSize: label.fontSize, fontFamily: label.fontFamily }
+                      const newCard = { id: label.id, x: label.x, y: label.y, title: label.text || '', isFolder: true }
+                      setDb(prev => {
+                        const cv = prev[cId]
+                        if (!cv) return prev
+                        return { ...prev, [cId]: { ...cv, labels: (cv.labels||[]).filter(l => l.id !== label.id), cards: [...cv.cards, newCard] } }
+                      })
+                      setSelectedLabel(null)
+                      pushCommand({
+                        undo: () => setDb(prev => { const cv = prev[cId]; if (!cv) return prev; return { ...prev, [cId]: { ...cv, cards: cv.cards.filter(c => c.id !== snap.id), labels: [...(cv.labels||[]), snap] } } }),
+                        redo: () => setDb(prev => { const cv = prev[cId]; if (!cv) return prev; return { ...prev, [cId]: { ...cv, labels: (cv.labels||[]).filter(l => l.id !== snap.id), cards: [...cv.cards, newCard] } } }),
+                      })
+                    }}
                   />
                 ))}
 
@@ -2100,7 +2145,7 @@ function AppInner({ userId, userEmail }) {
                     )
                   }
                   if (card.isLabel) {
-                    const labelObj = { id: card.id, x: card.x, y: card.y, text: card.title || '', fontSize: 16 }
+                    const labelObj = { id: card.id, x: card.x, y: card.y, text: card.title || '', fontSize: card.fontSize || 16, fontFamily: card.fontFamily || 'sans' }
                     return (
                       <CanvasLabel
                         key={card.id}
@@ -2127,6 +2172,8 @@ function AppInner({ userId, userEmail }) {
                           return { ...prev, [cId]: { ...canvas, cards: canvas.cards.filter(c => c.id !== card.id) } }
                         })}
                         onConnectDot={(e, anchor, dims) => onConnectDotMouseDown(e, labelObj, anchor, dims)}
+                        onFontChange={key => updateCardFn(card.id, { fontFamily: key })}
+                        onSizeChange={delta => updateCardFn(card.id, { fontSize: Math.max(10, Math.min(120, (card.fontSize || 16) + delta)) })}
                         onConvertToPostIt={() => {
                           updateCardFn(card.id, { isLabel: false })
                           pushCommand({
@@ -2195,6 +2242,33 @@ function AppInner({ userId, userEmail }) {
                     />
                   )
                 })}
+
+                {/* Selected post-it hint */}
+                {(() => {
+                  if (!selected || editingCardId === selected || activeNoteId === selected) return null
+                  const card = cards.find(c => c.id === selected)
+                  if (!card || card.isFolder || card.isLabel || card.isImage || card.isIcon) return null
+                  return (
+                    <div style={{
+                      position: 'absolute',
+                      left: card.x + CARD_W / 2,
+                      top: card.y + CARD_H_HALF * 2 + 8,
+                      transform: 'translateX(-50%)',
+                      pointerEvents: 'none',
+                      fontSize: 11,
+                      color: 'var(--text-muted)',
+                      background: 'var(--bg-panel)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 20,
+                      padding: '3px 10px',
+                      whiteSpace: 'nowrap',
+                      boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+                      zIndex: 5,
+                    }}>
+                      {lang === 'it' ? 'Doppio click o INVIO per scrivere una nota' : 'Double click or ENTER to write a note'}
+                    </div>
+                  )
+                })()}
               </div>
               {/* Multi-select panel */}
               {multiSelected.length > 0 && (
@@ -2304,14 +2378,22 @@ function AppInner({ userId, userEmail }) {
               {/* Empty canvas hint */}
               {cards.length === 0 && groups.length === 0 && labels.length === 0 && (
                 <div style={{
-                  position: 'absolute', top: '50%', left: '50%',
-                  transform: 'translate(-50%, -50%)',
+                  position: 'absolute', top: 20, left: 20,
                   pointerEvents: 'none', userSelect: 'none', zIndex: 10,
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  background: 'var(--bg-panel)', border: '1px solid var(--border)',
+                  borderRadius: 10, padding: '9px 14px',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
                 }}>
-                  <MousePointerClick size={28} style={{ opacity: 0.3, color: 'var(--text-muted)' }} />
-                  <span style={{ fontSize: 13, color: 'var(--text-muted)', opacity: 0.5, fontFamily: 'system-ui, sans-serif', letterSpacing: 0.1 }}>
-                    {t('emptyCanvasHint')}
+                  <MousePointerClick size={15} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                  <span style={{ fontSize: 13, color: 'var(--text)', fontFamily: 'system-ui, sans-serif' }}>
+                    {activeTool === 'text'
+                      ? (lang === 'it' ? 'Doppio click per aggiungere testo' : 'Double click to add text')
+                      : activeTool === 'group'
+                      ? (lang === 'it' ? 'Trascina per creare un gruppo' : 'Drag to create a group')
+                      : activeTool === 'icon'
+                      ? (lang === 'it' ? 'Scegli un\'icona dal pannello' : 'Choose an icon from the panel')
+                      : t('emptyCanvasHint')}
                   </span>
                 </div>
               )}

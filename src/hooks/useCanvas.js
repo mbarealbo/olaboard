@@ -325,10 +325,12 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
         const rw = Math.abs(wx - startWX)
         textDrawing.current = null
         setTextDrawPreview(null)
-        const labelId = createLabel(rx, ry, rw >= 40 ? Math.max(120, rw) : undefined)
-        setSelectedLabel(labelId)
-        setEditingLabelId(labelId)
-        setActiveTool('note')
+        if (rw >= 30) {
+          const labelId = createLabel(rx, ry, Math.max(120, rw))
+          setSelectedLabel(labelId)
+          setEditingLabelId(labelId)
+        }
+        // tool stays 'text' (sticky)
         return
       }
 
@@ -755,9 +757,15 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
   function onBoardDblClick(e) {
     if (activeTool === 'group') return
     if (e.target.closest('.postit')) return
+    if (e.target.closest('.canvas-label')) return
     const r = boardRef.current.getBoundingClientRect()
     const wx = (e.clientX - r.left - offset.x) / scale
     const wy = (e.clientY - r.top  - offset.y) / scale
+    if (activeTool === 'text') {
+      const id = createLabel(wx, wy)
+      setSelectedLabel(id); setEditingLabelId(id)
+      return
+    }
     const id = createCard(wx, wy)
     setSelected(id); setEditingCardId(id)
   }

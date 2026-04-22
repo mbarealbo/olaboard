@@ -182,6 +182,9 @@ export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit
         <>
           {['top','right','bottom','left'].map(anchor => (
             <div key={anchor} className={`connect-dot connect-dot-${anchor}`}
+              style={{ display: hovered ? 'block' : undefined }}
+              onMouseEnter={startHover}
+              onMouseLeave={endHover}
               onMouseDown={e => {
                 e.stopPropagation(); e.preventDefault()
                 const rect = e.currentTarget.closest('.canvas-label')?.getBoundingClientRect()
