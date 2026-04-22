@@ -34,6 +34,7 @@ export default function PostIt({ card, selected, onMouseDown, onClick, onDblClic
   const { t } = useLang()
   const titleRef = useRef(null)
   const [hovered, setHovered] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
   const isHC = theme === 'high-contrast'
 
   const bg = card.isFolder
@@ -47,7 +48,9 @@ export default function PostIt({ card, selected, onMouseDown, onClick, onDblClic
   function startEdit(e) {
     if (e) e.stopPropagation()
     const el = titleRef.current
+    if (el.contentEditable === 'true') return
     el.contentEditable = 'true'
+    setIsEditing(true)
     el.focus()
     const range = document.createRange()
     range.selectNodeContents(el)
@@ -63,6 +66,7 @@ export default function PostIt({ card, selected, onMouseDown, onClick, onDblClic
   function commitEdit() {
     const el = titleRef.current
     el.contentEditable = 'false'
+    setIsEditing(false)
     const title = el.textContent.trim()
     if (title !== card.title) onRename(title)
   }
@@ -102,8 +106,9 @@ export default function PostIt({ card, selected, onMouseDown, onClick, onDblClic
         ref={titleRef}
         className="postit-title"
         data-placeholder={t('untitled')}
-        style={{ color: textColor }}
-        onDoubleClick={startEdit}
+        style={{ color: textColor, fontWeight: isEditing ? 500 : 700 }}
+        onClick={startEdit}
+        onDoubleClick={e => e.stopPropagation()}
         onBlur={commitEdit}
         onKeyDown={e => {
           e.stopPropagation()

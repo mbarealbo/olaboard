@@ -21,6 +21,7 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
   const dragging = useRef(null)
   const connecting = useRef(null)
   const groupDrawing = useRef(null)
+  const spacePressed = useRef(false)
   const dbRef = useRef(db)
   const activeAutoCreateRef = useRef(false)
   const activeToolRef = useRef('note')
@@ -653,27 +654,50 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
     return () => window.removeEventListener('keydown', onKey)
   }, [selected, selectedLabel])
 
-  // ── wheel zoom ────────────────────────────────────────────────────────────
+  // ── space key → pan cursor ───────────────────────────────────────────────
+  useEffect(() => {
+    function onDown(e) {
+      if (e.key === ' ' && !e.target.isContentEditable && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+        e.preventDefault()
+        spacePressed.current = true
+      }
+    }
+    function onUp(e) { if (e.key === ' ') spacePressed.current = false }
+    window.addEventListener('keydown', onDown)
+    window.addEventListener('keyup', onUp)
+    return () => { window.removeEventListener('keydown', onDown); window.removeEventListener('keyup', onUp) }
+  }, [])
+
+  // ── wheel: pan (two-finger scroll) or zoom (pinch / ctrl+scroll) ─────────
   useEffect(() => {
     const el = boardRef.current
     if (!el) return
     function onWheel(e) {
       e.preventDefault()
-      const r = el.getBoundingClientRect()
-      const cx = e.clientX - r.left
-      const cy = e.clientY - r.top
-      const factor = e.deltaY < 0 ? 1.1 : 0.9
-      const s = scaleRef.current
-      const o = offsetRef.current
-      const next = Math.max(0.15, Math.min(4, s * factor))
-      const newOffset = {
-        x: cx - (cx - o.x) * (next / s),
-        y: cy - (cy - o.y) * (next / s),
+      if (e.ctrlKey || e.metaKey) {
+        // pinch gesture or ctrl/cmd+scroll → zoom
+        const r = el.getBoundingClientRect()
+        const cx = e.clientX - r.left
+        const cy = e.clientY - r.top
+        const factor = e.deltaY < 0 ? 1.1 : 0.9
+        const s = scaleRef.current
+        const o = offsetRef.current
+        const next = Math.max(0.15, Math.min(4, s * factor))
+        const newOffset = {
+          x: cx - (cx - o.x) * (next / s),
+          y: cy - (cy - o.y) * (next / s),
+        }
+        scaleRef.current = next
+        offsetRef.current = newOffset
+        setScale(next)
+        setOffset(newOffset)
+      } else {
+        // two-finger scroll on trackpad → pan
+        const o = offsetRef.current
+        const newOffset = { x: o.x - e.deltaX, y: o.y - e.deltaY }
+        offsetRef.current = newOffset
+        setOffset(newOffset)
       }
-      scaleRef.current = next
-      offsetRef.current = newOffset
-      setScale(next)
-      setOffset(newOffset)
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
@@ -694,8 +718,8 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
       return
     }
 
-    // Middle mouse button → pan
-    if (e.button === 1) {
+    // Space+drag or middle mouse button → pan
+    if (spacePressed.current || e.button === 1) {
       e.preventDefault()
       setIsPanning(true)
       dragging.current = { type: 'pan', sx: e.clientX, sy: e.clientY, ox: offset.x, oy: offset.y }
@@ -893,7 +917,14 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
     dragging.current = { type: 'label-resize', labelId: label.id, origFontSize: label.fontSize || 16, startClientX: e.clientX, startClientY: e.clientY }
   }
 
-  const boardCursor = isPanning ? 'grabbing' : 'crosshair'
+  const [spaceDown, setSpaceDown] = useState(false)
+  useEffect(() => {
+    const dn = (e) => { if (e.key === ' ' && !e.target.isContentEditable && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') setSpaceDown(true) }
+    const up = (e) => { if (e.key === ' ') setSpaceDown(false) }
+    window.addEventListener('keydown', dn); window.addEventListener('keyup', up)
+    return () => { window.removeEventListener('keydown', dn); window.removeEventListener('keyup', up) }
+  }, [])
+  const boardCursor = isPanning ? 'grabbing' : spaceDown ? 'grab' : 'crosshair'
 
   return {
     offset, setOffset,
