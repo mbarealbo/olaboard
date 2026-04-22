@@ -231,14 +231,14 @@ export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit
           )}
         </>
       )}
-      {(selected || hovered) && !editing && (
+      {(selected || hovered) && !editing && (onConvertToPostIt || onConvertToFolder) && (
         <div
           style={{
-            position: 'absolute', bottom: -38, left: '50%',
+            position: 'absolute', bottom: -30, left: '50%',
             transform: 'translateX(-50%)', display: 'flex', alignItems: 'center',
             gap: 2, zIndex: 9999, pointerEvents: 'all',
             background: '#fff', border: '1px solid rgba(0,0,0,0.12)',
-            borderRadius: 20, padding: '4px 8px',
+            borderRadius: 20, padding: '3px 8px',
             boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
             whiteSpace: 'nowrap',
           }}
@@ -246,33 +246,14 @@ export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit
           onMouseEnter={startHover}
           onMouseLeave={endHover}
         >
-          {LABEL_FONTS.map(f => (
-            <button
-              key={f.key}
-              onClick={e => { e.stopPropagation(); onFontChange?.(f.key) }}
-              style={{
-                fontFamily: f.family, fontSize: 11,
-                background: activeFontKey === f.key ? '#378ADD' : 'transparent',
-                color: activeFontKey === f.key ? '#fff' : '#444',
-                border: 'none', borderRadius: 10,
-                padding: '2px 7px', cursor: 'pointer',
-              }}
-            >{f.label}</button>
-          ))}
-          <div style={{ width: 1, height: 14, background: '#ddd', margin: '0 4px', flexShrink: 0 }} />
-          <button onClick={e => { e.stopPropagation(); onSizeChange?.(-4) }} style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 14, color: '#555', padding: '0 3px', lineHeight: 1 }}>−</button>
-          <span style={{ fontSize: 11, color: '#555', minWidth: 20, textAlign: 'center' }}>{fontSize}</span>
-          <button onClick={e => { e.stopPropagation(); onSizeChange?.(4) }} style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 14, color: '#555', padding: '0 3px', lineHeight: 1 }}>+</button>
-          {(onConvertToPostIt || onConvertToFolder) && (
-            <>
-              <div style={{ width: 1, height: 14, background: '#ddd', margin: '0 4px', flexShrink: 0 }} />
-              {onConvertToPostIt && (
-                <button onClick={e => { e.stopPropagation(); onConvertToPostIt() }} style={{ background: 'transparent', border: 'none', borderRadius: 10, padding: '2px 6px', fontSize: 11, cursor: 'pointer', color: '#444', whiteSpace: 'nowrap' }}>{t('convertToPostIt')}</button>
-              )}
-              {onConvertToFolder && (
-                <button onClick={e => { e.stopPropagation(); onConvertToFolder() }} style={{ background: 'transparent', border: 'none', borderRadius: 10, padding: '2px 6px', fontSize: 11, cursor: 'pointer', color: '#444' }}><Folder size={11} /></button>
-              )}
-            </>
+          {onConvertToPostIt && (
+            <button onClick={e => { e.stopPropagation(); onConvertToPostIt() }} style={{ background: 'transparent', border: 'none', borderRadius: 10, padding: '2px 6px', fontSize: 11, cursor: 'pointer', color: '#444', whiteSpace: 'nowrap' }}>{t('convertToPostIt')}</button>
+          )}
+          {onConvertToPostIt && onConvertToFolder && (
+            <div style={{ width: 1, height: 14, background: '#ddd', margin: '0 2px', flexShrink: 0 }} />
+          )}
+          {onConvertToFolder && (
+            <button onClick={e => { e.stopPropagation(); onConvertToFolder() }} style={{ background: 'transparent', border: 'none', borderRadius: 10, padding: '2px 6px', fontSize: 11, cursor: 'pointer', color: '#444' }}><Folder size={11} /></button>
           )}
         </div>
       )}
