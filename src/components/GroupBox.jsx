@@ -205,7 +205,7 @@ export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit
         <div
           title="Drag to set wrap width"
           style={{
-            position: 'absolute', top: '50%', right: 3,
+            position: 'absolute', top: '50%', right: 18,
             transform: 'translateY(-50%)',
             width: 5, height: 18, background: 'rgba(55,138,221,0.25)',
             border: '1.5px solid #378ADD', borderRadius: 3,
@@ -219,7 +219,7 @@ export function CanvasLabel({ label, selected, editing, onMouseDown, onStartEdit
         <div
           title="Drag to scale font size"
           style={{
-            position: 'absolute', bottom: 3, right: 3,
+            position: 'absolute', bottom: 16, right: 16,
             width: 9, height: 9, background: 'rgba(55,138,221,0.25)',
             border: '1.5px solid #378ADD', borderRadius: 2,
             cursor: 'se-resize', zIndex: 10,
