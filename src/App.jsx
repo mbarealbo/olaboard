@@ -265,6 +265,7 @@ function AppInner({ userId, userEmail }) {
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [deleteError, setDeleteError] = useState(null)
   const [confirmModal, setConfirmModal] = useState(null)
+  const [showShortcuts, setShowShortcuts] = useState(() => localStorage.getItem('olaboard_shortcuts') !== '0')
   const [showSearch, setShowSearch] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState([])
@@ -2590,18 +2591,31 @@ function AppInner({ userId, userEmail }) {
                   [[`${mod}Z`, lang === 'it' ? 'Annulla' : 'Undo'], [`${mod}K`, lang === 'it' ? 'Cerca' : 'Search'], ['Del', lang === 'it' ? 'Elimina' : 'Delete']],
                 ]
                 return (
-                  <div style={{ position: 'absolute', bottom: 16, right: 72, zIndex: 50, display: 'flex', gap: 5, alignItems: 'center', pointerEvents: 'none', userSelect: 'none', flexWrap: 'wrap', justifyContent: 'flex-end', maxWidth: 600 }}>
-                    {groups.map((group, gi) => (
-                      <span key={gi} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                        {gi > 0 && sep}
-                        {group.map(([key, label]) => (
-                          <span key={key} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                            <kbd style={kbdStyle}>{key}</kbd>
-                            <span style={labelStyle}>{label}</span>
+                  <div
+                    onMouseDown={e => e.stopPropagation()}
+                    onDoubleClick={e => e.stopPropagation()}
+                    style={{ position: 'absolute', bottom: 16, right: 16, zIndex: 50, display: 'flex', alignItems: 'flex-end', gap: 6, userSelect: 'none' }}
+                  >
+                    {showShortcuts && (
+                      <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end', maxWidth: 560, pointerEvents: 'none' }}>
+                        {groups.map((group, gi) => (
+                          <span key={gi} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                            {gi > 0 && sep}
+                            {group.map(([key, label]) => (
+                              <span key={key} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                                <kbd style={kbdStyle}>{key}</kbd>
+                                <span style={labelStyle}>{label}</span>
+                              </span>
+                            ))}
                           </span>
                         ))}
-                      </span>
-                    ))}
+                      </div>
+                    )}
+                    <button
+                      onClick={() => setShowShortcuts(v => { const next = !v; localStorage.setItem('olaboard_shortcuts', next ? '1' : '0'); return next })}
+                      title={showShortcuts ? (lang === 'it' ? 'Nascondi shortcut' : 'Hide shortcuts') : (lang === 'it' ? 'Mostra shortcut' : 'Show shortcuts')}
+                      style={{ fontSize: 14, lineHeight: 1, padding: '3px 6px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-panel)', color: showShortcuts ? 'var(--accent)' : 'var(--text-muted)', cursor: 'pointer', flexShrink: 0 }}
+                    >⌨</button>
                   </div>
                 )
               })()}
