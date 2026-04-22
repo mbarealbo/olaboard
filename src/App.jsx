@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useLang } from './contexts/LangContext'
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
-import { Trash2, Moon, Sun, Monitor, Zap, Folder, LogOut, Maximize2, Undo2, Redo2, User, MousePointerClick, Search, PenLine } from 'lucide-react'
+import { Trash2, Moon, Sun, Monitor, Zap, Folder, LogOut, Maximize2, Undo2, Redo2, User, MousePointerClick, Search, PenLine, ImageIcon } from 'lucide-react'
 import BlockEditor from './components/BlockEditor'
 import PostIt from './components/PostIt'
 import ImageCard from './components/ImageCard'
@@ -1442,7 +1442,7 @@ function AppInner({ userId, userEmail }) {
             const activeBtn = (active) => ({ ...smallBtn, background: active ? activeColor : 'var(--btn-bg)', color: active ? '#fff' : 'var(--btn-text)', borderColor: active ? activeColor : 'var(--btn-border)', ...disStyle })
             const divider = <div style={{ width: 1, height: 20, background: 'var(--border)', margin: '0 3px', alignSelf: 'center' }} />
             return <>
-            {/* Group 1: insertion tools */}
+            {/* Group 1: creation */}
             <div style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
               <button disabled={dis} style={activeBtn(activeTool === 'note' && !selectMode)}
                 onClick={!dis ? () => { setActiveTool('note'); setSelectMode(false) } : undefined}
@@ -1452,18 +1452,22 @@ function AppInner({ userId, userEmail }) {
                 onClick={!dis ? () => { setActiveTool(prev => prev === 'text' ? 'note' : 'text'); setSelectMode(false) } : undefined}
                 title={t('textToolTitle')}
               >{t('textTool')}</button>
+              <button disabled={dis} style={activeBtn(activeTool === 'group')}
+                onClick={!dis ? () => { setActiveTool(prev => prev === 'group' ? 'note' : 'group'); setSelectMode(false) } : undefined}
+                title={t('groupToolTitle')}
+              >{t('groupTool')}</button>
+            </div>
+            {divider}
+            {/* Group 2: media */}
+            <div style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
               <button disabled={dis} style={activeBtn(showIconPicker)}
                 onClick={!dis ? () => setShowIconPicker(v => !v) : undefined}
                 title="Add icon card"
               >⬡ Icons</button>
-              <button disabled={dis} style={activeBtn(showIllustrationPicker)}
-                onClick={!dis ? () => setShowIllustrationPicker(v => !v) : undefined}
-                title={t('illustrationsToolTitle')}
-              ><PenLine size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 3 }} />{t('illustrationsTool')}</button>
               <button disabled={dis} style={{ ...activeBtn(false) }}
                 onClick={!dis ? () => imageInputRef.current?.click() : undefined}
                 title={t('imageToolTitle')}
-              >🖼 {t('imageTool')}</button>
+              ><ImageIcon size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 3 }} />{t('imageTool')}</button>
               <input
                 ref={imageInputRef}
                 type="file"
@@ -1481,13 +1485,13 @@ function AppInner({ userId, userEmail }) {
                   try { await placeImageFromFile(file, wx, wy) } catch (err) { alert(err.message) }
                 }}
               />
-              <button disabled={dis} style={activeBtn(activeTool === 'group')}
-                onClick={!dis ? () => { setActiveTool(prev => prev === 'group' ? 'note' : 'group'); setSelectMode(false) } : undefined}
-                title={t('groupToolTitle')}
-              >{t('groupTool')}</button>
+              <button disabled={dis} style={activeBtn(showIllustrationPicker)}
+                onClick={!dis ? () => setShowIllustrationPicker(v => !v) : undefined}
+                title={t('illustrationsToolTitle')}
+              ><PenLine size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 3 }} />{t('illustrationsTool')}</button>
             </div>
             {divider}
-            {/* Group 2: visual tools */}
+            {/* Group 3: canvas tools */}
             <div style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
               <button disabled={dis} style={activeBtn(selectMode)}
                 onClick={!dis ? () => { setSelectMode(v => !v); setActiveTool('note') } : undefined}
