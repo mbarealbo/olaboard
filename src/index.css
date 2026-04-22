@@ -91,6 +91,11 @@ body { font-family: system-ui, sans-serif; background: var(--bg); }
   word-break: break-word;
   outline: none;
 }
+.postit-title:empty::before {
+  content: attr(data-placeholder);
+  opacity: 0.35;
+  pointer-events: none;
+}
 .postit-actions {
   position: absolute;
   bottom: 5px;

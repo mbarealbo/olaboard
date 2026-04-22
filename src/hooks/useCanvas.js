@@ -21,8 +21,6 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
   const dragging = useRef(null)
   const connecting = useRef(null)
   const groupDrawing = useRef(null)
-  const textDrawing = useRef(null)
-  const [textDrawPreview, setTextDrawPreview] = useState(null)
   const dbRef = useRef(db)
   const activeAutoCreateRef = useRef(false)
   const activeToolRef = useRef('note')
@@ -52,19 +50,6 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
         const wy = (e.clientY - r.top  - o.y) / s
         const { startWX, startWY } = groupDrawing.current
         setGroupDrawPreview({
-          x: Math.min(wx, startWX), y: Math.min(wy, startWY),
-          w: Math.abs(wx - startWX), h: Math.abs(wy - startWY),
-        })
-        return
-      }
-
-      if (textDrawing.current) {
-        const r = getBoardRect()
-        const o = offsetRef.current, s = scaleRef.current
-        const wx = (e.clientX - r.left - o.x) / s
-        const wy = (e.clientY - r.top  - o.y) / s
-        const { startWX, startWY } = textDrawing.current
-        setTextDrawPreview({
           x: Math.min(wx, startWX), y: Math.min(wy, startWY),
           w: Math.abs(wx - startWX), h: Math.abs(wy - startWY),
         })
@@ -315,25 +300,6 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
         return
       }
 
-      if (textDrawing.current) {
-        const r = getBoardRect()
-        const o = offsetRef.current, s = scaleRef.current
-        const wx = (e.clientX - r.left - o.x) / s
-        const wy = (e.clientY - r.top  - o.y) / s
-        const { startWX, startWY } = textDrawing.current
-        const rx = Math.min(wx, startWX), ry = Math.min(wy, startWY)
-        const rw = Math.abs(wx - startWX)
-        textDrawing.current = null
-        setTextDrawPreview(null)
-        if (rw >= 30) {
-          const labelId = createLabel(rx, ry, Math.max(120, rw))
-          setSelectedLabel(labelId)
-          setEditingLabelId(labelId)
-        }
-        // tool stays 'text' (sticky)
-        return
-      }
-
       if (connecting.current) {
         document.querySelectorAll('.connect-dot.anchor-hover').forEach(d => d.classList.remove('anchor-hover'))
         const fromId = connecting.current.fromId
@@ -369,7 +335,7 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
           const newId = uid()
           const newCard = isText
             ? { id: newId, isLabel: true, title: 'Testo libero', x: wx - 56, y: wy - 20 }
-            : { id: newId, isLabel: false, title: nextCardTitle(), x: wx - 65, y: wy - 37 }
+            : { id: newId, isLabel: false, title: '', x: wx - 65, y: wy - 37 }
           const newConn = { id: uid(), from: fromId, to: newId, fromAnchor, toAnchor, label: '' }
           const cId = currentIdRef.current
           setDb(prev => {
@@ -718,14 +684,6 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
     if (e.target.closest('.postit')) return
     if (e.target.closest('.canvas-label')) return
 
-    if (activeTool === 'text') {
-      const r = boardRef.current.getBoundingClientRect()
-      const o = offsetRef.current, s = scaleRef.current
-      const wx = (e.clientX - r.left - o.x) / s
-      const wy = (e.clientY - r.top  - o.y) / s
-      textDrawing.current = { startWX: wx, startWY: wy }
-      return
-    }
 
     if (activeTool === 'group') {
       const r = boardRef.current.getBoundingClientRect()
@@ -869,12 +827,6 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
   }
 
   // ── card creation ─────────────────────────────────────────────────────────
-  function nextCardTitle() {
-    const n = (parseInt(localStorage.getItem('olaboard_card_counter') || '0', 10) || 0) + 1
-    localStorage.setItem('olaboard_card_counter', String(n))
-    return `${t('newIdea')} #${n}`
-  }
-
   function createCard(wx, wy) {
     const cId = currentIdRef.current
     const currentCards = db[cId]?.cards || []
@@ -882,7 +834,7 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
       onLimitReached?.('cardsPerCanvas')
       return null
     }
-    const card = { id: uid(), title: nextCardTitle(), body: '', x: wx, y: wy, isFolder: false }
+    const card = { id: uid(), title: '', body: '', x: wx, y: wy, isFolder: false }
     setDb(prev => {
       const canvas = prev[cId]
       if (!canvas) return prev
@@ -962,7 +914,6 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
     onImageResizeMouseDown,
     onLabelMouseDown, onLabelResizeMouseDown, zoomBy,
     createLabel, updateLabel,
-    textDrawPreview,
     activeAutoCreateRef, activeToolRef, multiSelectedRef,
     snapGuides,
   }

@@ -63,7 +63,7 @@ export default function PostIt({ card, selected, onMouseDown, onClick, onDblClic
   function commitEdit() {
     const el = titleRef.current
     el.contentEditable = 'false'
-    const title = el.textContent.trim() || t('newIdea')
+    const title = el.textContent.trim()
     if (title !== card.title) onRename(title)
   }
 
@@ -101,6 +101,7 @@ export default function PostIt({ card, selected, onMouseDown, onClick, onDblClic
       <div
         ref={titleRef}
         className="postit-title"
+        data-placeholder={t('untitled')}
         style={{ color: textColor }}
         onDoubleClick={startEdit}
         onBlur={commitEdit}

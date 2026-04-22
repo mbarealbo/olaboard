@@ -587,12 +587,12 @@ function AppInner({ userId, userEmail }) {
     onLabelMouseDown, onLabelResizeMouseDown, zoomBy,
     activeAutoCreateRef, activeToolRef, multiSelectedRef,
     snapGuides,
-    textDrawPreview,
   } = useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnectionFn, setActiveNoteId, view, activeTool, setActiveTool, selectMode, setMultiSelected, setSelectionRect, onGroupCreated: id => setEditingGroupId(id), pushCommand, maxCardsPerCanvas: limits.cardsPerCanvas, onLimitReached: showLimitToast })
 
   useEffect(() => { activeAutoCreateRef.current = autoCreate }, [autoCreate, activeAutoCreateRef])
   useEffect(() => { activeToolRef.current = activeTool }, [activeTool, activeToolRef])
   useEffect(() => { multiSelectedRef.current = multiSelected }, [multiSelected, multiSelectedRef])
+  useEffect(() => { if (multiSelected.length > 0) setActiveNoteId(null) }, [multiSelected])
 
   // refs so drag handlers always see current offset/scale without stale closures
   const iconDragOffsetRef = useRef({ x: 0, y: 0 })
@@ -1998,16 +1998,6 @@ function AppInner({ userId, userEmail }) {
                   }} />
                 )}
 
-                {/* Text draw preview */}
-                {textDrawPreview && (
-                  <div style={{
-                    position: 'absolute',
-                    left: textDrawPreview.x, top: textDrawPreview.y,
-                    width: textDrawPreview.w, height: Math.max(textDrawPreview.h, 32),
-                    border: '2px dashed #888', background: 'rgba(0,0,0,0.03)',
-                    borderRadius: 3, pointerEvents: 'none', zIndex: 0,
-                  }} />
-                )}
 
                 {/* Labels */}
                 {labels.map(label => (

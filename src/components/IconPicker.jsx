@@ -1,9 +1,14 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { ICON_MAP, ICON_CATEGORIES, ICON_COLORS, ICON_STROKE_COLORS, ICON_SWATCH_BG } from '../lib/icons'
 
 export default function IconPicker({ onDragStart, onClose }) {
   const [query, setQuery] = useState('')
   const [activeColor, setActiveColor] = useState('blue')
+  const inputRef = useRef(null)
+  useEffect(() => {
+    const t = setTimeout(() => inputRef.current?.focus(), 80)
+    return () => clearTimeout(t)
+  }, [])
 
   const q = query.trim().toLowerCase()
   const filtered = q.length > 0
@@ -33,7 +38,7 @@ export default function IconPicker({ onDragStart, onClose }) {
         {/* Header */}
         <div style={{ padding: '12px 16px 10px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8 }}>
           <input
-            autoFocus
+            ref={inputRef}
             placeholder="Search icons…"
             value={query}
             onChange={e => setQuery(e.target.value)}
