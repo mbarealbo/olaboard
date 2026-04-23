@@ -912,7 +912,7 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
     const wy = (e.clientY - r.top  - offset.y) / scale
     if (activeTool === 'text') {
       const id = createLabel(wx, wy)
-      setSelectedLabel(id); setEditingLabelId(id)
+      setSelectedLabel(id)
       return
     }
     if (activeTool === 'shape') {
@@ -1060,7 +1060,7 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
 
   function createLabel(wx, wy, width) {
     const { fontFamily } = lastLabelStyleRef.current
-    const label = { id: uid(), x: wx - 100, y: wy - 20, text: '', fontSize: 16, fontFamily, ...(width ? { width } : {}) }
+    const label = { id: uid(), x: wx - 100, y: wy - 20, text: 'Untitled', fontSize: 16, fontFamily, ...(width ? { width } : {}) }
     const cId = currentIdRef.current
     setDb(prev => {
       const canvas = prev[cId]
