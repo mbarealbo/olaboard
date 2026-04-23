@@ -26,7 +26,15 @@
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f'{len\\(d\\)} illustrazioni nel manifest'\\); [print\\(f'  {e[\\\\\"id\\\\\"]} — viewBox: {e[\\\\\"viewBox\\\\\"]}'\\) for e in d[:3]]\")",
       "Bash(curl -s http://localhost:5174/illustrations/highlights/standing-1.svg)",
       "Bash(kill %1)",
-      "Bash(node /Users/albo/progetti/olaboard/scripts/normalize-illustrations.js)"
+      "Bash(node /Users/albo/progetti/olaboard/scripts/normalize-illustrations.js)",
+      "Bash(gh issue *)",
+      "Bash(git remote *)",
+      "Bash(supabase --version)",
+      "Bash(supabase db *)",
+      "Bash(supabase inspect *)",
+      "Bash(npm run *)",
+      "Bash(curl -s http://localhost:5174)",
+      "Bash(npx tsc *)"
     ]
   }
 }

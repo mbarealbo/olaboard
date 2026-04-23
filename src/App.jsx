@@ -1467,7 +1467,7 @@ function AppInner({ userId, userEmail }) {
                 <a href="https://olab.quest" target="_blank" rel="noopener noreferrer" style={{ color: '#378ADD', textDecoration: 'none' }}>olab.quest</a>
               </div>
               <div style={{ fontSize: 10, color: '#bbb', marginTop: 4, display: 'flex', gap: 8 }}>
-                <span>v0.8.0</span>
+                <span>v1.0.2</span>
                 <button onClick={() => window.revisitCkyConsent?.()} style={{ fontSize: 10, color: '#bbb', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}
                   onMouseEnter={e => e.currentTarget.style.color = '#378ADD'}
                   onMouseLeave={e => e.currentTarget.style.color = '#bbb'}
@@ -2881,8 +2881,8 @@ function AppInner({ userId, userEmail }) {
                 ><Redo2 size={14} /></button>
               </div>
 
-              {/* Tool hint / empty canvas hint */}
-              {!hintDismissed && (['shape','text','group','icon'].includes(activeTool) || (cards.length === 0 && groups.length === 0 && labels.length === 0 && shapes.length === 0)) && (
+              {/* Tool hint */}
+              {!hintDismissed && (
                 <div style={{
                   position: 'absolute', top: 20, left: 20,
                   pointerEvents: 'auto', userSelect: 'none', zIndex: 10,
