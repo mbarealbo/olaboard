@@ -766,6 +766,7 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
     const el = boardRef.current
     if (!el) return
     function onWheel(e) {
+      if (e.target.closest('[data-scrollable]')) return
       e.preventDefault()
       if (e.ctrlKey || e.metaKey || scrollZoom) {
         // pinch gesture or ctrl/cmd+scroll or scroll-zoom mode → zoom

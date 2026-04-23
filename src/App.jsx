@@ -2654,7 +2654,7 @@ function AppInner({ userId, userEmail }) {
                   <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>
                     {multiSelected.length === 1 ? t('selectedOne') : t('selectedMany', { n: multiSelected.length })}
                   </div>
-                  <div style={{ maxHeight: 220, overflowY: 'auto', padding: '6px 0' }}>
+                  <div data-scrollable style={{ maxHeight: 220, overflowY: 'auto', padding: '6px 0' }}>
                     {multiSelected.map(id => {
                       const card = cards.find(c => c.id === id)
                       const group = groups.find(g => g.id === id)
