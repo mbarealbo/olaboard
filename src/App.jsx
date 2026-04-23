@@ -1175,6 +1175,44 @@ function AppInner({ userId, userEmail }) {
   }
 
   // ── export markdown ───────────────────────────────────────────────────────
+  function exportNotesPdf() {
+    const canvas = db[currentId]
+    const notes = cards.filter(c => !c.isFolder)
+    if (!notes.length) return
+    let body = notes.map(c => {
+      const title = `<h2>${c.title || t('untitled')}</h2>`
+      const content = c.body
+        ? `<div>${c.body
+            .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+            .replace(/^#{3} (.+)$/gm,'<h3>$1</h3>')
+            .replace(/^#{2} (.+)$/gm,'<h4>$1</h4>')
+            .replace(/^#{1} (.+)$/gm,'<h5>$1</h5>')
+            .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+            .replace(/\*(.+?)\*/g,'<em>$1</em>')
+            .replace(/`(.+?)`/g,'<code>$1</code>')
+            .replace(/\n/g,'<br>')
+          }</div>`
+        : ''
+      return `<section>${title}${content}</section>`
+    }).join('\n')
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${canvas.name}</title>
+    <style>
+      body{font-family:system-ui,sans-serif;max-width:700px;margin:0 auto;padding:40px 24px;color:#111}
+      h1{font-size:22px;border-bottom:2px solid #eee;padding-bottom:10px;margin-bottom:28px}
+      h2{font-size:17px;margin:32px 0 6px;font-weight:700}
+      h3,h4,h5{font-size:14px;font-weight:600;margin:12px 0 4px}
+      code{background:#f3f4f6;padding:1px 4px;border-radius:3px;font-size:12px}
+      section{border-bottom:1px solid #eee;padding-bottom:20px;margin-bottom:20px}
+      section:last-child{border:none}
+      @media print{@page{margin:15mm}body{padding:0}}
+    </style></head>
+    <body><h1>${canvas.name}</h1>${body}</body></html>`
+    const w = window.open('', '_blank')
+    w.document.write(html)
+    w.document.close()
+    w.addEventListener('load', () => setTimeout(() => w.print(), 300))
+  }
+
   function exportMd() {
     const canvas = db[currentId]
     let md = `# ${canvas.name}\n\n`
@@ -1278,6 +1316,73 @@ function AppInner({ userId, userEmail }) {
     w.document.write(html)
     w.document.close()
     w.addEventListener('load', () => { setTimeout(() => w.print(), 300) })
+  }
+
+  function exportPng() {
+    const canvas = db[currentId]
+    const PAD = 60
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+    for (const c of (canvas?.cards || [])) {
+      const w = (c.isImage || c.isIllustration) ? (c.width || 200) : (c.isIcon ? 80 : 130)
+      const h = (c.isImage || c.isIllustration) ? (c.height || 200) : (c.isIcon ? 80 : 74)
+      minX = Math.min(minX, c.x); minY = Math.min(minY, c.y)
+      maxX = Math.max(maxX, c.x + w); maxY = Math.max(maxY, c.y + h)
+    }
+    for (const l of (canvas?.labels || [])) {
+      minX = Math.min(minX, l.x); minY = Math.min(minY, l.y)
+      maxX = Math.max(maxX, l.x + (l.width || 200)); maxY = Math.max(maxY, l.y + 40)
+    }
+    for (const g of (canvas?.groups || [])) {
+      minX = Math.min(minX, g.x); minY = Math.min(minY, g.y)
+      maxX = Math.max(maxX, g.x + g.width); maxY = Math.max(maxY, g.y + g.height)
+    }
+    for (const s of (canvas?.shapes || [])) {
+      minX = Math.min(minX, s.x); minY = Math.min(minY, s.y)
+      maxX = Math.max(maxX, s.x + (s.width || 160)); maxY = Math.max(maxY, s.y + (s.height || 100))
+    }
+    if (!isFinite(minX)) return
+
+    const contentW = Math.ceil(maxX - minX + PAD * 2)
+    const contentH = Math.ceil(maxY - minY + PAD * 2)
+
+    const boardEl = boardRef.current
+    const innerEl = boardEl?.querySelector('[style*="transformOrigin"]')
+    if (!innerEl) return
+    const clone = innerEl.cloneNode(true)
+    clone.querySelectorAll('.connect-dot, [title="Drag to scale font size"]').forEach(el => el.remove())
+    clone.style.transform = `translate(${PAD - minX}px, ${PAD - minY}px)`
+    clone.style.position = 'absolute'
+    clone.style.top = '0'
+    clone.style.left = '0'
+
+    const cssVars = `--text:#111;--text-muted:#888;--bg:#f8f8f8;--bg-panel:#fff;--border:#e0e0e0;--accent:#378ADD;--btn-bg:#f3f4f6;--btn-text:#333;`
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${contentW}" height="${contentH}">
+      <foreignObject width="${contentW}" height="${contentH}">
+        <div xmlns="http://www.w3.org/1999/xhtml" style="width:${contentW}px;height:${contentH}px;background:#f8f8f8;position:relative;overflow:hidden">
+          <style>:root{${cssVars}}*{box-sizing:border-box}</style>
+          ${clone.outerHTML}
+        </div>
+      </foreignObject>
+    </svg>`
+
+    const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const img = new Image()
+    img.onload = () => {
+      const c = document.createElement('canvas')
+      c.width = contentW; c.height = contentH
+      const ctx = c.getContext('2d')
+      ctx.fillStyle = '#f8f8f8'
+      ctx.fillRect(0, 0, contentW, contentH)
+      ctx.drawImage(img, 0, 0)
+      URL.revokeObjectURL(url)
+      const a = document.createElement('a')
+      a.href = c.toDataURL('image/png')
+      a.download = `${canvas.name}.png`
+      a.click()
+    }
+    img.onerror = () => URL.revokeObjectURL(url)
+    img.src = url
   }
 
   // ── list view ─────────────────────────────────────────────────────────────
@@ -1669,14 +1774,14 @@ function AppInner({ userId, userEmail }) {
                 style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, background: 'var(--bg-panel)', border: '1px solid var(--border)', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.12)', zIndex: 500, overflow: 'hidden', minWidth: 100 }}
                 onMouseLeave={() => setShowExportMenu(false)}
               >
-                <button onClick={() => { exportMd(); setShowExportMenu(false) }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 14px', fontSize: 12, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text)' }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'var(--btn-bg)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'none'}
-                >Markdown (.md)</button>
                 <button onClick={() => { exportPdf(); setShowExportMenu(false) }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 14px', fontSize: 12, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text)' }}
                   onMouseEnter={e => e.currentTarget.style.background = 'var(--btn-bg)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'none'}
                 >PDF (.pdf)</button>
+                <button onClick={() => { exportPng(); setShowExportMenu(false) }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 14px', fontSize: 12, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text)' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--btn-bg)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                >PNG (.png)</button>
               </div>
             )}
           </div>
@@ -3024,6 +3129,8 @@ function AppInner({ userId, userEmail }) {
               onColorChange={color => updateCardFn(activeNoteId, { color })}
               onToggleMode={() => setNotePanelMode(m => m === 'side' ? 'full' : 'side')}
               theme={theme}
+              onExportMd={exportMd}
+              onExportPdf={exportNotesPdf}
             />
           )}
         </div>
@@ -3052,7 +3159,7 @@ const HC_NOTE_COLOR_MAP = {
   white: '#000099', red: '#ff0000',
 }
 
-function NotePanel({ mode, noteForm, onChangeForm, onTitleChange, onBodyChange, onClose, onToggleMode, activeCard, onColorChange, theme, uploadImage }) {
+function NotePanel({ mode, noteForm, onChangeForm, onTitleChange, onBodyChange, onClose, onToggleMode, activeCard, onColorChange, theme, uploadImage, onExportMd, onExportPdf }) {
   const { t, lang } = useLang()
   const isFull = mode === 'full'
   const [titleFocused, setTitleFocused] = useState(false)
@@ -3066,6 +3173,8 @@ function NotePanel({ mode, noteForm, onChangeForm, onTitleChange, onBodyChange, 
       <div style={{ height: 44, display: 'flex', alignItems: 'center', padding: '0 16px', gap: 8, borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
         <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: 1, textTransform: 'uppercase' }}>{t('notes')}</span>
         <div style={{ flex: 1 }} />
+        {onExportMd && <button style={{ ...iconBtn, fontSize: 11, padding: '2px 6px' }} title="Markdown" onClick={onExportMd}>↓ md</button>}
+        {onExportPdf && <button style={{ ...iconBtn, fontSize: 11, padding: '2px 6px' }} title="PDF" onClick={onExportPdf}>↓ pdf</button>}
         <button style={iconBtn} title={isFull ? t('sideView') : t('fullView')} onClick={onToggleMode}>{isFull ? '⤡' : '⤢'}</button>
         <button style={iconBtn} title={t('close')} onClick={onClose}>×</button>
       </div>
