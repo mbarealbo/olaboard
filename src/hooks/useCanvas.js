@@ -1116,7 +1116,7 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
 
   // ── shape creation & update ───────────────────────────────────────────────
   function createShape(wx, wy) {
-    const shape = { id: uid(), x: Math.round(wx - 80), y: Math.round(wy - 50), width: 160, height: 100, shapeType: pendingShapeType, fillColor: 'transparent', strokeColor: '#000000', text: '', fontSize: 14, fontFamily: 'sans' }
+    const shape = { id: uid(), x: Math.round(wx - 80), y: Math.round(wy - 50), width: 160, height: 100, shapeType: pendingShapeType, fillColor: 'transparent', strokeColor: '#000000', text: 'Untitled', fontSize: 14, fontFamily: 'sans' }
     const cId = currentIdRef.current
     setDb(prev => {
       const canvas = prev[cId]
