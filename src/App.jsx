@@ -259,7 +259,7 @@ function AppInner({ userId, userEmail }) {
   })
   const [sidebarFocusId, setSidebarFocusId] = useState(null)
   const [showExportMenu, setShowExportMenu] = useState(false)
-  const [hintDismissed, setHintDismissed] = useState(() => sessionStorage.getItem('hintDismissed') === '1')
+  const [hintDismissed, setHintDismissed] = useState(false)
   const [showAccount, setShowAccount] = useState(false)
   const [showUpgrade, setShowUpgrade] = useState(false)
   const [showManagePlan, setShowManagePlan] = useState(false)
@@ -2904,7 +2904,7 @@ function AppInner({ userId, userEmail }) {
                       : t('emptyCanvasHint')}
                   </span>
                   <button
-                    onClick={() => { sessionStorage.setItem('hintDismissed', '1'); setHintDismissed(true) }}
+                    onClick={() => setHintDismissed(true)}
                     style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 0 2px', color: 'var(--text-muted)', fontSize: 16, lineHeight: 1, flexShrink: 0 }}
                   >×</button>
                 </div>
