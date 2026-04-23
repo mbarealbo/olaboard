@@ -10,6 +10,9 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
   const [groupDrawPreview, setGroupDrawPreview] = useState(null)
   const [selectedLabel, setSelectedLabel] = useState(null)
   const [editingLabelId, setEditingLabelId] = useState(null)
+  const [selectedShape, setSelectedShape] = useState(null)
+  const [editingShapeId, setEditingShapeId] = useState(null)
+  const [pendingShapeType, setPendingShapeType] = useState('rounded')
   const [selected, setSelected] = useState(null)
   const [editingCardId, setEditingCardId] = useState(null)
   const [snapGuides, setSnapGuides] = useState([])
@@ -50,7 +53,7 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
       return { w: 130, h: 74 }
     }
 
-    function snapToGuides(nx, ny, dw, dh, excludeCardId, excludeLabelId, s) {
+    function snapToGuides(nx, ny, dw, dh, excludeCardId, excludeLabelId, s, excludeShapeId) {
       const SNAP_PX = 8
       const threshold = SNAP_PX / s
       const canvas = dbRef.current[currentIdRef.current]
@@ -65,6 +68,9 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
         ...(canvas?.labels || [])
           .filter(l => l.id !== excludeLabelId)
           .map(l => ({ x: l.x, y: l.y, w: l.width || 80, h: 24 })),
+        ...(canvas?.shapes || [])
+          .filter(s => s.id !== excludeShapeId)
+          .map(s => ({ x: s.x, y: s.y, w: s.width || 160, h: s.height || 100 })),
       ]
 
       const dragRefsX = [nx, nx + dw / 2, nx + dw]
@@ -291,6 +297,39 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
             return newWidth ? { ...l, fontSize: newSize, width: newWidth } : { ...l, fontSize: newSize }
           })}}
         })
+      } else if (d.type === 'shape') {
+        const r = getBoardRect()
+        const o = offsetRef.current, s = scaleRef.current
+        const wx = (e.clientX - r.left - o.x) / s
+        const wy = (e.clientY - r.top  - o.y) / s
+        let nx = d.origX + (wx - d.startWX)
+        let ny = d.origY + (wy - d.startWY)
+        const { nx: snappedX, ny: snappedY, guides } = snapToGuides(nx, ny, d.shapeW || 160, d.shapeH || 100, null, null, s, d.shapeId)
+        nx = snappedX; ny = snappedY
+        setSnapGuides(guides)
+        d.finalX = nx; d.finalY = ny
+        setDb(prev => {
+          const cId = currentIdRef.current
+          const canvas = prev[cId]
+          if (!canvas) return prev
+          return { ...prev, [cId]: { ...canvas, shapes: (canvas.shapes||[]).map(sh => sh.id === d.shapeId ? { ...sh, x: nx, y: ny } : sh) } }
+        })
+      } else if (d.type === 'shape-resize') {
+        const r = getBoardRect()
+        const o = offsetRef.current, s = scaleRef.current
+        const wx = (e.clientX - r.left - o.x) / s
+        const wy = (e.clientY - r.top  - o.y) / s
+        const dx = wx - d.startWX
+        const dy = wy - d.startWY
+        const newW = Math.max(60, Math.round(d.origW + dx))
+        const newH = Math.max(40, Math.round(d.origH + dy))
+        d.finalW = newW; d.finalH = newH
+        setDb(prev => {
+          const cId = currentIdRef.current
+          const canvas = prev[cId]
+          if (!canvas) return prev
+          return { ...prev, [cId]: { ...canvas, shapes: (canvas.shapes||[]).map(sh => sh.id === d.shapeId ? { ...sh, width: newW, height: newH } : sh) } }
+        })
       } else if (d.type === 'label') {
         const r = getBoardRect()
         const o = offsetRef.current, s = scaleRef.current
@@ -453,6 +492,10 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
           for (const l of (canvas.labels || [])) {
             if (l.x >= rx && l.x <= rx + rw && l.y >= ry && l.y <= ry + rh) ids.push(l.id)
           }
+          for (const s of (canvas.shapes || [])) {
+            const scx = s.x + (s.width || 160) / 2, scy = s.y + (s.height || 100) / 2
+            if (scx >= rx && scx <= rx + rw && scy >= ry && scy <= ry + rh) ids.push(s.id)
+          }
           setMultiSelected(ids)
         }
         setSelectionRect(null)
@@ -541,6 +584,34 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
             if (l.id !== d.labelId) return l
             return { ...l, fontSize: d.finalFontSize, ...(d.finalWidth ? { width: d.finalWidth } : {}) }
           })}
+          pushCommandRef.current({
+            undo: () => setDb(prev => ({ ...prev, [cId]: bc })),
+            redo: () => setDb(prev => ({ ...prev, [cId]: afterCanvas })),
+          })
+        }
+      }
+
+      // Shape drag completion: push history
+      if (dragging.current?.type === 'shape' && dragging.current.finalX !== undefined) {
+        const d = dragging.current
+        if ((d.finalX !== d.origX || d.finalY !== d.origY) && d.canvasSnapshot) {
+          const cId = d.canvasId
+          const bc = d.canvasSnapshot
+          const afterCanvas = { ...bc, shapes: (bc.shapes || []).map(sh => sh.id === d.shapeId ? { ...sh, x: d.finalX, y: d.finalY } : sh) }
+          pushCommandRef.current({
+            undo: () => setDb(prev => ({ ...prev, [cId]: bc })),
+            redo: () => setDb(prev => ({ ...prev, [cId]: afterCanvas })),
+          })
+        }
+      }
+
+      // Shape resize completion: push history
+      if (dragging.current?.type === 'shape-resize' && dragging.current.finalW !== undefined) {
+        const d = dragging.current
+        if ((d.finalW !== d.origW || d.finalH !== d.origH) && d.canvasSnapshot) {
+          const cId = d.canvasId
+          const bc = d.canvasSnapshot
+          const afterCanvas = { ...bc, shapes: (bc.shapes || []).map(sh => sh.id === d.shapeId ? { ...sh, width: d.finalW, height: d.finalH } : sh) }
           pushCommandRef.current({
             undo: () => setDb(prev => ({ ...prev, [cId]: bc })),
             redo: () => setDb(prev => ({ ...prev, [cId]: afterCanvas })),
@@ -801,6 +872,8 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
   function onBoardMouseDown(e) {
     if (e.target.closest('.postit')) return
     if (e.target.closest('.canvas-label')) return
+    if (e.target.closest('.canvas-shape')) return
+    setSelectedShape(null)
 
 
     if (activeTool === 'group') {
@@ -840,6 +913,11 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
     if (activeTool === 'text') {
       const id = createLabel(wx, wy)
       setSelectedLabel(id); setEditingLabelId(id)
+      return
+    }
+    if (activeTool === 'shape') {
+      const id = createShape(wx, wy)
+      if (id) { setSelectedShape(id); setEditingShapeId(id) }
       return
     }
     const id = createCard(wx, wy)
@@ -1036,6 +1114,52 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
     dragging.current = { type: 'label-fontscale', labelId: label.id, origFontSize: label.fontSize || 16, origWidth, origHeight, startWX: wx, startWY: wy, canvasId: cId, canvasSnapshot: dbRef.current[cId] }
   }
 
+  // ── shape creation & update ───────────────────────────────────────────────
+  function createShape(wx, wy) {
+    const shape = { id: uid(), x: Math.round(wx - 80), y: Math.round(wy - 50), width: 160, height: 100, shapeType: pendingShapeType, fillColor: 'transparent', strokeColor: '#000000', text: '', fontSize: 14, fontFamily: 'sans' }
+    const cId = currentIdRef.current
+    setDb(prev => {
+      const canvas = prev[cId]
+      if (!canvas) return prev
+      return { ...prev, [cId]: { ...canvas, shapes: [...(canvas.shapes||[]), shape] } }
+    })
+    pushCommandRef.current({
+      undo: () => setDb(prev => { const cv = prev[cId]; if (!cv) return prev; return { ...prev, [cId]: { ...cv, shapes: (cv.shapes||[]).filter(s => s.id !== shape.id) } } }),
+      redo: () => setDb(prev => { const cv = prev[cId]; if (!cv) return prev; return { ...prev, [cId]: { ...cv, shapes: [...(cv.shapes||[]), shape] } } }),
+    })
+    return shape.id
+  }
+
+  function updateShape(id, changes) {
+    setDb(prev => {
+      const cId = currentIdRef.current
+      const canvas = prev[cId]
+      if (!canvas) return prev
+      return { ...prev, [cId]: { ...canvas, shapes: (canvas.shapes||[]).map(s => s.id === id ? { ...s, ...changes } : s) } }
+    })
+  }
+
+  function onShapeMouseDown(e, shape) {
+    e.stopPropagation()
+    setSelectedShape(shape.id); setSelected(null); setSelectedLabel(null); setMultiSelected([])
+    const r = boardRef.current.getBoundingClientRect()
+    const o = offsetRef.current, s = scaleRef.current
+    const wx = (e.clientX - r.left - o.x) / s
+    const wy = (e.clientY - r.top  - o.y) / s
+    const cId = currentIdRef.current
+    dragging.current = { type: 'shape', shapeId: shape.id, startWX: wx, startWY: wy, origX: shape.x, origY: shape.y, shapeW: shape.width || 160, shapeH: shape.height || 100, canvasId: cId, canvasSnapshot: dbRef.current[cId] }
+  }
+
+  function onShapeResizeMouseDown(e, shape) {
+    e.stopPropagation()
+    const r = boardRef.current.getBoundingClientRect()
+    const o = offsetRef.current, s = scaleRef.current
+    const wx = (e.clientX - r.left - o.x) / s
+    const wy = (e.clientY - r.top  - o.y) / s
+    const cId = currentIdRef.current
+    dragging.current = { type: 'shape-resize', shapeId: shape.id, startWX: wx, startWY: wy, origW: shape.width || 160, origH: shape.height || 100, canvasId: cId, canvasSnapshot: dbRef.current[cId] }
+  }
+
   const [spaceDown, setSpaceDown] = useState(false)
   useEffect(() => {
     const dn = (e) => { if (e.key === ' ' && !e.target.isContentEditable && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') setSpaceDown(true) }
@@ -1064,6 +1188,9 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
     onImageResizeMouseDown,
     onLabelMouseDown, onLabelResizeMouseDown, onLabelFontScaleMouseDown, zoomBy,
     createLabel, updateLabel, setLastLabelStyle,
+    selectedShape, setSelectedShape, editingShapeId, setEditingShapeId,
+    pendingShapeType, setPendingShapeType,
+    createShape, updateShape, onShapeMouseDown, onShapeResizeMouseDown,
     activeAutoCreateRef, activeToolRef, multiSelectedRef,
     snapGuides,
   }

@@ -172,6 +172,7 @@ export const translations = {
     addTextHint: 'Doppio click per aggiungere testo',
     drawGroupHint: 'Trascina per creare un gruppo',
     chooseIconHint: 'Scegli un\'icona dal pannello',
+    addShapeHint: 'Doppio click per creare una forma',
 
     // Shortcut labels
     kbdText: 'Testo',
@@ -358,6 +359,7 @@ export const translations = {
     addTextHint: 'Double click to add text',
     drawGroupHint: 'Drag to create a group',
     chooseIconHint: 'Choose an icon from the panel',
+    addShapeHint: 'Double click to create a shape',
 
     // Shortcut labels
     kbdText: 'Text',
@@ -544,6 +546,7 @@ export const translations = {
     addTextHint: 'Doble clic para añadir texto',
     drawGroupHint: 'Arrastra para crear un grupo',
     chooseIconHint: 'Elige un icono del panel',
+    addShapeHint: 'Doble clic para crear una forma',
 
     // Shortcut labels
     kbdText: 'Texto',
@@ -730,6 +733,7 @@ export const translations = {
     addTextHint: 'Doppelklick zum Hinzufügen von Text',
     drawGroupHint: 'Ziehen, um eine Gruppe zu erstellen',
     chooseIconHint: 'Symbol aus dem Panel auswählen',
+    addShapeHint: 'Doppelklick zum Erstellen einer Form',
 
     // Shortcut labels
     kbdText: 'Text',

@@ -13,6 +13,7 @@
 - `src/App.jsx` – App (auth gate), AppInner (stato top-level), FolderTree, LoadingOverlay, NotePanel, render SVG frecce, modali (upgrade, manage plan, delete account, confirm generico)
 - `src/hooks/useCanvas.js` – tutto lo stato canvas: offset, scale, dragging, connecting, keyboard, exitPoint
 - `src/components/PostIt.jsx` – componente PostIt con 4 connect dots cardinali, Lucide icons
+- `src/components/CanvasShape.jsx` – forme geometriche (rect/rounded/circle) con testo, color picker, resize, connect dots
 - `src/components/GroupBox.jsx` – Group (box ridimensionabile) e CanvasLabel (testo libero, link cliccabili)
 - `src/components/IllustrationNode.jsx` – nodo illustrazione SVG (fetch + cache in-memory, resize, connect dots)
 - `src/components/IllustrationPicker.jsx` – modale selezione illustrazioni con ricerca, tab per source, thumbnails lazy
@@ -46,7 +47,7 @@
 
 ### Tabelle
 - `boards` – id, user_id, name, created_at
-- `canvases` – id, board_id, parent_id, user_id, name, groups (jsonb), labels (jsonb)
+- `canvases` – id, board_id, parent_id, user_id, name, groups (jsonb), labels (jsonb), shapes (jsonb)
 - `cards` – id, canvas_id, title, body, x, y, is_folder, is_label, color, created_at
 - `connections` – id, canvas_id, from_card_id, to_card_id, label, from_anchor, to_anchor
 
@@ -66,10 +67,13 @@
 
 // Label standalone
 { id, x, y, text, fontSize, fontFamily }
+
+// Shape (forma geometrica)
+{ id, x, y, width, height, shapeType: 'rect'|'rounded'|'circle', fillColor, strokeColor, text, fontSize, fontFamily }
 ```
 
 ## Stato in AppInner
-- `db` – `{ [canvasId]: { id, name, cards, connections, groups, labels } }`
+- `db` – `{ [canvasId]: { id, name, cards, connections, groups, labels, shapes } }`
 - `boards` – `[{ id, name }]`
 - `stack` – array di canvasId (root board in [0], canvas corrente in [last])
 - `displayName` – nome human-readable del canvas corrente, settato eagerly prima della navigazione per evitare flash UUID
@@ -144,6 +148,7 @@
   - **Selezione**: bordo `2px solid #378ADD` identico alle illustrazioni
   - Connect dots nascosti se la label non ha testo
   - Pills (convert) nascoste in multi-select
+- **Forme geometriche** (`CanvasShape`): rect / rounded rect / circle, doppio click per creare, testo inline, colore fill + bordo tramite context pill, resize diagonale (SE handle), connect dots cardinali, selezionabile con singolo click; shortcut **F**; tipo forma pre-selezionabile dalla toolbar prima della creazione; fill trasparente di default
 - Gruppi: box ridimensionabili, titolo editabile, drag muove card interne
 - **Illustrazioni SVG**: nodo `isIllustration`, renderizzato da `IllustrationNode`
   - SVG serviti da `public/illustrations/` (tre pack: Open Doodles, Humaans, Open Peeps)
@@ -158,7 +163,7 @@
 - ⚡ Quick (autoCreate): drag freccia → crea card collegata; la nuova card viene auto-selezionata
 - **Snap-to-alignment guides**: guide magnetiche su tutti i tipi di elemento (post-it, immagini, icone, illustrazioni, label), usano dimensioni reali per ciascun tipo; attive sia su drag card che su drag label
 - Griglia puntini toggle
-- activeTool modale: `'note'|'text'|'group'`
+- activeTool modale: `'note'|'text'|'group'|'shape'`
 
 ### Selezione multipla
 - ⬚ Select (lasso multi-selezione) nel canvas
@@ -191,6 +196,7 @@
 - **Q** – attiva Quick mode
 - **G** – toggle tool Gruppo
 - **T** – toggle tool Testo
+- **F** – toggle tool Forme (shape)
 - **I** – apre/chiude `IllustrationPicker`
 - **Tab** – cicla canvas fratelli allo stesso livello (root: board list; annidato: folder figli del parent)
 - **↑/↓** – muove `sidebarFocusId` attraverso la lista flat degli item sidebar visibili (rispetta collapsed), wrap-around

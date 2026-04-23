@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useLang } from './contexts/LangContext'
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
-import { Trash2, Moon, Sun, Monitor, Zap, Folder, LogOut, Maximize2, Undo2, Redo2, User, MousePointerClick, Search, PenLine, ImageIcon } from 'lucide-react'
+import { Trash2, Moon, Sun, Monitor, Zap, Folder, LogOut, Maximize2, Undo2, Redo2, User, MousePointerClick, Search, PenLine, ImageIcon, Square } from 'lucide-react'
 import BlockEditor from './components/BlockEditor'
 import PostIt from './components/PostIt'
 import ImageCard from './components/ImageCard'
@@ -12,6 +12,7 @@ import IllustrationPicker from './components/IllustrationPicker'
 import { fetchIllustrationSvg } from './components/IllustrationNode'
 import { ICON_MAP, ICON_STROKE_COLORS } from './lib/icons'
 import { Group, CanvasLabel } from './components/GroupBox'
+import { CanvasShape } from './components/CanvasShape'
 import { useCanvas } from './hooks/useCanvas'
 import { useHistory } from './hooks/useHistory'
 import { CARD_W, CARD_H_HALF, uid } from './utils'
@@ -89,7 +90,7 @@ function FolderTree({ db, currentId, onNavigate, id, depth, theme, collapsedIds,
       {!isCollapsed && subFolders.map(f => {
         const fCanvas = db[f.id] || {
           id: f.id, name: f.title,
-          cards: [], connections: [], groups: [], labels: []
+          cards: [], connections: [], groups: [], labels: [], shapes: []
         }
         return (
           <FolderTree
@@ -258,6 +259,7 @@ function AppInner({ userId, userEmail }) {
   })
   const [sidebarFocusId, setSidebarFocusId] = useState(null)
   const [showExportMenu, setShowExportMenu] = useState(false)
+  const [hintDismissed, setHintDismissed] = useState(() => sessionStorage.getItem('hintDismissed') === '1')
   const [showAccount, setShowAccount] = useState(false)
   const [showUpgrade, setShowUpgrade] = useState(false)
   const [showManagePlan, setShowManagePlan] = useState(false)
@@ -504,6 +506,7 @@ function AppInner({ userId, userEmail }) {
         connections: (connectionsData || []).map(mapConn),
         groups: canvasData?.groups || [],
         labels: canvasData?.labels || [],
+        shapes: canvasData?.shapes || [],
       }
       setDb(prev => ({ ...prev, [canvasId]: loadedCanvas }))
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(confirmedName)
@@ -536,7 +539,7 @@ function AppInner({ userId, userEmail }) {
       const boardName = t('defaultBoardName')
       const board = { id: LOCAL_BOARD_ID, name: boardName }
       const savedDb = loadLocalDb()
-      const rootCanvas = savedDb?.[LOCAL_BOARD_ID] || { id: LOCAL_BOARD_ID, name: boardName, cards: [], connections: [], groups: [], labels: [] }
+      const rootCanvas = savedDb?.[LOCAL_BOARD_ID] || { id: LOCAL_BOARD_ID, name: boardName, cards: [], connections: [], groups: [], labels: [], shapes: [] }
       const fullDb = savedDb || { [LOCAL_BOARD_ID]: rootCanvas }
       setBoards([board])
       setDb(fullDb)
@@ -618,7 +621,7 @@ function AppInner({ userId, userEmail }) {
         deleteCardsByIds([...prev.cardIds].filter(id => !curCardIds.has(id))),
         upsertConnections(canvas.connections, canvasId),
         deleteConnectionsByIds([...prev.connectionIds].filter(id => !curConnIds.has(id))),
-        updateCanvasDB(canvasId, { groups: canvas.groups || [], labels: canvas.labels || [] }),
+        updateCanvasDB(canvasId, { groups: canvas.groups || [], labels: canvas.labels || [], shapes: canvas.shapes || [] }),
       ])
       syncedRef.current[canvasId] = { cardIds: curCardIds, connectionIds: curConnIds }
     } catch (err) {
@@ -640,11 +643,12 @@ function AppInner({ userId, userEmail }) {
 
   useEffect(() => { currentIdRef.current = currentId }, [currentId])
 
-  const currentCanvas = db[currentId] || { cards: [], connections: [], groups: [], labels: [] }
+  const currentCanvas = db[currentId] || { cards: [], connections: [], groups: [], labels: [], shapes: [] }
   const cards = currentCanvas.cards
   const connections = currentCanvas.connections
   const groups = currentCanvas.groups || []
   const labels = currentCanvas.labels || []
+  const shapes = currentCanvas.shapes || []
   const isSingleSelect = multiSelected.length === 0
 
   // ── stable db mutators ────────────────────────────────────────────────────
@@ -695,6 +699,9 @@ function AppInner({ userId, userEmail }) {
     onGroupTitleBarMouseDown, onGroupResizeHandleMouseDown,
     onImageResizeMouseDown,
     onLabelMouseDown, onLabelResizeMouseDown, onLabelFontScaleMouseDown, zoomBy,
+    selectedShape, setSelectedShape, editingShapeId, setEditingShapeId,
+    pendingShapeType, setPendingShapeType,
+    createShape, updateShape, onShapeMouseDown, onShapeResizeMouseDown,
     activeAutoCreateRef, activeToolRef, multiSelectedRef,
     snapGuides, setLastLabelStyle,
   } = useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnectionFn, setActiveNoteId, view, activeTool, setActiveTool, selectMode, setMultiSelected, setSelectionRect, onGroupCreated: id => setEditingGroupId(id), pushCommand, maxCardsPerCanvas: limits.cardsPerCanvas, onLimitReached: showLimitToast, scrollZoom })
@@ -722,6 +729,7 @@ function AppInner({ userId, userEmail }) {
       ...(canvas.cards || []).map(c => ({ x: c.x, y: c.y, w: (c.isImage || c.isIllustration) ? (c.width || 200) : CARD_W, h: (c.isImage || c.isIllustration) ? (c.height || 200) : CARD_H_HALF * 2 })),
       ...(canvas.groups || []).map(g => ({ x: g.x, y: g.y, w: g.width, h: g.height })),
       ...(canvas.labels || []).map(l => ({ x: l.x, y: l.y, w: 100, h: 30 })),
+      ...(canvas.shapes || []).map(s => ({ x: s.x, y: s.y, w: s.width || 160, h: s.height || 100 })),
     ]
     if (elements.length === 0) { setOffset({ x: 0, y: 0 }); setScale(1); return }
     const minX = Math.min(...elements.map(e => e.x))
@@ -744,7 +752,7 @@ function AppInner({ userId, userEmail }) {
   async function enterCanvas(id, name) {
     const resolvedName = name || boardsRef.current.find(b => b.id === id)?.name || id
     setDisplayName(resolvedName)
-    setDb(prev => prev[id] ? prev : { ...prev, [id]: { id, name: resolvedName, cards: [], connections: [], groups: [], labels: [] } })
+    setDb(prev => prev[id] ? prev : { ...prev, [id]: { id, name: resolvedName, cards: [], connections: [], groups: [], labels: [], shapes: [] } })
     setStack(prev => [...prev, id])
     setSelected(null); setActiveNoteId(null)
     if (!loadedRef.current.has(id)) {
@@ -829,7 +837,7 @@ function AppInner({ userId, userEmail }) {
       if (prev[targetId]) return prev
       return {
         ...prev,
-        [targetId]: { id: targetId, name: targetName || targetId, cards: [], connections: [], groups: [], labels: [] }
+        [targetId]: { id: targetId, name: targetName || targetId, cards: [], connections: [], groups: [], labels: [], shapes: [] }
       }
     })
 
@@ -857,6 +865,7 @@ function AppInner({ userId, userEmail }) {
     const deletedConns = canvas.connections.filter(c => ids.has(c.from) || ids.has(c.to))
     const deletedGroups = (canvas.groups || []).filter(g => ids.has(g.id))
     const deletedLabels = (canvas.labels || []).filter(l => ids.has(l.id))
+    const deletedShapes = (canvas.shapes || []).filter(s => ids.has(s.id))
     const removedConnIds = deletedConns.map(c => c.id)
     setDb(prev => {
       const cv = prev[cId]
@@ -868,6 +877,7 @@ function AppInner({ userId, userEmail }) {
           connections: cv.connections.filter(c => !ids.has(c.from) && !ids.has(c.to)),
           groups: (cv.groups || []).filter(g => !ids.has(g.id)),
           labels: (cv.labels || []).filter(l => !ids.has(l.id)),
+          shapes: (cv.shapes || []).filter(s => !ids.has(s.id)),
         }
       }
     })
@@ -877,17 +887,17 @@ function AppInner({ userId, userEmail }) {
     }
     deletedCards.filter(c => c.isImage && c.url).forEach(c => deleteImageDB(getStoragePath(c.url)).catch(console.error))
     setMultiSelected([])
-    if (deletedCards.length > 0 || deletedGroups.length > 0 || deletedLabels.length > 0 || deletedConns.length > 0) {
+    if (deletedCards.length > 0 || deletedGroups.length > 0 || deletedLabels.length > 0 || deletedShapes.length > 0 || deletedConns.length > 0) {
       pushCommand({
         undo: () => setDb(prev => {
           const cv = prev[cId]
           if (!cv) return prev
-          return { ...prev, [cId]: { ...cv, cards: [...cv.cards, ...deletedCards], connections: [...cv.connections, ...deletedConns], groups: [...(cv.groups || []), ...deletedGroups], labels: [...(cv.labels || []), ...deletedLabels] } }
+          return { ...prev, [cId]: { ...cv, cards: [...cv.cards, ...deletedCards], connections: [...cv.connections, ...deletedConns], groups: [...(cv.groups || []), ...deletedGroups], labels: [...(cv.labels || []), ...deletedLabels], shapes: [...(cv.shapes || []), ...deletedShapes] } }
         }),
         redo: () => setDb(prev => {
           const cv = prev[cId]
           if (!cv) return prev
-          return { ...prev, [cId]: { ...cv, cards: cv.cards.filter(c => !ids.has(c.id)), connections: cv.connections.filter(c => !ids.has(c.from) && !ids.has(c.to)), groups: (cv.groups || []).filter(g => !ids.has(g.id)), labels: (cv.labels || []).filter(l => !ids.has(l.id)) } }
+          return { ...prev, [cId]: { ...cv, cards: cv.cards.filter(c => !ids.has(c.id)), connections: cv.connections.filter(c => !ids.has(c.from) && !ids.has(c.to)), groups: (cv.groups || []).filter(g => !ids.has(g.id)), labels: (cv.labels || []).filter(l => !ids.has(l.id)), shapes: (cv.shapes || []).filter(s => !ids.has(s.id)) } }
         }),
       })
     }
@@ -956,11 +966,29 @@ function AppInner({ userId, userEmail }) {
             })
           }
         }
+        if (selectedShape) {
+          const cId = currentIdRef.current
+          const canvas = dbRef.current[cId]
+          const deletedShape = (canvas?.shapes || []).find(s => s.id === selectedShape)
+          const deletedConns = (canvas?.connections || []).filter(c => c.from === selectedShape || c.to === selectedShape)
+          setDb(prev => {
+            const cv = prev[cId]
+            if (!cv) return prev
+            return { ...prev, [cId]: { ...cv, shapes: (cv.shapes || []).filter(s => s.id !== selectedShape), connections: cv.connections.filter(c => c.from !== selectedShape && c.to !== selectedShape) } }
+          })
+          setSelectedShape(null)
+          if (deletedShape) {
+            pushCommand({
+              undo: () => setDb(prev => { const cv = prev[cId]; if (!cv) return prev; return { ...prev, [cId]: { ...cv, shapes: [...(cv.shapes || []), deletedShape], connections: [...cv.connections, ...deletedConns] } } }),
+              redo: () => setDb(prev => { const cv = prev[cId]; if (!cv) return prev; return { ...prev, [cId]: { ...cv, shapes: (cv.shapes || []).filter(s => s.id !== deletedShape.id), connections: cv.connections.filter(c => c.from !== deletedShape.id && c.to !== deletedShape.id) } } }),
+            })
+          }
+        }
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selected, selectedConn, selectedGroup, multiSelected]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selected, selectedConn, selectedGroup, selectedShape, multiSelected]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── tool + navigation keyboard shortcuts ─────────────────────────────────
   useEffect(() => {
@@ -996,6 +1024,7 @@ function AppInner({ userId, userEmail }) {
           ...canvas.cards.map(c => c.id),
           ...(canvas.groups || []).map(g => g.id),
           ...(canvas.labels || []).map(l => l.id),
+          ...(canvas.shapes || []).map(s => s.id),
         ]
         if (selectMode && multiSelected.length === allIds.length) {
           setMultiSelected([]); setSelectMode(false)
@@ -1022,6 +1051,8 @@ function AppInner({ userId, userEmail }) {
         imageInputRef.current?.click()
       } else if (e.key === 'd' || e.key === 'D') {
         setShowIllustrationPicker(prev => !prev)
+      } else if (e.key === 'f' || e.key === 'F') {
+        setActiveTool(prev => prev === 'shape' ? 'note' : 'shape'); setSelectMode(false)
       }
     }
     window.addEventListener('keydown', onKey)
@@ -1175,6 +1206,7 @@ function AppInner({ userId, userEmail }) {
     const allCards = canvas?.cards || []
     const allLabels = canvas?.labels || []
     const allGroups = canvas?.groups || []
+    const allShapes = canvas?.shapes || []
     for (const c of allCards) {
       const w = (c.isImage || c.isIllustration) ? (c.width || 200) : (c.isIcon ? 80 : 130)
       const h = (c.isImage || c.isIllustration) ? (c.height || 200) : (c.isIcon ? 80 : 74)
@@ -1188,6 +1220,10 @@ function AppInner({ userId, userEmail }) {
     for (const g of allGroups) {
       minX = Math.min(minX, g.x); minY = Math.min(minY, g.y)
       maxX = Math.max(maxX, g.x + g.width); maxY = Math.max(maxY, g.y + g.height)
+    }
+    for (const s of allShapes) {
+      minX = Math.min(minX, s.x); minY = Math.min(minY, s.y)
+      maxX = Math.max(maxX, s.x + (s.width || 160)); maxY = Math.max(maxY, s.y + (s.height || 100))
     }
     if (!isFinite(minX)) return
 
@@ -1259,6 +1295,13 @@ function AppInner({ userId, userEmail }) {
       type: 'label',
       createdAt: l.createdAt || null,
       _label: l,
+    })),
+    ...shapes.map(s => ({
+      id: s.id,
+      title: s.text || t('untitled'),
+      type: 'shape',
+      createdAt: null,
+      _shape: s,
     })),
   ].sort((a, b) => {
     if (listSort === 'az') return a.title.localeCompare(b.title)
@@ -1407,7 +1450,7 @@ function AppInner({ userId, userEmail }) {
                   }
                   loadedRef.current.add(id)
                   setBoards(prev => [...prev, { id, name }])
-                  setDb(prev => ({ ...prev, [id]: { id, name, cards: [], connections: [], groups: [], labels: [] } }))
+                  setDb(prev => ({ ...prev, [id]: { id, name, cards: [], connections: [], groups: [], labels: [], shapes: [] } }))
                   setDisplayName(name)
                   setStack([id]); localStorage.setItem(STACK_KEY, JSON.stringify([id])); setSelected(null); setActiveNoteId(null)
                   setOffset({ x: 0, y: 0 }); setScale(1)
@@ -1545,6 +1588,22 @@ function AppInner({ userId, userEmail }) {
             {divider}
             {/* Group 2: media */}
             <div style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+              <button disabled={dis} style={activeBtn(activeTool === 'shape')}
+                onClick={!dis ? () => { setActiveTool(prev => prev === 'shape' ? 'note' : 'shape'); setSelectMode(false) } : undefined}
+                title="Forme (F)"
+              ><Square size={11} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 3 }} />Forme</button>
+              {activeTool === 'shape' && [
+                { key: 'rect',    label: '▭' },
+                { key: 'rounded', label: '▢' },
+                { key: 'circle',  label: '○' },
+              ].map(st => (
+                <button
+                  key={st.key}
+                  style={activeBtn(pendingShapeType === st.key)}
+                  onClick={() => setPendingShapeType(st.key)}
+                  title={st.key}
+                >{st.label}</button>
+              ))}
               <button disabled={dis} style={activeBtn(showIconPicker)}
                 onClick={!dis ? () => setShowIconPicker(v => !v) : undefined}
                 title="Icons (I)"
@@ -2162,9 +2221,11 @@ function AppInner({ userId, userEmail }) {
                   }
                   function resolveEntity(id) {
                     const card = cards.find(c => c.id === id && !c.isLabel)
-                    if (card) return { entity: card, isLabel: false }
+                    if (card) return { entity: card, isLabel: false, isShape: false }
                     const lbl = allLabels.find(l => l.id === id)
-                    if (lbl) return { entity: lbl, isLabel: true }
+                    if (lbl) return { entity: lbl, isLabel: true, isShape: false }
+                    const shp = shapes.find(s => s.id === id)
+                    if (shp) return { entity: shp, isLabel: false, isShape: true }
                     return null
                   }
                   return connections.map(conn => {
@@ -2174,11 +2235,11 @@ function AppInner({ userId, userEmail }) {
                   if (!fromRes || !toRes) return null
                   const fe = fromRes.entity, te = toRes.entity
                   const feDims = fromRes.isLabel ? estimateLabelDims(fe) : null
-                  const feW = feDims?.w ?? ((fe.isImage || fe.isIllustration) ? (fe.width || 200) : (fe.isIcon ? 80 : CARD_W))
-                  const feH = feDims?.h ?? ((fe.isImage || fe.isIllustration) ? (fe.height || 200) : (fe.isIcon ? 80 : CARD_H_HALF * 2))
+                  const feW = feDims?.w ?? (fromRes.isShape ? (fe.width || 160) : ((fe.isImage || fe.isIllustration) ? (fe.width || 200) : (fe.isIcon ? 80 : CARD_W)))
+                  const feH = feDims?.h ?? (fromRes.isShape ? (fe.height || 100) : ((fe.isImage || fe.isIllustration) ? (fe.height || 200) : (fe.isIcon ? 80 : CARD_H_HALF * 2)))
                   const teDims = toRes.isLabel ? estimateLabelDims(te) : null
-                  const teW = teDims?.w ?? ((te.isImage || te.isIllustration) ? (te.width || 200) : (te.isIcon ? 80 : CARD_W))
-                  const teH = teDims?.h ?? ((te.isImage || te.isIllustration) ? (te.height || 200) : (te.isIcon ? 80 : CARD_H_HALF * 2))
+                  const teW = teDims?.w ?? (toRes.isShape ? (te.width || 160) : ((te.isImage || te.isIllustration) ? (te.width || 200) : (te.isIcon ? 80 : CARD_W)))
+                  const teH = teDims?.h ?? (toRes.isShape ? (te.height || 100) : ((te.isImage || te.isIllustration) ? (te.height || 200) : (te.isIcon ? 80 : CARD_H_HALF * 2)))
                   const fCX = fe.x + feW / 2
                   const fCY = fe.y + feH / 2
                   const tCX = te.x + teW / 2
@@ -2349,6 +2410,39 @@ function AppInner({ userId, userEmail }) {
                   }} />
                 )}
 
+
+                {/* Shapes */}
+                {shapes.map(shape => (
+                  <CanvasShape
+                    key={shape.id}
+                    shape={shape}
+                    selected={selectedShape === shape.id || multiSelected.includes(shape.id)}
+                    editing={editingShapeId === shape.id}
+                    onMouseDown={e => { onShapeMouseDown(e, shape); setSelectedShape(shape.id) }}
+                    onStartEdit={() => setEditingShapeId(shape.id)}
+                    onEndEdit={() => setEditingShapeId(null)}
+                    onTextChange={text => {
+                      const cId = currentId
+                      setDb(prev => {
+                        const cv = prev[cId]
+                        if (!cv) return prev
+                        return { ...prev, [cId]: { ...cv, shapes: (cv.shapes||[]).map(s => s.id === shape.id ? { ...s, text } : s) } }
+                      })
+                    }}
+                    onDelete={() => {
+                      const cId = currentId
+                      setDb(prev => {
+                        const cv = prev[cId]
+                        if (!cv) return prev
+                        return { ...prev, [cId]: { ...cv, shapes: (cv.shapes||[]).filter(s => s.id !== shape.id) } }
+                      })
+                    }}
+                    onConnectDot={(e, anchor, dims) => onConnectDotMouseDown(e, shape, anchor, dims)}
+                    onResizeMouseDown={e => onShapeResizeMouseDown(e, shape)}
+                    onFillColorChange={isSingleSelect ? (fillColor, strokeColor) => updateShape(shape.id, { fillColor, strokeColor }) : undefined}
+                    onShapeTypeChange={isSingleSelect ? shapeType => updateShape(shape.id, { shapeType }) : undefined}
+                  />
+                ))}
 
                 {/* Labels */}
                 {labels.map(label => (
@@ -2588,7 +2682,7 @@ function AppInner({ userId, userEmail }) {
                         if (becomingFolder) {
                           setDb(prev => prev[card.id] ? prev : {
                             ...prev,
-                            [card.id]: { id: card.id, name: card.title, cards: [], connections: [], groups: [], labels: [] },
+                            [card.id]: { id: card.id, name: card.title, cards: [], connections: [], groups: [], labels: [], shapes: [] },
                           })
                         }
                         pushCommand({
@@ -2787,19 +2881,21 @@ function AppInner({ userId, userEmail }) {
                 ><Redo2 size={14} /></button>
               </div>
 
-              {/* Empty canvas hint */}
-              {cards.length === 0 && groups.length === 0 && labels.length === 0 && (
+              {/* Tool hint / empty canvas hint */}
+              {!hintDismissed && (['shape','text','group','icon'].includes(activeTool) || (cards.length === 0 && groups.length === 0 && labels.length === 0 && shapes.length === 0)) && (
                 <div style={{
                   position: 'absolute', top: 20, left: 20,
-                  pointerEvents: 'none', userSelect: 'none', zIndex: 10,
+                  pointerEvents: 'auto', userSelect: 'none', zIndex: 10,
                   display: 'flex', alignItems: 'center', gap: 8,
                   background: 'var(--bg-panel)', border: '1px solid var(--border)',
                   borderRadius: 10, padding: '9px 14px',
                   boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
                 }}>
-                  <MousePointerClick size={15} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                  <span style={{ fontSize: 13, color: 'var(--text)', fontFamily: 'system-ui, sans-serif' }}>
-                    {activeTool === 'text'
+                  <MousePointerClick size={15} style={{ color: 'var(--text-muted)', flexShrink: 0, pointerEvents: 'none' }} />
+                  <span style={{ fontSize: 13, color: 'var(--text)', fontFamily: 'system-ui, sans-serif', pointerEvents: 'none' }}>
+                    {activeTool === 'shape'
+                      ? t('addShapeHint')
+                      : activeTool === 'text'
                       ? t('addTextHint')
                       : activeTool === 'group'
                       ? t('drawGroupHint')
@@ -2807,6 +2903,10 @@ function AppInner({ userId, userEmail }) {
                       ? t('chooseIconHint')
                       : t('emptyCanvasHint')}
                   </span>
+                  <button
+                    onClick={() => { sessionStorage.setItem('hintDismissed', '1'); setHintDismissed(true) }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 0 2px', color: 'var(--text-muted)', fontSize: 16, lineHeight: 1, flexShrink: 0 }}
+                  >×</button>
                 </div>
               )}
 
@@ -2871,8 +2971,8 @@ function AppInner({ userId, userEmail }) {
               </div>
               {listItems.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>{t('emptyCanvas')}</p>}
               {listItems.map(item => {
-                const badgeIcon = item.type === 'folder' ? <Folder size={12} /> : item.type === 'label' ? <span style={{fontSize:11}}>T</span> : <span style={{fontSize:11}}>✎</span>
-                const badgeLabel = item.type === 'folder' ? t('typeFolder') : item.type === 'label' ? t('typeLabel') : t('typeNote')
+                const badgeIcon = item.type === 'folder' ? <Folder size={12} /> : item.type === 'label' ? <span style={{fontSize:11}}>T</span> : item.type === 'shape' ? <Square size={11} /> : <span style={{fontSize:11}}>✎</span>
+                const badgeLabel = item.type === 'folder' ? t('typeFolder') : item.type === 'label' ? t('typeLabel') : item.type === 'shape' ? 'Forma' : t('typeNote')
                 const dateStr = item.createdAt
                   ? new Date(item.createdAt).toLocaleDateString(t('dateLocale'), { day: '2-digit', month: '2-digit', year: 'numeric' })
                   : '—'
