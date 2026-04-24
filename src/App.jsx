@@ -1733,6 +1733,12 @@ function AppInner({ userId, userEmail }) {
                   {plan === 'god' ? '⚡ God' : plan === 'pro' ? '★ Pro' : 'Free'}
                 </span>
               </div>
+              {plan === 'god' && (
+                <button onClick={() => { setShowAccount(false); window.location.href = '/olaops' }}
+                  style={{ fontSize: 11, fontWeight: 650, padding: '5px 10px', borderRadius: 6, border: 'none', background: '#7b2fff', color: '#fff', cursor: 'pointer' }}>
+                  Admin →
+                </button>
+              )}
               {plan === 'free' && userId !== 'local' && (
                 <button onClick={() => { setShowAccount(false); setShowUpgrade(true) }}
                   style={{ fontSize: 11, fontWeight: 650, padding: '5px 10px', borderRadius: 6, border: 'none', background: '#378ADD', color: '#fff', cursor: 'pointer' }}>
