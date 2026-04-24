@@ -337,6 +337,73 @@ function NestedCanvasMockup() {
   )
 }
 
+// ── Illustrations mockup ──────────────────────────────────────────────────────
+function IllustrationsMockup() {
+  const peeps = [
+    { src: '/illustrations/open-peeps/peep-standing-3.svg',  left: 220, bottom: 20, h: 200 },
+    { src: '/illustrations/open-peeps/peep-standing-7.svg',  left: 340, bottom: 20, h: 220, flip: true },
+    { src: '/illustrations/open-peeps/peep-standing-12.svg', left: 460, bottom: 20, h: 195 },
+    { src: '/illustrations/open-peeps/peep-standing-18.svg', left: 570, bottom: 20, h: 210, flip: true },
+    { src: '/illustrations/open-peeps/peep-standing-24.svg', left: 680, bottom: 20, h: 190 },
+  ]
+
+  return (
+    <div style={{ width: 760, height: 380, background: '#f0f0f0', backgroundImage: 'radial-gradient(circle, #bbb 1px, transparent 1px)', backgroundSize: '20px 20px', position: 'relative', overflow: 'hidden' }}>
+
+      {/* Picker panel */}
+      <div style={{ position: 'absolute', left: 16, top: 16, width: 168, background: 'rgba(255,255,255,0.97)', borderRadius: 10, border: '1px solid #e5e7eb', boxShadow: '0 4px 16px rgba(0,0,0,0.10)', overflow: 'hidden', zIndex: 2 }}>
+        <div style={{ padding: '8px 10px 6px', borderBottom: '1px solid #f0f0f0' }}>
+          <div style={{ fontSize: 8.5, fontWeight: 700, color: '#9ca3af', letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 5 }}>Illustrations</div>
+          <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+            {['Doodles','Humaans','Peeps'].map((t, i) => (
+              <div key={t} style={{ fontSize: 8, padding: '2px 6px', borderRadius: 4, background: i === 2 ? '#378ADD' : '#f3f4f6', color: i === 2 ? '#fff' : '#6b7280', fontWeight: 600 }}>{t}</div>
+            ))}
+          </div>
+          <div style={{ height: 18, background: '#f9fafb', borderRadius: 4, border: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', padding: '0 6px' }}>
+            <span style={{ fontSize: 8, color: '#ccc' }}>Search…</span>
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3, padding: 6 }}>
+          {[1,2,3,4,5,6,7,8].map(n => (
+            <div key={n} style={{ aspectRatio: '1', borderRadius: 5, background: '#fafafa', border: `1px solid ${n === 3 ? '#378ADD' : '#f0f0f0'}`, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <img src={`/illustrations/open-peeps/peep-standing-${n}.svg`} style={{ height: '80%', width: 'auto', display: 'block' }} alt="" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Placed peep figures on canvas */}
+      {peeps.map((p, i) => (
+        <img
+          key={i}
+          src={p.src}
+          style={{
+            position: 'absolute',
+            left: p.left,
+            bottom: p.bottom,
+            height: p.h,
+            width: 'auto',
+            transform: p.flip ? 'scaleX(-1)' : undefined,
+            filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.12))',
+          }}
+          alt=""
+        />
+      ))}
+
+      {/* Shapes strip bottom-left */}
+      <div style={{ position: 'absolute', left: 16, bottom: 20, display: 'flex', gap: 10, alignItems: 'center', zIndex: 2 }}>
+        <div style={{ width: 64, height: 38, borderRadius: 8, border: '2px solid #378ADD', background: 'rgba(55,138,221,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: '#378ADD', fontWeight: 600 }}>Strategy</div>
+        <svg width="20" height="10"><defs><marker id="sm" markerWidth="6" markerHeight="5" refX="6" refY="2.5" orient="auto"><polygon points="0 0,6 2.5,0 5" fill="#aaa" /></marker></defs><line x1="2" y1="5" x2="16" y2="5" stroke="#aaa" strokeWidth="1.5" markerEnd="url(#sm)" /></svg>
+        <div style={{ width: 44, height: 44, borderRadius: '50%', border: '2px solid #EF9F27', background: 'rgba(239,159,39,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: '#EF9F27', fontWeight: 600 }}>Goals</div>
+        <svg width="20" height="10"><defs><marker id="sm2" markerWidth="6" markerHeight="5" refX="6" refY="2.5" orient="auto"><polygon points="0 0,6 2.5,0 5" fill="#aaa" /></marker></defs><line x1="2" y1="5" x2="16" y2="5" stroke="#aaa" strokeWidth="1.5" markerEnd="url(#sm2)" /></svg>
+        <div style={{ width: 60, height: 36, borderRadius: 4, border: '2px solid #b8e986', background: 'rgba(184,233,134,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: '#5a8c2a', fontWeight: 600 }}>Output</div>
+      </div>
+
+      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 60, background: 'linear-gradient(transparent, rgba(240,240,240,0.96))' }} />
+    </div>
+  )
+}
+
 // ── Feature card ──────────────────────────────────────────────────────────────
 function FeatureCard({ icon, title, body, delay, isMobile }) {
   return (
@@ -512,6 +579,44 @@ export default function LandingPage() {
                 <p style={{ fontSize: 13.5, color: '#777', lineHeight: 1.7 }}>
                   Convert any post-it into a folder with one click. Double-click to step inside — each folder is its own canvas. Nest your thinking as deep as you need.
                 </p>
+              </FadeIn>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Illustrations & Shapes ──────────────────────────────────────── */}
+      <section style={{ padding: `${isMobile ? '72px' : '100px'} ${px}` }}>
+        <div style={{ maxWidth: 920, margin: '0 auto' }}>
+          <div style={{ display: 'flex', gap: isTablet ? 40 : 72, alignItems: 'center', flexDirection: isTablet ? 'column' : 'row' }}>
+            <FadeIn delay={0} style={{ flex: 1, minWidth: 0 }}>
+              <ScaledMockup naturalW={760} naturalH={380}>
+                <IllustrationsMockup />
+              </ScaledMockup>
+            </FadeIn>
+            <div style={{ flex: '0 0 auto', width: isTablet ? '100%' : 290 }}>
+              <FadeIn>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#378ADD', letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 14 }}>Illustrations & Shapes</div>
+                <h2 style={{ fontSize: isMobile ? 26 : 'clamp(24px, 2.8vw, 36px)', fontWeight: 750, letterSpacing: '-1px', lineHeight: 1.15, marginBottom: 18 }}>
+                  Make it yours.
+                </h2>
+                <p style={{ fontSize: 13.5, color: '#777', lineHeight: 1.7, marginBottom: 24 }}>
+                  Drop illustrated characters from three curated packs — Open Doodles, Humaans, Open Peeps — directly onto your canvas. Add shapes, connect them with arrows, and turn any canvas into a visual story.
+                </p>
+              </FadeIn>
+              <FadeIn delay={80}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
+                  {[
+                    ['🎨', '300+ illustrations across 3 packs, searchable by keyword'],
+                    ['▭', 'Shapes: rect, rounded rect, circle — with fill, border and inline text'],
+                    ['↗', 'Everything connects — shapes, illustrations, cards and labels all accept arrows'],
+                  ].map(([icon, text]) => (
+                    <div key={text} style={{ display: 'flex', gap: 11, alignItems: 'flex-start' }}>
+                      <span style={{ fontSize: 14, lineHeight: 1, marginTop: 1, flexShrink: 0 }}>{icon}</span>
+                      <span style={{ fontSize: 13, color: '#555', lineHeight: 1.55 }}>{text}</span>
+                    </div>
+                  ))}
+                </div>
               </FadeIn>
             </div>
           </div>
