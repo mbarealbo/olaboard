@@ -43,15 +43,16 @@ Sync across devices via Supabase. Sign in with **email and password** or **Googl
 |---|---|---|---|
 | **Price** | Free forever | €6/month or €45/year | Free forever |
 | **Boards** | 3 | Unlimited | Unlimited |
-| **Cards per canvas** | 150 | Unlimited | Unlimited |
-| **Total canvases** | 30 | Unlimited | Unlimited |
+| **Cards per canvas** | 30 | Unlimited | Unlimited |
+| **Total canvases** | 10 | Unlimited | Unlimited |
+| **Connections per canvas** | 15 | Unlimited | Unlimited |
 | **Storage** | 20 MB | 100 MB | Your own Supabase |
 | **Notes** | Unlimited | Unlimited | Unlimited |
 | **Sync across devices** | ✓ | ✓ | ✓ |
 
 **Demo mode** (`/app`) is always free and unlimited — no account needed, data stored locally in the browser.
 
-**Self-hosting is always free.** Clone the repo, connect your own Supabase project, and all limits are gone. The code is MIT — do whatever you want with it.
+**Self-hosting is always free and fully unlimited.** When you run Olaboard on your own infrastructure, plan limits and Stripe don't exist — there is no concept of free/pro in your install. The code is MIT — do whatever you want with it.
 
 Upgrade to Pro on [olab.quest](https://olab.quest) to support development and get unlimited everything on the hosted version.
 
@@ -190,26 +191,73 @@ Follow progress on [GitHub](https://github.com/mbarealbo/olaboard) or at [olab.q
 
 ---
 
-## Getting Started
+## Self-Hosting
+
+Olaboard is designed to be self-hosted. When you run your own instance, all plan limits disappear — there is no free/pro distinction, no Stripe, no upgrade prompts. You get the full product.
+
+### Quick start
 
 ```bash
 git clone https://github.com/mbarealbo/olaboard.git
 cd olaboard
 npm install
+cp .env.example .env
 ```
 
-Create a `.env` file with your Supabase credentials:
+Edit `.env` with your own values:
 
-```
+```env
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key
+VITE_SELF_HOSTED=true
 ```
 
 ```bash
 npm run dev
 ```
 
-Open `http://localhost:5173` — landing at `/landing`, demo canvas at `/app`.
+Open `http://localhost:5173`.
+
+### What `VITE_SELF_HOSTED=true` does
+
+- All users get unlimited boards, canvases, cards, connections, and storage
+- No plan badges, no upgrade modals, no limit toasts appear anywhere in the UI
+- The Stripe environment variables are not required and can be left empty
+- The `plan` field in the `profiles` table is ignored
+
+### Database setup
+
+1. Create a new project on [supabase.com](https://supabase.com)
+2. Run the migrations in `supabase/migrations/` in order (the filenames are timestamped)
+3. Enable **Email** auth (and optionally Google OAuth) in the Supabase dashboard under Authentication → Providers
+4. Create a storage bucket named `images` with **private** access
+5. Add the bucket's RLS policy to allow authenticated users to read/write their own folder:
+   ```sql
+   -- Read own images
+   create policy "Users read own images" on storage.objects
+     for select to authenticated
+     using ((storage.foldername(name))[1] = (select auth.uid()::text));
+
+   -- Upload own images
+   create policy "Users upload own images" on storage.objects
+     for insert to authenticated
+     with check ((storage.foldername(name))[1] = (select auth.uid()::text));
+
+   -- Delete own images
+   create policy "Users delete own images" on storage.objects
+     for delete to authenticated
+     using ((storage.foldername(name))[1] = (select auth.uid()::text));
+   ```
+
+### Deploying
+
+The app is a standard Vite SPA — deploy anywhere that serves static files:
+
+- **Netlify**: connect the repo, set env vars in the dashboard, build command `npm run build`, publish directory `dist`
+- **Vercel**: same — set env vars, Vercel detects Vite automatically
+- **Self-hosted server**: `npm run build` → serve the `dist/` folder with any static file server (nginx, Caddy, etc.)
+
+Make sure `VITE_SELF_HOSTED=true` is set in your build environment, not just locally.
 
 ---
 

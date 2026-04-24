@@ -1,20 +1,23 @@
 export const LIMITS = {
   free: {
     boards: 3,
-    cardsPerCanvas: 150,
-    totalCanvases: 30,
+    cardsPerCanvas: 30,
+    totalCanvases: 10,
+    connectionsPerCanvas: 15,
     storageMB: 20,
   },
   pro: {
     boards: Infinity,
     cardsPerCanvas: Infinity,
     totalCanvases: Infinity,
+    connectionsPerCanvas: Infinity,
     storageMB: 100,
   },
   god: {
     boards: Infinity,
     cardsPerCanvas: Infinity,
     totalCanvases: Infinity,
+    connectionsPerCanvas: Infinity,
     storageMB: Infinity,
   },
 }

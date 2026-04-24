@@ -20,6 +20,7 @@ import { CARD_W, CARD_H_HALF, uid } from './utils'
 import { supabase } from './lib/supabase'
 import AuthPage from './components/AuthPage'
 import AdminPage from './components/AdminPage'
+import SettingsPage from './components/SettingsPage'
 import OlaboardLogo from './components/OlaboardLogo'
 import LandingPage from './components/LandingPage'
 import PricingPage from './components/PricingPage'
@@ -28,6 +29,7 @@ import TermsPage from './components/TermsPage'
 import MobileBlock from './components/MobileBlock'
 import { PlanProvider, usePlan } from './contexts/PlanContext'
 import { countTotalCanvases } from './lib/plans'
+import { IS_SELF_HOSTED } from './lib/env'
 import {
   fetchBoards as fetchBoardsDB,
   searchCards,
@@ -204,16 +206,30 @@ function AppInner({ userId, userEmail }) {
   const { plan, limits } = usePlan()
   const navigate = useNavigate()
   const [limitToast, setLimitToast] = useState(null)
+  const [softWarning, setSoftWarning] = useState(null)
+  const warnedLimitsRef = useRef(new Set())
 
   function showLimitToast(type) {
     const msgs = {
-      boards:         plan === 'free' ? `Limite raggiunto: max ${limits.boards} lavagne nel piano free.`         : 'Limite raggiunto.',
-      cardsPerCanvas: plan === 'free' ? `Limite raggiunto: max ${limits.cardsPerCanvas} elementi per canvas.`   : 'Limite raggiunto.',
-      totalCanvases:  plan === 'free' ? `Limite raggiunto: max ${limits.totalCanvases} canvas totali nel piano free.` : 'Limite raggiunto.',
-      storage:        plan === 'free' ? `Limite storage: max ${limits.storageMB} MB nel piano free.`            : 'Limite raggiunto.',
+      boards:               plan === 'free' ? `Limite raggiunto: max ${limits.boards} lavagne nel piano free.`              : 'Limite raggiunto.',
+      cardsPerCanvas:       plan === 'free' ? `Limite raggiunto: max ${limits.cardsPerCanvas} elementi per canvas.`         : 'Limite raggiunto.',
+      totalCanvases:        plan === 'free' ? `Limite raggiunto: max ${limits.totalCanvases} canvas totali nel piano free.` : 'Limite raggiunto.',
+      connections:          plan === 'free' ? `Limite raggiunto: max ${limits.connectionsPerCanvas} connessioni per canvas.`: 'Limite raggiunto.',
+      storage:              plan === 'free' ? `Limite storage: max ${limits.storageMB} MB nel piano free.`                  : 'Limite raggiunto.',
     }
     setLimitToast(msgs[type] || 'Limite del piano raggiunto.')
     setTimeout(() => setLimitToast(null), 4000)
+  }
+
+  function showSoftWarning(type) {
+    if (warnedLimitsRef.current.has(type)) return
+    warnedLimitsRef.current.add(type)
+    const msgs = {
+      cardsPerCanvas: `Quasi al limite: stai usando l'80% delle carte disponibili. Passa a Pro per carte illimitate.`,
+      connections:    `Quasi al limite connessioni. Passa a Pro per connessioni illimitate.`,
+    }
+    setSoftWarning(msgs[type] || 'Stai avvicinandoti al limite del piano free.')
+    setTimeout(() => setSoftWarning(null), 6000)
   }
 
   const [db, setDb] = useState({})
@@ -264,6 +280,7 @@ function AppInner({ userId, userEmail }) {
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [hintDismissed, setHintDismissed] = useState(false)
   const [showAccount, setShowAccount] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
   const [showUpgrade, setShowUpgrade] = useState(false)
   const [showManagePlan, setShowManagePlan] = useState(false)
   const [showDeleteAccount, setShowDeleteAccount] = useState(false)
@@ -357,9 +374,13 @@ function AppInner({ userId, userEmail }) {
   function placeIconCard(iconName, iconColor, x, y) {
     const cId = currentIdRef.current
     const currentCards = db[cId]?.cards || []
-    if (currentCards.filter(c => !c.isLabel).length >= limits.cardsPerCanvas) {
+    const nonLabelCount = currentCards.filter(c => !c.isLabel).length
+    if (nonLabelCount >= limits.cardsPerCanvas) {
       showLimitToast('cardsPerCanvas')
       return
+    }
+    if (limits.cardsPerCanvas !== Infinity && nonLabelCount >= Math.floor(limits.cardsPerCanvas * 0.8)) {
+      showSoftWarning('cardsPerCanvas')
     }
     const newCard = { id: uid(), nodeType: 'icon', isIcon: true, body: iconName, title: '', color: iconColor, x, y, isFolder: false, isLabel: false, isImage: false, url: null, width: 80, height: 80 }
     setDb(prev => {
@@ -412,9 +433,13 @@ function AppInner({ userId, userEmail }) {
   function placeIllustration(ill, x, y) {
     const cId = currentIdRef.current
     const currentCards = db[cId]?.cards || []
-    if (currentCards.filter(c => !c.isLabel).length >= limits.cardsPerCanvas) {
+    const nonLabelCount = currentCards.filter(c => !c.isLabel).length
+    if (nonLabelCount >= limits.cardsPerCanvas) {
       showLimitToast('cardsPerCanvas')
       return
+    }
+    if (limits.cardsPerCanvas !== Infinity && nonLabelCount >= Math.floor(limits.cardsPerCanvas * 0.8)) {
+      showSoftWarning('cardsPerCanvas')
     }
     // Compute height from viewBox aspect ratio
     const vbParts = (ill.viewBox || '0 0 200 200').trim().split(/\s+/)
@@ -709,7 +734,7 @@ function AppInner({ userId, userEmail }) {
     createShape, updateShape, onShapeMouseDown, onShapeResizeMouseDown,
     activeAutoCreateRef, activeToolRef, multiSelectedRef,
     snapGuides, setLastLabelStyle,
-  } = useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnectionFn, setActiveNoteId, view, activeTool, setActiveTool, selectMode, setMultiSelected, setSelectionRect, onGroupCreated: id => setEditingGroupId(id), pushCommand, maxCardsPerCanvas: limits.cardsPerCanvas, onLimitReached: showLimitToast, scrollZoom })
+  } = useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnectionFn, setActiveNoteId, view, activeTool, setActiveTool, selectMode, setMultiSelected, setSelectionRect, onGroupCreated: id => setEditingGroupId(id), pushCommand, maxCardsPerCanvas: limits.cardsPerCanvas, maxConnectionsPerCanvas: limits.connectionsPerCanvas, onLimitReached: showLimitToast, onNearLimit: showSoftWarning, scrollZoom })
 
   useEffect(() => { activeAutoCreateRef.current = autoCreate }, [autoCreate, activeAutoCreateRef])
   useEffect(() => { activeToolRef.current = activeTool }, [activeTool, activeToolRef])
@@ -1333,8 +1358,15 @@ function AppInner({ userId, userEmail }) {
         </div>
       )}
 
-      {limitToast && (
-        <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 9999, background: '#1a1a1a', color: '#fff', padding: '10px 20px', borderRadius: 10, fontSize: 13, fontWeight: 500, boxShadow: '0 4px 20px rgba(0,0,0,0.25)', display: 'flex', alignItems: 'center', gap: 12, whiteSpace: 'nowrap' }}>
+      {!IS_SELF_HOSTED && softWarning && (
+        <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 9998, background: '#fffbeb', color: '#92400e', border: '1px solid #fcd34d', padding: '10px 16px', borderRadius: 10, fontSize: 13, fontWeight: 500, boxShadow: '0 4px 20px rgba(0,0,0,0.12)', display: 'flex', alignItems: 'center', gap: 10, maxWidth: 420 }}>
+          <span>⚠️ {softWarning}</span>
+          <button onClick={() => setSoftWarning(null)} style={{ background: 'none', border: 'none', color: '#b45309', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 0, flexShrink: 0 }}>×</button>
+        </div>
+      )}
+
+      {!IS_SELF_HOSTED && limitToast && (
+        <div style={{ position: 'fixed', bottom: softWarning ? 80 : 24, left: '50%', transform: 'translateX(-50%)', zIndex: 9999, background: '#1a1a1a', color: '#fff', padding: '10px 20px', borderRadius: 10, fontSize: 13, fontWeight: 500, boxShadow: '0 4px 20px rgba(0,0,0,0.25)', display: 'flex', alignItems: 'center', gap: 12, whiteSpace: 'nowrap' }}>
           <span>🔒 {limitToast}</span>
           <button onClick={() => setLimitToast(null)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 0 }}>×</button>
         </div>
@@ -1689,111 +1721,41 @@ function AppInner({ userId, userEmail }) {
             )}
           </div>
 
-          {/* Account button */}
+          {/* Account / Settings button */}
           <button
             style={{ ...iconBtn, position: 'relative' }}
-            title="Account"
-            onClick={async () => {
-              setShowAccount(v => {
-                if (!v && userId !== 'local') getUserStorageUsed(userId).then(setStorageUsed).catch(() => {})
-                return !v
-              })
+            title="Impostazioni"
+            onClick={() => {
+              if (userId !== 'local') getUserStorageUsed(userId).then(setStorageUsed).catch(() => {})
+              setShowSettings(true)
             }}
           ><User size={16} /></button>
         </div>
 
-        {/* Account panel */}
-        {showAccount && (
-          <div
-            onMouseDown={e => e.stopPropagation()}
-            style={{
-              position: 'fixed', top: 52, right: 12, zIndex: 9999,
-              width: 260, background: 'var(--bg-panel)', border: '1px solid var(--border)',
-              borderRadius: 10, boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-              padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12,
-              fontFamily: 'system-ui, sans-serif',
-            }}
-          >
-            {/* Close on outside click */}
-            <div
-              style={{ position: 'fixed', inset: 0, zIndex: -1 }}
-              onClick={() => setShowAccount(false)}
-            />
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: 0.5, textTransform: 'uppercase' }}>{t('account')}</div>
-            <div style={{ fontSize: 13, color: 'var(--text)', wordBreak: 'break-all' }}>{userEmail}</div>
-
-            {/* Plan section */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)' }}>
-              <div>
-                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: 0.5, textTransform: 'uppercase', marginRight: 8 }}>Piano</span>
-                <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
-                  background: plan === 'god' ? '#7b2fff' : plan === 'pro' ? '#378ADD' : 'var(--border)',
-                  color: plan === 'free' ? 'var(--text-muted)' : '#fff',
-                }}>
-                  {plan === 'god' ? '⚡ God' : plan === 'pro' ? '★ Pro' : 'Free'}
-                </span>
-              </div>
-              {plan === 'god' && (
-                <button onClick={() => { setShowAccount(false); window.location.href = '/olaops' }}
-                  style={{ fontSize: 11, fontWeight: 650, padding: '5px 10px', borderRadius: 6, border: 'none', background: '#7b2fff', color: '#fff', cursor: 'pointer' }}>
-                  Admin →
-                </button>
-              )}
-              {plan === 'free' && userId !== 'local' && (
-                <button onClick={() => { setShowAccount(false); setShowUpgrade(true) }}
-                  style={{ fontSize: 11, fontWeight: 650, padding: '5px 10px', borderRadius: 6, border: 'none', background: '#378ADD', color: '#fff', cursor: 'pointer' }}>
-                  Upgrade →
-                </button>
-              )}
-              {plan === 'pro' && userId !== 'local' && (
-                <button onClick={() => { setShowAccount(false); setShowManagePlan(true) }}
-                  style={{ fontSize: 11, padding: '4px 9px', borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                  Gestisci →
-                </button>
-              )}
-            </div>
-
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>
-                <span>{t('storage')}</span>
-                <span>{storageUsed !== null ? `${(storageUsed / 1024 / 1024).toFixed(1)} MB / ${limits.storageMB === Infinity ? '∞' : limits.storageMB + ' MB'}` : '…'}</span>
-              </div>
-              <div style={{ height: 6, borderRadius: 3, background: 'var(--border)', overflow: 'hidden' }}>
-                <div style={{
-                  height: '100%', borderRadius: 3,
-                  background: storageUsed > (limits.storageMB * 0.9) * 1024 * 1024 ? '#e53935' : 'var(--accent)',
-                  width: storageUsed !== null && limits.storageMB !== Infinity ? `${Math.min(100, (storageUsed / (limits.storageMB * 1024 * 1024)) * 100).toFixed(1)}%` : storageUsed !== null ? '5%' : '0%',
-                  transition: 'width 0.4s ease',
-                }} />
-              </div>
-            </div>
-            <p style={{ fontSize: 10, color: 'var(--text-muted)', lineHeight: 1.5, marginTop: -4 }}>{t('illustrationsAttribution')}</p>
-
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 6 }}>{t('lang')}</div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {[['it','Italiano'],['en','English'],['es','Español'],['de','Deutsch']].map(([code, label]) => (
-                  <button key={code} onClick={() => setLang(code)} style={{ fontSize: 12, padding: '3px 10px', borderRadius: 4, border: '1px solid var(--border)', background: lang === code ? 'var(--accent)' : 'var(--btn-bg)', color: lang === code ? '#fff' : 'var(--btn-text)', cursor: 'pointer', fontFamily: 'inherit' }}>{label}</button>
-                ))}
-              </div>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <button
-                onClick={() => supabase.auth.signOut()}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 0', fontSize: 13, border: 'none', background: 'none', cursor: 'pointer', color: '#e53935', fontFamily: 'inherit' }}
-              ><LogOut size={13} /> {t('signOut')}</button>
-              <button
-                onClick={() => { setShowAccount(false); setDeleteConfirmText(''); setDeleteError(null); setShowDeleteAccount(true) }}
-                style={{ fontSize: 11, color: '#bbb', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: '4px 0' }}
-                onMouseEnter={e => e.currentTarget.style.color = '#e53935'}
-                onMouseLeave={e => e.currentTarget.style.color = '#bbb'}
-              >{t('deleteAccountLink')}</button>
-            </div>
-          </div>
+        {/* Settings fullscreen */}
+        {showSettings && (
+          <SettingsPage
+            userEmail={userEmail}
+            plan={plan}
+            limits={limits}
+            boardCount={boards.length}
+            totalCanvasCount={countTotalCanvases(boards, db)}
+            currentCardCount={currentCanvas.cards.filter(c => !c.isLabel).length}
+            currentConnectionCount={connections.length}
+            storageUsed={storageUsed}
+            lang={lang}
+            setLang={setLang}
+            userId={userId}
+            onClose={() => setShowSettings(false)}
+            onUpgrade={() => { setShowSettings(false); setShowUpgrade(true) }}
+            onManagePlan={() => { setShowSettings(false); setShowManagePlan(true) }}
+            onDeleteAccount={() => { setShowSettings(false); setDeleteConfirmText(''); setDeleteError(null); setShowDeleteAccount(true) }}
+            onAdmin={() => { setShowSettings(false); window.location.href = '/olaops' }}
+          />
         )}
 
         {/* Upgrade modal */}
-        {showManagePlan && (
+        {!IS_SELF_HOSTED && showManagePlan && (
           <div onMouseDown={() => setShowManagePlan(false)} style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
             <div onMouseDown={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 20, padding: '32px 28px 28px', width: '100%', maxWidth: 420, boxShadow: '0 24px 64px rgba(0,0,0,0.18)', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif', color: '#0a0a0a' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
@@ -2062,7 +2024,7 @@ function AppInner({ userId, userEmail }) {
           </div>
         )}
 
-        {showUpgrade && (
+        {!IS_SELF_HOSTED && showUpgrade && (
           <div onMouseDown={() => setShowUpgrade(false)} style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
             <div onMouseDown={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 20, padding: '32px 28px 28px', width: '100%', maxWidth: 560, boxShadow: '0 24px 64px rgba(0,0,0,0.18)', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif', color: '#0a0a0a' }}>
 

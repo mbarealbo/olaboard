@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { uid, anchorPoint } from '../utils'
 import { useLang } from '../contexts/LangContext'
 
-export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnectionFn, setActiveNoteId, view, activeTool, setActiveTool, selectMode, setMultiSelected, setSelectionRect, onGroupCreated, pushCommand, maxCardsPerCanvas = Infinity, onLimitReached, scrollZoom = false }) {
+export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnectionFn, setActiveNoteId, view, activeTool, setActiveTool, selectMode, setMultiSelected, setSelectionRect, onGroupCreated, pushCommand, maxCardsPerCanvas = Infinity, maxConnectionsPerCanvas = Infinity, onLimitReached, onNearLimit, scrollZoom = false }) {
   const { t } = useLang()
   const [offset, setOffset] = useState({ x: 0, y: 0 })
   const [scale, setScale] = useState(1)
@@ -405,8 +405,18 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
         const toId = connecting.current.toCardId
         const toAnchor = connecting.current.toAnchor || 'left'
         if (toId) {
-          const newConn = { id: uid(), from: fromId, to: toId, fromAnchor, toAnchor, label: '' }
           const cId = currentIdRef.current
+          const currentConns = dbRef.current[cId]?.connections?.length || 0
+          if (maxConnectionsPerCanvas !== Infinity && currentConns >= maxConnectionsPerCanvas) {
+            onLimitReached?.('connections')
+            connecting.current = null
+            setConnectLine(null)
+            return
+          }
+          if (maxConnectionsPerCanvas !== Infinity && currentConns >= Math.floor(maxConnectionsPerCanvas * 0.8)) {
+            onNearLimit?.('connections')
+          }
+          const newConn = { id: uid(), from: fromId, to: toId, fromAnchor, toAnchor, label: '' }
           setDb(prev => {
             const canvas = prev[cId]
             if (!canvas) return prev
@@ -1030,9 +1040,13 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
   function createCard(wx, wy) {
     const cId = currentIdRef.current
     const currentCards = db[cId]?.cards || []
-    if (currentCards.filter(c => !c.isLabel).length >= maxCardsPerCanvas) {
+    const nonLabelCount = currentCards.filter(c => !c.isLabel).length
+    if (nonLabelCount >= maxCardsPerCanvas) {
       onLimitReached?.('cardsPerCanvas')
       return null
+    }
+    if (maxCardsPerCanvas !== Infinity && nonLabelCount >= Math.floor(maxCardsPerCanvas * 0.8)) {
+      onNearLimit?.('cardsPerCanvas')
     }
     const card = { id: uid(), title: '', body: '', x: wx, y: wy, isFolder: false }
     setDb(prev => {
