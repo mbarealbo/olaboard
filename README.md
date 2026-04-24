@@ -20,6 +20,23 @@ Sync across devices via Supabase. Sign in with **email and password** or **Googl
 
 ---
 
+## Privacy
+
+**Your board content is yours. We don't read it, index it, or use it.**
+
+- **Board content is zero-knowledge at the application level.** Row-Level Security (RLS) in Supabase ensures that every database query can only access data belonging to the authenticated user. No query in the application can read another user's boards, cards, connections, or notes — not even as an admin operation.
+- **No analytics SDK, no tracking pixels, no third-party telemetry.** The app makes no calls to analytics services. There is no Google Analytics, no Mixpanel, no Amplitude, no session recording.
+- **The only metadata we collect** is the minimum needed to run a subscription service:
+  - Your email address (from auth)
+  - Your subscription plan (`free` or `pro`)
+  - Timestamp of account creation
+  - Timestamp of last login (tracked by Supabase Auth natively)
+  - Timestamp of last app open (`last_active_at`) — updated silently on login, used only to understand if the product is being used, never tied to any content
+- **Self-hosting eliminates even that.** Clone the repo, connect your own Supabase project, and we have zero access to anything. You own the infrastructure completely.
+- **GDPR compliant.** Privacy Policy and Terms at [olaboard.netlify.app/privacy](https://olaboard.netlify.app/privacy) — available in Italian and English.
+
+---
+
 ## Pricing
 
 | | Free | Pro | Self-hosted |
@@ -48,6 +65,11 @@ Upgrade to Pro on [olab.quest](https://olab.quest) to support development and ge
 - **Snap-to-alignment guides** — magnetic guide lines appear while dragging, snapping to edges and centers of other cards
 - **Post-it notes** with markdown body preview, custom colors, and rich notes
   - **Context toolbar** on selection: instant color picker, no extra click needed
+- **Geometric shapes** — rect, rounded rect, and circle with inline text
+  - Pre-select the shape type from the toolbar before creating
+  - Fill color + border color via context pill; transparent fill by default
+  - Resize with SE handle; connect with arrows; single-click to select
+  - Press **F** to activate the shapes tool
 - **Illustrations** — insert SVG characters from Open Doodles, Humaans, and Open Peeps packs
   - Searchable picker with tabs per pack, lazy-loaded thumbnails
   - Click to insert at canvas center, or drag directly to position
@@ -65,6 +87,7 @@ Upgrade to Pro on [olab.quest](https://olab.quest) to support development and ge
 - Trackpad two-finger scroll pans the canvas; pinch / Ctrl+scroll zooms; Space+drag also pans
 - Middle mouse to pan (grabbing cursor); left click on empty canvas for immediate lasso + deselect
 - Dot grid background (toggleable)
+- **Tool hint** — always-visible guide showing what to do with the active tool; dismissible per session
 
 ### Undo / Redo
 - Full history (Ctrl+Z / Ctrl+Shift+Z) for all canvas operations
@@ -76,7 +99,11 @@ Upgrade to Pro on [olab.quest](https://olab.quest) to support development and ge
 - Block types: paragraph, H1/H2/H3, bullet list, numbered list, quote, code, image
 - Auto-save on every keystroke — no save button
 - Creation date and last-modified date below the title
-- Text fully selectable by mouse drag in read mode
+- **Export from panel**: save the current note as Markdown (`.md`) or PDF directly from the note header
+
+### Export
+- **From notes panel**: `↓ md` downloads the current note as a Markdown file; `↓ pdf` opens a print-ready version of the current note
+- **From canvas toolbar**: `PDF` exports a visual snapshot of the full canvas (DOM clone, print dialog); `PNG` captures the visible canvas as a high-res image
 
 ### Storage
 - Drag & drop images directly onto the canvas (Supabase Storage)
@@ -89,7 +116,6 @@ Upgrade to Pro on [olab.quest](https://olab.quest) to support development and ge
 - **Collapsible sidebar tree** — state persisted across sessions
 - **Breadcrumb** navigation anchored to canvas bottom-left
 - **List view** — all elements with type badge, creation date, and bulk-select
-- **Export** — Markdown (`.md`) or graphic PDF (visual snapshot of the canvas, browser print-to-PDF)
 
 ### Languages
 - Italian, English, Spanish, German
@@ -107,7 +133,8 @@ Upgrade to Pro on [olab.quest](https://olab.quest) to support development and ge
 | `N` | Create new post-it at canvas center |
 | `T` | Text label tool |
 | `G` | Group draw tool |
-| `I` | Open / close Icon Picker |
+| `F` | Geometric shapes tool |
+| `I` | Open / close Illustration Picker |
 | `P` | Upload image from computer |
 | `D` | Open / close Illustration Picker (Draw) |
 | `S` | Lasso select mode |
@@ -156,8 +183,9 @@ Follow progress on [GitHub](https://github.com/mbarealbo/olaboard) or at [olab.q
 - **Supabase** — auth (email + password, Google OAuth) + Postgres + Storage + Edge Functions
 - **Stripe** — subscription payments
 - **Resend** — transactional email
-- Pure CSS + inline styles (no Tailwind)
-- No canvas libraries — all SVG + DOM
+- **html-to-image** — canvas PNG export
+- Pure CSS + inline styles (no Tailwind in app)
+- No canvas drawing libraries — all SVG + DOM
 - Lucide React for icons
 
 ---
@@ -193,6 +221,13 @@ Open `http://localhost:5173` — landing at `/landing`, demo canvas at `/app`.
 ---
 
 ## Changelog
+
+### 1.0.2
+- **Geometric shapes tool** — rect, rounded rect, circle with inline text, color picker, resize, connect dots; press **F**; type pre-selectable from toolbar; transparent fill by default
+- **Export redesigned** — notes panel gets dedicated Markdown and PDF export for the current note; canvas toolbar exports visual PDF and PNG (via `html-to-image`)
+- **Tool hint** — always-visible contextual hint showing what to do with the active tool; dismissible per session, resets on page reload
+- **User activity tracking** — `last_active_at` timestamp on profiles, updated silently on login; zero content access (see Privacy section)
+- Text labels and shapes now default to "Untitled" so they are immediately draggable without double-clicking first
 
 ### 1.1.0
 - **Spanish and German** language support (4 languages total: IT, EN, ES, DE) — auto-detected from browser locale, all UI strings fully translated
@@ -256,6 +291,8 @@ Open `http://localhost:5173` — landing at `/landing`, demo canvas at `/app`.
 Olaboard is built for people who think visually but also need depth. A post-it on a canvas is just the surface — behind each one is a full document editor. Folders are nested canvases. Arrows are relationships. Everything is connected.
 
 The goal is a tool that stays out of your way until you need it, and gets out of the way again when you don't.
+
+Privacy is not a feature — it's a constraint. The product is designed so that we couldn't read your boards even if we wanted to.
 
 ---
 

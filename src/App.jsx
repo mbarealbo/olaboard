@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { toPng } from 'html-to-image'
 import { useLang } from './contexts/LangContext'
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { Trash2, Moon, Sun, Monitor, Zap, Folder, LogOut, Maximize2, Undo2, Redo2, User, MousePointerClick, Search, PenLine, ImageIcon, Square } from 'lucide-react'
@@ -549,6 +550,8 @@ function AppInner({ userId, userEmail }) {
       setLoading(false)
       return
     }
+    supabase.from('profiles').update({ last_active_at: new Date().toISOString() }).eq('id', userId).then(() => {})
+
     ;(async () => {
       try {
         let boardsData = await fetchBoardsDB(userId)
@@ -1175,150 +1178,42 @@ function AppInner({ userId, userEmail }) {
   }
 
   // ── export markdown ───────────────────────────────────────────────────────
-  function exportNotesPdf() {
-    const canvas = db[currentId]
-    const notes = cards.filter(c => !c.isFolder)
-    if (!notes.length) return
-    let body = notes.map(c => {
-      const title = `<h2>${c.title || t('untitled')}</h2>`
-      const content = c.body
-        ? `<div>${c.body
-            .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-            .replace(/^#{3} (.+)$/gm,'<h3>$1</h3>')
-            .replace(/^#{2} (.+)$/gm,'<h4>$1</h4>')
-            .replace(/^#{1} (.+)$/gm,'<h5>$1</h5>')
-            .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
-            .replace(/\*(.+?)\*/g,'<em>$1</em>')
-            .replace(/`(.+?)`/g,'<code>$1</code>')
-            .replace(/\n/g,'<br>')
-          }</div>`
-        : ''
-      return `<section>${title}${content}</section>`
-    }).join('\n')
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${canvas.name}</title>
-    <style>
-      body{font-family:system-ui,sans-serif;max-width:700px;margin:0 auto;padding:40px 24px;color:#111}
-      h1{font-size:22px;border-bottom:2px solid #eee;padding-bottom:10px;margin-bottom:28px}
-      h2{font-size:17px;margin:32px 0 6px;font-weight:700}
-      h3,h4,h5{font-size:14px;font-weight:600;margin:12px 0 4px}
-      code{background:#f3f4f6;padding:1px 4px;border-radius:3px;font-size:12px}
-      section{border-bottom:1px solid #eee;padding-bottom:20px;margin-bottom:20px}
-      section:last-child{border:none}
-      @media print{@page{margin:15mm}body{padding:0}}
-    </style></head>
-    <body><h1>${canvas.name}</h1>${body}</body></html>`
-    const w = window.open('', '_blank')
-    w.document.write(html)
-    w.document.close()
-    w.addEventListener('load', () => setTimeout(() => w.print(), 300))
-  }
-
-  function exportMd() {
-    const canvas = db[currentId]
-    let md = `# ${canvas.name}\n\n`
-    cards.filter(c => !c.isFolder).forEach(c => {
-      md += `### ${c.title || t('untitled')}\n\n`
-      if (c.body) md += `${c.body}\n\n`
-    })
-    if (connections.length) {
-      md += `## ${t('connections')}\n\n`
-      connections.forEach(cn => {
-        const from = cards.find(c => c.id === cn.from)
-        const to = cards.find(c => c.id === cn.to)
-        md += `- **${from?.title || '?'}** → **${to?.title || '?'}**${cn.label ? ` _(${cn.label})_` : ''}\n`
-      })
-    }
+  function exportNoteMd() {
+    const title = noteForm.title || t('untitled')
+    const md = `# ${title}\n\n${noteForm.body || ''}`
     const a = Object.assign(document.createElement('a'), {
       href: URL.createObjectURL(new Blob([md], { type: 'text/markdown' })),
-      download: `${canvas.name}.md`,
+      download: `${title}.md`,
     })
     a.click()
   }
 
-  function exportPdf() {
-    const canvas = db[currentId]
-    const PAD = 60
-
-    // Compute world bounding box of all elements
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-    const allCards = canvas?.cards || []
-    const allLabels = canvas?.labels || []
-    const allGroups = canvas?.groups || []
-    const allShapes = canvas?.shapes || []
-    for (const c of allCards) {
-      const w = (c.isImage || c.isIllustration) ? (c.width || 200) : (c.isIcon ? 80 : 130)
-      const h = (c.isImage || c.isIllustration) ? (c.height || 200) : (c.isIcon ? 80 : 74)
-      minX = Math.min(minX, c.x); minY = Math.min(minY, c.y)
-      maxX = Math.max(maxX, c.x + w); maxY = Math.max(maxY, c.y + h)
-    }
-    for (const l of allLabels) {
-      minX = Math.min(minX, l.x); minY = Math.min(minY, l.y)
-      maxX = Math.max(maxX, l.x + (l.width || 200)); maxY = Math.max(maxY, l.y + 40)
-    }
-    for (const g of allGroups) {
-      minX = Math.min(minX, g.x); minY = Math.min(minY, g.y)
-      maxX = Math.max(maxX, g.x + g.width); maxY = Math.max(maxY, g.y + g.height)
-    }
-    for (const s of allShapes) {
-      minX = Math.min(minX, s.x); minY = Math.min(minY, s.y)
-      maxX = Math.max(maxX, s.x + (s.width || 160)); maxY = Math.max(maxY, s.y + (s.height || 100))
-    }
-    if (!isFinite(minX)) return
-
-    const contentW = maxX - minX + PAD * 2
-    const contentH = maxY - minY + PAD * 2
-
-    // Clone the world div (the one with pan/zoom transform)
-    const boardEl = boardRef.current
-    const innerEl = boardEl?.querySelector('[style*="transformOrigin"]')
-    if (!innerEl) return
-    const clone = innerEl.cloneNode(true)
-
-    // Remove interactive overlays (connect dots, resize handles, delete buttons, pills)
-    clone.querySelectorAll('.connect-dot, [title="Drag to scale font size"]').forEach(el => el.remove())
-
-    // Reset transform to align content to (PAD, PAD)
-    clone.style.transform = `translate(${PAD - minX}px, ${PAD - minY}px)`
-    clone.style.position = 'absolute'
-    clone.style.top = '0'
-    clone.style.left = '0'
-
-    const wrapperHtml = `<div style="position:relative;width:${contentW}px;height:${contentH}px">${clone.outerHTML}</div>`
-
-    const cssVars = `
-      --text:#111; --text-muted:#888; --bg:#f8f8f8; --bg-panel:#fff;
-      --border:#e0e0e0; --accent:#378ADD; --btn-bg:#f3f4f6; --btn-text:#333;
-      --sidebar-bg:#fafafa; --grid-dot:#d1d5db;
-    `
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${canvas.name}</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Space+Mono&family=Caveat&family=Lora:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  function exportNotesPdf() {
+    const title = noteForm.title || t('untitled')
+    const bodyHtml = (noteForm.body || '')
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/^#{3} (.+)$/gm,'<h3>$1</h3>')
+      .replace(/^#{2} (.+)$/gm,'<h4>$1</h4>')
+      .replace(/^# (.+)$/gm,'<h5>$1</h5>')
+      .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g,'<em>$1</em>')
+      .replace(/`(.+?)`/g,'<code>$1</code>')
+      .replace(/\n/g,'<br>')
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title>
     <style>
-      :root{${cssVars}}
-      *{box-sizing:border-box}
-      body{margin:0;padding:0;background:#f8f8f8;font-family:system-ui,sans-serif}
-      h1{font-size:14px;font-weight:600;color:#888;padding:12px 20px 0;margin:0}
-      .wrap{background:white;margin:8px;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08)}
-      @media print{
-        body{background:white}
-        .title{display:none}
-        .wrap{margin:0;box-shadow:none;border-radius:0}
-        @page{size:auto;margin:8mm}
-        *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-      }
-    </style></head>
-    <body>
-      <p class="title" style="font-size:13px;color:#888;padding:12px 20px 4px;margin:0">${canvas.name}</p>
-      <div class="wrap">${wrapperHtml}</div>
-    </body></html>`
-
-    const w = window.open('', '_blank')
-    w.document.write(html)
-    w.document.close()
-    w.addEventListener('load', () => { setTimeout(() => w.print(), 300) })
+      body{font-family:system-ui,sans-serif;max-width:700px;margin:0 auto;padding:40px 24px;color:#111}
+      h1{font-size:22px;border-bottom:2px solid #eee;padding-bottom:10px;margin-bottom:28px}
+      h3,h4,h5{font-size:14px;font-weight:600;margin:16px 0 4px}
+      code{background:#f3f4f6;padding:1px 4px;border-radius:3px;font-size:12px}
+      @media print{@page{margin:15mm}body{padding:0}}
+    </style>
+    <script>window.addEventListener('load',()=>setTimeout(()=>window.print(),400))<\/script>
+    </head><body><h1>${title}</h1><div>${bodyHtml}</div></body></html>`
+    const blob = new Blob([html], { type: 'text/html' })
+    window.open(URL.createObjectURL(blob), '_blank')
   }
 
-  function exportPng() {
+  function exportPdf() {
     const canvas = db[currentId]
     const PAD = 60
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
@@ -1342,9 +1237,8 @@ function AppInner({ userId, userEmail }) {
     }
     if (!isFinite(minX)) return
 
-    const contentW = Math.ceil(maxX - minX + PAD * 2)
-    const contentH = Math.ceil(maxY - minY + PAD * 2)
-
+    const contentW = maxX - minX + PAD * 2
+    const contentH = maxY - minY + PAD * 2
     const boardEl = boardRef.current
     const innerEl = boardEl?.querySelector('[style*="transformOrigin"]')
     if (!innerEl) return
@@ -1352,37 +1246,44 @@ function AppInner({ userId, userEmail }) {
     clone.querySelectorAll('.connect-dot, [title="Drag to scale font size"]').forEach(el => el.remove())
     clone.style.transform = `translate(${PAD - minX}px, ${PAD - minY}px)`
     clone.style.position = 'absolute'
-    clone.style.top = '0'
-    clone.style.left = '0'
+    clone.style.top = '0'; clone.style.left = '0'
 
-    const cssVars = `--text:#111;--text-muted:#888;--bg:#f8f8f8;--bg-panel:#fff;--border:#e0e0e0;--accent:#378ADD;--btn-bg:#f3f4f6;--btn-text:#333;`
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${contentW}" height="${contentH}">
-      <foreignObject width="${contentW}" height="${contentH}">
-        <div xmlns="http://www.w3.org/1999/xhtml" style="width:${contentW}px;height:${contentH}px;background:#f8f8f8;position:relative;overflow:hidden">
-          <style>:root{${cssVars}}*{box-sizing:border-box}</style>
-          ${clone.outerHTML}
-        </div>
-      </foreignObject>
-    </svg>`
+    const cssVars = `--text:#111;--text-muted:#888;--bg:#f8f8f8;--bg-panel:#fff;--border:#e0e0e0;--accent:#378ADD;--btn-bg:#f3f4f6;--btn-text:#333;--sidebar-bg:#fafafa;--grid-dot:#d1d5db;`
+    const wrapperHtml = `<div style="position:relative;width:${contentW}px;height:${contentH}px">${clone.outerHTML}</div>`
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${canvas.name}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono&family=Caveat&family=Lora:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <style>
+      :root{${cssVars}}*{box-sizing:border-box}
+      body{margin:0;padding:0;background:#f8f8f8;font-family:system-ui,sans-serif}
+      .wrap{background:white;margin:8px;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+      @media print{body{background:white}.wrap{margin:0;box-shadow:none;border-radius:0}@page{size:auto;margin:8mm}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+    </style>
+    <script>window.addEventListener('load',()=>setTimeout(()=>window.print(),600))<\/script>
+    </head><body>
+      <p style="font-size:13px;color:#888;padding:12px 20px 4px;margin:0">${canvas.name}</p>
+      <div class="wrap">${wrapperHtml}</div>
+    </body></html>`
+    const blob = new Blob([html], { type: 'text/html' })
+    window.open(URL.createObjectURL(blob), '_blank')
+  }
 
-    const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const img = new Image()
-    img.onload = () => {
-      const c = document.createElement('canvas')
-      c.width = contentW; c.height = contentH
-      const ctx = c.getContext('2d')
-      ctx.fillStyle = '#f8f8f8'
-      ctx.fillRect(0, 0, contentW, contentH)
-      ctx.drawImage(img, 0, 0)
-      URL.revokeObjectURL(url)
+  async function exportPng() {
+    const boardEl = boardRef.current
+    if (!boardEl) return
+    const canvas = db[currentId]
+    try {
+      const dataUrl = await toPng(boardEl, {
+        pixelRatio: 2,
+        backgroundColor: '#f8f8f8',
+        filter: node => !node.classList?.contains('connect-dot'),
+      })
       const a = document.createElement('a')
-      a.href = c.toDataURL('image/png')
+      a.href = dataUrl
       a.download = `${canvas.name}.png`
       a.click()
+    } catch (err) {
+      console.error('PNG export failed', err)
     }
-    img.onerror = () => URL.revokeObjectURL(url)
-    img.src = url
   }
 
   // ── list view ─────────────────────────────────────────────────────────────
@@ -3129,7 +3030,7 @@ function AppInner({ userId, userEmail }) {
               onColorChange={color => updateCardFn(activeNoteId, { color })}
               onToggleMode={() => setNotePanelMode(m => m === 'side' ? 'full' : 'side')}
               theme={theme}
-              onExportMd={exportMd}
+              onExportMd={exportNoteMd}
               onExportPdf={exportNotesPdf}
             />
           )}

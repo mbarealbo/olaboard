@@ -48,6 +48,7 @@
 ### Tabelle
 - `boards` – id, user_id, name, created_at
 - `canvases` – id, board_id, parent_id, user_id, name, groups (jsonb), labels (jsonb), shapes (jsonb)
+- `profiles` – id, plan ('free'|'pro'|'god'), created_at, last_active_at (updated silently on app open)
 - `cards` – id, canvas_id, title, body, x, y, is_folder, is_label, color, created_at
 - `connections` – id, canvas_id, from_card_id, to_card_id, label, from_anchor, to_anchor
 
@@ -257,6 +258,26 @@ function exitPoint(entity, isLbl, goingRight, goingDown, isHoriz, isSource) {
 - `showManagePlan` – gestione piano Pro (downgrade a Free, cancella abbonamento)
 - `showDeleteAccount` – eliminazione account con conferma testuale (parola localizzata: "ELIMINA"/"DELETE"/"ELIMINAR"/"LÖSCHEN")
 - `confirmModal` – modale generica riutilizzabile `{ title, message, confirmLabel, danger, onConfirm }` — usata per elimina lavagna, downgrade, cancella abbonamento
+
+## User analytics (admin-only, no content access)
+Query da eseguire su Supabase SQL Editor per vedere attività utenti:
+```sql
+select u.email, p.plan, u.created_at, u.last_sign_in_at, p.last_active_at
+from auth.users u
+join public.profiles p on p.id = u.id
+order by p.last_active_at desc nulls last;
+```
+`last_active_at` viene aggiornato silenziosamente al boot dell'app (`supabase.from('profiles').update({ last_active_at })`). Nessun accesso al contenuto delle lavagne.
+
+## Export
+- **Note panel** (`↓ md` / `↓ pdf`): esporta la nota corrente (`noteForm.title` + `noteForm.body`) come file `.md` o come PDF via Blob URL + `window.print()` embedded nel HTML
+- **Canvas toolbar** (`PDF` / `PNG`): PDF è clone DOM + Blob URL + auto-print; PNG usa `html-to-image` (toPng) che cattura il canvas visibile a 2x pixel ratio
+
+## Privacy
+- RLS su tutte le tabelle: ogni query può accedere solo ai dati del proprio `auth.uid()`
+- Nessuna libreria analytics, nessun SDK di tracking
+- Dati raccolti: email, piano, created_at, last_sign_in_at (Supabase Auth nativo), last_active_at (solo timestamp)
+- Contenuto board: zero-knowledge a livello applicativo
 
 ## Prossimi step
 1. Ricerca full-text tra le idee
