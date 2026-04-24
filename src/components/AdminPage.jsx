@@ -23,6 +23,8 @@ export default function AdminPage() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { navigate('/login', { replace: true }); return }
 
+      supabase.from('profiles').update({ last_active_at: new Date().toISOString() }).eq('id', session.user.id).then(() => {})
+
       const { data, error } = await supabase.rpc('admin_get_users')
       if (error || !data?.length) { navigate('/board', { replace: true }); return }
       setUsers(data)
