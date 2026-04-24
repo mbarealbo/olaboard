@@ -50,7 +50,7 @@ export default function AdminPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: '#f9fafb' }}>
-                {['Email', 'Plan', 'Registered', 'Last login', 'Last active', 'Storage'].map(h => (
+                {['Email', 'Plan', 'Registered', 'Last login', 'Last active', 'Cards', 'Storage'].map(h => (
                   <th key={h} style={{ padding: '10px 16px', fontSize: 11, fontWeight: 700, color: '#9ca3af', letterSpacing: 0.6, textTransform: 'uppercase', textAlign: 'left', borderBottom: '1px solid #e5e7eb' }}>{h}</th>
                 ))}
               </tr>
@@ -67,6 +67,7 @@ export default function AdminPage() {
                     <td style={{ ...cell, color: '#6b7280' }}>{fmt(u.created_at)}</td>
                     <td style={{ ...cell, color: '#6b7280' }}>{fmt(u.last_sign_in_at)}</td>
                     <td style={{ ...cell, color: u.last_active_at ? '#111' : '#9ca3af' }}>{fmt(u.last_active_at)}</td>
+                    <td style={{ ...cell, color: u.card_count > 0 ? '#111' : '#9ca3af' }}>{u.card_count ?? 0}</td>
                     <td style={{ ...cell, color: u.storage_bytes > 0 ? '#111' : '#9ca3af' }}>{fmtMb(u.storage_bytes)}</td>
                   </tr>
                 )

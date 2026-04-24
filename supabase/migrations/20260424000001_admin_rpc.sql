@@ -1,12 +1,13 @@
 create or replace function public.admin_get_users()
 returns table (
-  id         uuid,
-  email      text,
-  plan       text,
-  created_at timestamptz,
+  id              uuid,
+  email           text,
+  plan            text,
+  created_at      timestamptz,
   last_sign_in_at timestamptz,
   last_active_at  timestamptz,
-  storage_bytes   bigint
+  storage_bytes   bigint,
+  card_count      bigint
 )
 language plpgsql
 security definer
@@ -30,10 +31,12 @@ begin
     u.created_at,
     u.last_sign_in_at,
     p.last_active_at,
-    coalesce(
-      sum(nullif(o.metadata->>'size', '')::bigint),
-      0
-    )::bigint as storage_bytes
+    coalesce(sum(nullif(o.metadata->>'size', '')::bigint), 0)::bigint as storage_bytes,
+    coalesce((
+      select count(*)::bigint from public.cards c
+      join public.canvases cv on cv.id = c.canvas_id
+      where cv.user_id = u.id
+    ), 0) as card_count
   from auth.users u
   join public.profiles p on p.id = u.id
   left join storage.objects o
