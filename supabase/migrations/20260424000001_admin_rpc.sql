@@ -33,7 +33,7 @@ begin
     coalesce(
       sum(nullif(o.metadata->>'size', '')::bigint),
       0
-    ) as storage_bytes
+    )::bigint as storage_bytes
   from auth.users u
   join public.profiles p on p.id = u.id
   left join storage.objects o
