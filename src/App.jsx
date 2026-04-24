@@ -19,6 +19,7 @@ import { useHistory } from './hooks/useHistory'
 import { CARD_W, CARD_H_HALF, uid } from './utils'
 import { supabase } from './lib/supabase'
 import AuthPage from './components/AuthPage'
+import AdminPage from './components/AdminPage'
 import OlaboardLogo from './components/OlaboardLogo'
 import LandingPage from './components/LandingPage'
 import PricingPage from './components/PricingPage'
@@ -193,6 +194,7 @@ export default function App() {
       <Route path="/app" element={gate(<PlanProvider userId="local"><AppInner userId="local" userEmail="" /></PlanProvider>)} />
       <Route path="/login" element={gate(<LoginRoute />)} />
       <Route path="/board" element={gate(<BoardRoute />)} />
+      <Route path="/olaops" element={<AdminPage />} />
     </Routes>
   )
 }
