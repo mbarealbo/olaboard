@@ -444,6 +444,18 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
             }),
           })
         } else if (activeAutoCreateRef.current) {
+          const cId = currentIdRef.current
+          const currentConns = dbRef.current[cId]?.connections?.length || 0
+          const maxConns = maxConnectionsRef.current
+          if (maxConns !== Infinity && currentConns >= maxConns) {
+            onLimitReachedRef.current?.('connections')
+            connecting.current = null
+            setConnectLine(null)
+            return
+          }
+          if (maxConns !== Infinity && currentConns >= Math.floor(maxConns * 0.8)) {
+            onNearLimitRef.current?.('connections')
+          }
           const r = getBoardRect()
           const o = offsetRef.current, s = scaleRef.current
           const wx = (e.clientX - r.left - o.x) / s
@@ -451,7 +463,6 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
           const isText = activeToolRef.current === 'text'
           const newId = uid()
           const newConn = { id: uid(), from: fromId, to: newId, fromAnchor, toAnchor, label: '' }
-          const cId = currentIdRef.current
           if (isText) {
             const { fontFamily: lf } = lastLabelStyleRef.current
             const srcLabel = dbRef.current[cId]?.labels?.find(l => l.id === fromId)

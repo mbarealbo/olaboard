@@ -3,7 +3,7 @@ export const LIMITS = {
     boards: 3,
     cardsPerCanvas: 30,
     totalCanvases: 10,
-    connectionsPerCanvas: 15,
+    connectionsPerCanvas: 30,
     storageMB: 20,
   },
   pro: {

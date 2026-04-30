@@ -45,7 +45,7 @@ Sync across devices via Supabase. Sign in with **email and password** or **Googl
 | **Boards** | 3 | Unlimited | Unlimited |
 | **Cards per canvas** | 30 | Unlimited | Unlimited |
 | **Total canvases** | 10 | Unlimited | Unlimited |
-| **Connections per canvas** | 15 | Unlimited | Unlimited |
+| **Connections per canvas** | 30 | Unlimited | Unlimited |
 | **Storage** | 20 MB | 100 MB | Your own Supabase |
 | **Notes** | Unlimited | Unlimited | Unlimited |
 | **Sync across devices** | ✓ | ✓ | ✓ |
