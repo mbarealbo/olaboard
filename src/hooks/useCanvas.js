@@ -31,11 +31,19 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
   const multiSelectedRef = useRef([])
   const pushCommandRef = useRef(pushCommand)
   const lastLabelStyleRef = useRef({ fontFamily: 'sans', fontSize: 16 })
+  const maxCardsRef = useRef(maxCardsPerCanvas)
+  const maxConnectionsRef = useRef(maxConnectionsPerCanvas)
+  const onLimitReachedRef = useRef(onLimitReached)
+  const onNearLimitRef = useRef(onNearLimit)
 
   useEffect(() => { offsetRef.current = offset }, [offset])
   useEffect(() => { scaleRef.current = scale }, [scale])
   useEffect(() => { dbRef.current = db }, [db])
   useEffect(() => { pushCommandRef.current = pushCommand }, [pushCommand])
+  useEffect(() => { maxCardsRef.current = maxCardsPerCanvas }, [maxCardsPerCanvas])
+  useEffect(() => { maxConnectionsRef.current = maxConnectionsPerCanvas }, [maxConnectionsPerCanvas])
+  useEffect(() => { onLimitReachedRef.current = onLimitReached }, [onLimitReached])
+  useEffect(() => { onNearLimitRef.current = onNearLimit }, [onNearLimit])
 
   // ── world-to-screen ───────────────────────────────────────────────────────
   function w2s(wx, wy) {
@@ -407,14 +415,15 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
         if (toId) {
           const cId = currentIdRef.current
           const currentConns = dbRef.current[cId]?.connections?.length || 0
-          if (maxConnectionsPerCanvas !== Infinity && currentConns >= maxConnectionsPerCanvas) {
-            onLimitReached?.('connections')
+          const maxConns = maxConnectionsRef.current
+          if (maxConns !== Infinity && currentConns >= maxConns) {
+            onLimitReachedRef.current?.('connections')
             connecting.current = null
             setConnectLine(null)
             return
           }
-          if (maxConnectionsPerCanvas !== Infinity && currentConns >= Math.floor(maxConnectionsPerCanvas * 0.8)) {
-            onNearLimit?.('connections')
+          if (maxConns !== Infinity && currentConns >= Math.floor(maxConns * 0.8)) {
+            onNearLimitRef.current?.('connections')
           }
           const newConn = { id: uid(), from: fromId, to: toId, fromAnchor, toAnchor, label: '' }
           setDb(prev => {
@@ -1041,12 +1050,13 @@ export function useCanvas({ db, setDb, currentIdRef, updateCardFn, addConnection
     const cId = currentIdRef.current
     const currentCards = db[cId]?.cards || []
     const nonLabelCount = currentCards.filter(c => !c.isLabel).length
-    if (nonLabelCount >= maxCardsPerCanvas) {
-      onLimitReached?.('cardsPerCanvas')
+    const maxCards = maxCardsRef.current
+    if (nonLabelCount >= maxCards) {
+      onLimitReachedRef.current?.('cardsPerCanvas')
       return null
     }
-    if (maxCardsPerCanvas !== Infinity && nonLabelCount >= Math.floor(maxCardsPerCanvas * 0.8)) {
-      onNearLimit?.('cardsPerCanvas')
+    if (maxCards !== Infinity && nonLabelCount >= Math.floor(maxCards * 0.8)) {
+      onNearLimitRef.current?.('cardsPerCanvas')
     }
     const card = { id: uid(), title: '', body: '', x: wx, y: wy, isFolder: false }
     setDb(prev => {
