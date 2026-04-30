@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { toPng } from 'html-to-image'
 import { useLang } from './contexts/LangContext'
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { Trash2, Moon, Sun, Monitor, Zap, Folder, LogOut, Maximize2, Undo2, Redo2, User, MousePointerClick, Search, PenLine, ImageIcon, Square } from 'lucide-react'
 import BlockEditor from './components/BlockEditor'
 import PostIt from './components/PostIt'
+import TagPicker from './components/TagPicker'
 import ImageCard from './components/ImageCard'
 import IconCard from './components/IconCard'
 import IconPicker from './components/IconPicker'
@@ -51,6 +52,7 @@ import {
 } from './lib/db'
 
 const STACK_KEY = 'olaboard_stack'
+const isPostIt = c => !c.isFolder && !c.isLabel && !c.isImage && !c.isIcon && !c.isIllustration
 
 // ─── FolderTree ───────────────────────────────────────────────────────────────
 function FolderTree({ db, currentId, onNavigate, id, depth, theme, collapsedIds, onToggleCollapse, sidebarFocusId, skipSelf }) {
@@ -289,6 +291,7 @@ function AppInner({ userId, userEmail }) {
   const [deleteError, setDeleteError] = useState(null)
   const [confirmModal, setConfirmModal] = useState(null)
   const [showShortcuts, setShowShortcuts] = useState(() => localStorage.getItem('olaboard_shortcuts') !== '0')
+  const [filterTag, setFilterTag] = useState(null)
   const [showSearch, setShowSearch] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState([])
@@ -331,7 +334,7 @@ function AppInner({ userId, userEmail }) {
 
   // ── map Supabase rows → app shape ─────────────────────────────────────────
   function mapCard(row) {
-    return { id: row.id, title: row.title || '', body: row.body || '', x: row.x, y: row.y, isFolder: row.is_folder || false, isLabel: row.is_label || false, color: row.color || 'yellow', createdAt: row.created_at, updatedAt: row.updated_at || row.created_at, url: row.url || null, width: row.width || null, height: row.height || null, isImage: !!(row.url) && row.node_type !== 'icon', nodeType: row.node_type || 'postit', isIcon: row.node_type === 'icon', isIllustration: row.node_type === 'illustration' }
+    return { id: row.id, title: row.title || '', body: row.body || '', x: row.x, y: row.y, isFolder: row.is_folder || false, isLabel: row.is_label || false, color: row.color || 'yellow', createdAt: row.created_at, updatedAt: row.updated_at || row.created_at, url: row.url || null, width: row.width || null, height: row.height || null, isImage: !!(row.url) && row.node_type !== 'icon', nodeType: row.node_type || 'postit', isIcon: row.node_type === 'icon', isIllustration: row.node_type === 'illustration', tag: row.tag || null }
   }
 
   // ── image upload helpers ───────────────────────────────────────────────────
@@ -676,6 +679,32 @@ function AppInner({ userId, userEmail }) {
   const currentCanvas = db[currentId] || { cards: [], connections: [], groups: [], labels: [], shapes: [] }
   const cards = currentCanvas.cards
   const connections = currentCanvas.connections
+
+  const allTags = useMemo(() => {
+    const tagMap = {}
+    for (const canvas of Object.values(db)) {
+      for (const card of canvas?.cards || []) {
+        if (card.tag && !card.isFolder && !card.isLabel) {
+          tagMap[card.tag] = (tagMap[card.tag] || 0) + 1
+        }
+      }
+    }
+    return Object.entries(tagMap).sort(([a], [b]) => a.localeCompare(b))
+  }, [db])
+
+  const tagModalItems = useMemo(() => {
+    if (!filterTag) return []
+    const items = []
+    for (const canvas of Object.values(db)) {
+      if (!canvas?.cards) continue
+      for (const card of canvas.cards) {
+        if (card.tag === filterTag && isPostIt(card)) {
+          items.push({ id: card.id, title: card.title, canvasId: canvas.id, canvasName: canvas.name || canvas.id })
+        }
+      }
+    }
+    return items.sort((a, b) => (a.title || '').localeCompare(b.title || ''))
+  }, [db, filterTag])
   const groups = currentCanvas.groups || []
   const labels = currentCanvas.labels || []
   const shapes = currentCanvas.shapes || []
@@ -1470,6 +1499,31 @@ function AppInner({ userId, userEmail }) {
               )
             })}
           </div>
+          {/* Tags section */}
+          {allTags.length > 0 && (
+            <div style={{ borderTop: '1px solid var(--border)', padding: '10px 12px 6px', flexShrink: 0 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 }}>Tags</div>
+              {allTags.map(([tag, count]) => (
+                <button
+                  key={tag}
+                  onClick={() => setFilterTag(tag)}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    width: '100%', textAlign: 'left', padding: '4px 8px', borderRadius: 6,
+                    border: 'none', background: 'transparent',
+                    color: 'var(--text)', cursor: 'pointer', fontSize: 12,
+                    fontFamily: 'inherit', marginBottom: 1,
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'var(--border)' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+                >
+                  <span>#{tag}</span>
+                  <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{count}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Bottom fixed section */}
           <div style={{ borderTop: '1px solid var(--border)', flexShrink: 0 }}>
             <button
@@ -1587,6 +1641,12 @@ function AppInner({ userId, userEmail }) {
                       style={{ width: 16, height: 16, borderRadius: '50%', background: COLOR_HEX[c], border: cur === c ? '2.5px solid var(--accent)' : '1.5px solid rgba(0,0,0,0.12)', cursor: 'pointer', padding: 0, flexShrink: 0 }}
                     />
                   ))}
+                  <div style={{ width: 1, height: 14, background: 'var(--border)', margin: '0 2px' }} />
+                  <TagPicker
+                    tag={card.tag || null}
+                    allTags={allTags}
+                    onChange={val => updateCardFn(selected, { tag: val })}
+                  />
                 </div>
               )
             }
@@ -1936,6 +1996,45 @@ function AppInner({ userId, userEmail }) {
                     {t('searchHint')}
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tag modal */}
+        {filterTag && (
+          <div onMouseDown={() => setFilterTag(null)} style={{ position: 'fixed', inset: 0, zIndex: 10001, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+            <div onMouseDown={e => e.stopPropagation()} style={{ background: 'var(--bg-panel)', borderRadius: 14, width: '100%', maxWidth: 480, maxHeight: '70vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 64px rgba(0,0,0,0.18)', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif', overflow: 'hidden' }}>
+              <div style={{ padding: '18px 20px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+                <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>#{filterTag}</span>
+                <button onClick={() => setFilterTag(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 20, lineHeight: 1, padding: '2px 6px', borderRadius: 6 }}
+                  onMouseEnter={e => { e.currentTarget.style.color = 'var(--text)' }}
+                  onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)' }}
+                >×</button>
+              </div>
+              <div style={{ overflowY: 'auto', padding: '10px 12px' }}>
+                {tagModalItems.length === 0 && (
+                  <p style={{ fontSize: 13, color: 'var(--text-muted)', padding: '12px 8px' }}>Nessun elemento con questo tag.</p>
+                )}
+                {tagModalItems.map(item => (
+                  <div
+                    key={item.id}
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 8, cursor: 'pointer', marginBottom: 2 }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--border)' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+                    onClick={async () => {
+                      setFilterTag(null)
+                      await handleSidebarNavigate(item.canvasId)
+                      setSelected(item.id)
+                      setView('canvas')
+                    }}
+                  >
+                    <span style={{ fontSize: 14, color: 'var(--text)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>
+                      {item.title || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Senza titolo</span>}
+                    </span>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 120 }}>{item.canvasName}</span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>

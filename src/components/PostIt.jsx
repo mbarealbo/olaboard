@@ -64,6 +64,8 @@ export default function PostIt({ card, selected, onMouseDown, onClick, onDblClic
   const [hovered, setHovered] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const isHC = theme === 'high-contrast'
+  const lastMouseDownRef = useRef(0)
+  const pendingDblClickRef = useRef(false)
 
   const bg = card.isFolder
     ? (isHC ? '#ff00ff' : COLOR_MAP.orange)
@@ -73,7 +75,22 @@ export default function PostIt({ card, selected, onMouseDown, onClick, onDblClic
 
   const textColor = getTextColor(bg)
 
+  function handleMouseDown(e) {
+    const now = Date.now()
+    if (now - lastMouseDownRef.current < 300) {
+      pendingDblClickRef.current = true
+      e.stopPropagation()
+      onDblClick(e)
+      lastMouseDownRef.current = 0
+      return
+    }
+    lastMouseDownRef.current = now
+    pendingDblClickRef.current = false
+    onMouseDown(e)
+  }
+
   function startEdit(e) {
+    if (pendingDblClickRef.current) return
     if (e) e.stopPropagation()
     const el = titleRef.current
     if (el.contentEditable === 'true') return
@@ -104,9 +121,8 @@ export default function PostIt({ card, selected, onMouseDown, onClick, onDblClic
       data-card-id={card.id}
       className={`postit${card.isFolder ? ' is-folder' : ''}${selected ? ' selected' : ''}`}
       style={{ left: card.x, top: card.y, zIndex: 2, ...(bg ? { background: bg } : {}) }}
-      onMouseDown={onMouseDown}
+      onMouseDown={handleMouseDown}
       onClick={onClick}
-      onDoubleClick={onDblClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
@@ -136,7 +152,6 @@ export default function PostIt({ card, selected, onMouseDown, onClick, onDblClic
         data-placeholder={t('untitled')}
         style={{ color: textColor, fontWeight: isEditing ? 500 : 700 }}
         onClick={startEdit}
-        onDoubleClick={e => e.stopPropagation()}
         onBlur={commitEdit}
         onKeyDown={e => {
           e.stopPropagation()
@@ -155,6 +170,12 @@ export default function PostIt({ card, selected, onMouseDown, onClick, onDblClic
           <BodyPreview body={card.body} textColor={textColor} />
         </div>
       ) : null}
+
+      {card.tag && !card.isFolder && (
+        <div style={{ fontSize: 9, color: `${textColor}88`, marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: 0.2 }}>
+          #{card.tag}
+        </div>
+      )}
 
       <div className="postit-actions">
         <button className="paction" title={t('openNote')} onMouseDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onNoteOpen() }}><FileText size={12} /></button>
